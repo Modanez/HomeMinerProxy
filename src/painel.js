@@ -7,12 +7,18 @@ const https = require('https');
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const { pickLang, localizePage, LOCALES, WIDGET } = require('./i18n');
 
 // ---------------------------------------------------------------- configuração
 const PORT = Number(process.env.PORT || 3000);
+// Idioma padrão do painel e do widget: pt-BR ou en. Vazio = idioma do navegador. ?lang=pt|en força na URL.
+const LANGUAGE = normLang(process.env.LANGUAGE);
+// Moeda dos valores em dinheiro (cotação, prêmio, conta de luz): BRL ou USD. A tarifa TARIFA_KWH é nessa moeda.
+const CURRENCY = /^(BRL|USD)$/i.test(process.env.CURRENCY || '') ? process.env.CURRENCY.toUpperCase() : (LANGUAGE === 'pt' ? 'BRL' : 'USD');
+function normLang(v) { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; }
 const ADDRESS = (process.env.BTC_ADDRESS || '').trim();
 if (!ADDRESS) {
-  console.error('Defina BTC_ADDRESS (o endereço que os mineradores usam como usuário). Veja config/mineracao.env.example.');
+  console.error('Set BTC_ADDRESS (the address your miners use as username) / Defina BTC_ADDRESS. See config/mineracao.env.example.');
   process.exit(1);
 }
 const LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
@@ -253,7 +259,7 @@ function sampleHistory() {
 }
 
 // ---------------------------------------------------------------- carteira e cotação
-let wallet = { at: 0, okAt: 0, sats: null, pendingSats: 0, txCount: 0, brl: null, usd: null, change24h: null, error: null };
+let wallet = { at: 0, okAt: 0, sats: null, pendingSats: 0, txCount: 0, brl: null, usd: null, change24h: null, changeUsd24h: null, error: null };
 
 async function tickWallet() {
   wallet.at = Date.now();
@@ -268,19 +274,22 @@ async function tickWallet() {
   } catch (e) {
     wallet.error = e.message;
   }
-  // Cotação: CoinGecko e, se falhar, Binance (BTC/BRL). Mantém a última se ambas falharem.
+  // Cotação: CoinGecko e, se falhar, Binance (BTC/BRL e BTC/USDT). Mantém a última se ambas falharem.
   try {
     const p = await getJsonRetry('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl,usd&include_24hr_change=true', 2);
     if (!(p.bitcoin && p.bitcoin.brl)) throw new Error('sem cotação');
     wallet.brl = p.bitcoin.brl;
     wallet.usd = p.bitcoin.usd;
     wallet.change24h = Number.isFinite(p.bitcoin.brl_24h_change) ? p.bitcoin.brl_24h_change : null;
+    wallet.changeUsd24h = Number.isFinite(p.bitcoin.usd_24h_change) ? p.bitcoin.usd_24h_change : null;
   } catch (_) {
-    try {
-      const b = await getJsonRetry('https://api.binance.com/api/v3/ticker/24hr?symbol=BTCBRL', 2);
-      const v = Number(b.lastPrice);
-      if (v > 0) { wallet.brl = v; wallet.change24h = Number(b.priceChangePercent); }
-    } catch (_) { /* mantém a última cotação */ }
+    for (const [sym, key, chg] of [['BTCBRL', 'brl', 'change24h'], ['BTCUSDT', 'usd', 'changeUsd24h']]) {
+      try {
+        const b = await getJsonRetry(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`, 2);
+        const v = Number(b.lastPrice);
+        if (v > 0) { wallet[key] = v; wallet[chg] = Number(b.priceChangePercent); }
+      } catch (_) { /* mantém a última cotação */ }
+    }
   }
 }
 
@@ -641,7 +650,7 @@ function snapshot() {
       lastShare: proxyUp() ? proxy.recent.find((r) => r.ok) || null : null,
       poolHashrate: Number((client.accounting || {}).hashRateLastHour) || 0,
     },
-    wallet,
+    wallet: { ...wallet, fiat: CURRENCY === 'USD' ? wallet.usd : wallet.brl, fiatChange24h: CURRENCY === 'USD' ? wallet.changeUsd24h : wallet.change24h },
     net: { ...net, halving },
     timeMachine: timeMachine(best),
     nearBlock: {
@@ -850,7 +859,7 @@ const PAGE = `<!doctype html>
   </div>
   <div class="card wallet">
     <div><div class="label">Carteira</div><div class="big gold" id="wbtc">–</div><div class="sub" id="wsats">–</div></div>
-    <div><div class="label">Em reais</div><div class="big" id="wbrl">–</div><div class="sub" id="wprice">–</div></div>
+    <div><div class="label">Valor</div><div class="big" id="wfiat">–</div><div class="sub" id="wprice">–</div></div>
     <div><div class="label">Movimentação</div><div class="big" id="wtx">–</div><div class="sub" id="wpend">–</div></div>
   </div>
   <div class="err" id="werr"></div>
@@ -869,7 +878,7 @@ const PAGE = `<!doctype html>
     <div class="card">
       <div class="label">Prêmio em jogo</div>
       <div class="lead">Se a fazenda achar o próximo bloco, leva</div>
-      <div class="big gold" id="prizeBRL">–</div>
+      <div class="big gold" id="prizeFiat">–</div>
       <div class="sub" id="prizeS">–</div>
       <div class="sub" id="priceS">–</div>
     </div>
@@ -940,6 +949,7 @@ const PAGE = `<!doctype html>
 </div>
 
 <script>
+const LOC = '__LOC__', CUR = '__CUR__';   // preenchidos pelo servidor (idioma e moeda)
 const kiosk = new URLSearchParams(location.search).has('kiosk');
 if (kiosk) document.body.classList.add('kiosk');
 
@@ -947,13 +957,13 @@ const $ = (id) => document.getElementById(id);
 const set = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
 // nomes de worker vêm do usuário do minerador (qualquer um na rede pode escolher): sempre escapar antes de ir para HTML
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
-const nf = (n, d = 0) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: d });
+const nf = (n, d = 0) => Number(n).toLocaleString(LOC, { maximumFractionDigits: d });
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const mesAno = (ms) => { const d = new Date(ms); return MESES[d.getMonth()] + '/' + d.getFullYear(); };
-const diaMes = (ms) => new Date(ms).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
-const hora = (ms) => new Date(ms).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-const brl = (v) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const brlCompact = (v) => v >= 1e6 ? 'R$ ' + nf(v / 1e6, 2) + ' mi' : brl(v);
+const diaMes = (ms) => new Date(ms).toLocaleDateString(LOC, { day: '2-digit', month: '2-digit' });
+const hora = (ms) => new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
+const money = (v) => v.toLocaleString(LOC, { style: 'currency', currency: CUR });
+const moneyCompact = (v) => v >= 1e6 ? v.toLocaleString(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 2 }) : money(v);
 
 function fmtHash(h) {
   const u = ['H/s','kH/s','MH/s','GH/s','TH/s','PH/s','EH/s']; let i = 0;
@@ -975,6 +985,7 @@ function dur(ms) {
   return nf(d, d < 10 ? 1 : 0) + ' dias';
 }
 const ago = (t) => t ? dur(Date.now() - new Date(t).getTime()) : '–';
+const agoTxt = (t) => { const a = ago(t); return a === 'agora' ? a : 'há ' + a; };   // "há 5 min" / "agora"
 function odds(hashrate, D) {
   if (!(hashrate > 0)) return null;
   const secs = D * 4294967296 / hashrate;
@@ -1150,10 +1161,10 @@ function renderWallet(w) {
   set('werr', w.error && w.sats === null ? 'Saldo indisponível: ' + w.error : '');
   if (w.sats === null) return;
   const btc = w.sats / 1e8;
-  set('wbtc', btc.toLocaleString('pt-BR', { minimumFractionDigits: 8, maximumFractionDigits: 8 }) + ' BTC');
+  set('wbtc', btc.toLocaleString(LOC, { minimumFractionDigits: 8, maximumFractionDigits: 8 }) + ' BTC');
   const oc = lastOcean;
   set('wsats', nf(w.sats) + ' sats' + (oc && oc.unpaidSats > 0 ? ' · +' + nf(oc.unpaidSats) + ' a receber na OCEAN' : ''));
-  if (w.brl) { set('wbrl', brl(btc * w.brl)); set('wprice', '1 BTC = ' + brl(w.brl)); }
+  if (w.fiat) { set('wfiat', money(btc * w.fiat)); set('wprice', '1 BTC = ' + money(w.fiat)); }
   set('wtx', nf(w.txCount) + (w.txCount === 1 ? ' transação' : ' transações'));
   set('wpend', w.pendingSats ? (w.pendingSats > 0 ? '+' : '') + nf(w.pendingSats) + ' sats pendentes' : 'nada pendente');
 }
@@ -1162,7 +1173,7 @@ function renderNet(j) {
   const n = j.net || {}, w = j.wallet || {};
   if (n.tip) {
     set('tipH', '#' + nf(n.tip.height));
-    set('tipS', 'há ' + ago(n.tip.time * 1000) + (n.tip.pool ? ' · ' + n.tip.pool : ''));
+    set('tipS', agoTxt(n.tip.time * 1000) + (n.tip.pool ? ' · ' + n.tip.pool : ''));
   }
   if (n.adj && Number.isFinite(n.adj.change)) {
     set('adjC', (n.adj.change >= 0 ? '+' : '') + nf(n.adj.change, 1) + '%');
@@ -1179,12 +1190,12 @@ function renderNet(j) {
   }
   if (n.prize) {
     const btc = n.prize.sats / 1e8;
-    set('prizeBRL', w.brl ? brlCompact(btc * w.brl) : nf(btc, 3) + ' BTC');
+    set('prizeFiat', w.fiat ? moneyCompact(btc * w.fiat) : nf(btc, 3) + ' BTC');
     set('prizeS', nf(btc, 3) + ' BTC: 3,125 de recompensa + ' + nf(n.prize.feesSats / 1e8, 3) + ' em taxas (média dos últimos blocos)');
   }
-  if (w.brl) {
-    const c = w.change24h;
-    set('priceS', '1 BTC = ' + brl(w.brl) + (Number.isFinite(c) ? ' · ' + (c >= 0 ? '▲ +' : '▼ ') + nf(c, 1) + '% em 24 h' : ''));
+  if (w.fiat) {
+    const c = w.fiatChange24h;
+    set('priceS', '1 BTC = ' + money(w.fiat) + (Number.isFinite(c) ? ' · ' + (c >= 0 ? '▲ +' : '▼ ') + nf(c, 1) + '% em 24 h' : ''));
   }
   const tm = j.timeMachine, best = j.farm.best;
   if (tm && tm.now) {
@@ -1311,8 +1322,8 @@ function renderHistory(j) {
 
   const e = j.energy || {}, od = odds(j.farm.hashrate, j.farm.difficulty);
   if (e.parts) {
-    set('enC', brl(e.costMonth) + '/mês');
-    set('enS', nf(e.watts) + ' W · ' + nf(e.kwhMonth) + ' kWh/mês · ' + brl(e.tarifa) + '/kWh');
+    set('enC', money(e.costMonth) + '/mês');
+    set('enS', nf(e.watts) + ' W · ' + nf(e.kwhMonth) + ' kWh/mês · ' + money(e.tarifa) + '/kWh');
     set('enJ', od ? 'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄' : '');
   }
 }
@@ -1336,9 +1347,9 @@ function narrate(j) {
   }
   if (f.best > 0) out.push('Faltam só ' + fmtBig(f.difficulty / f.best) + ' de vezes. Já já sai.');
   if (e.costMonth > 0) {
-    out.push('Luz: ' + brl(e.costMonth) + '/mês. Lucro: R$ 0,00. Negócio impecável.');
-    if (n.prize && w.brl) {
-      const anos = (n.prize.sats / 1e8 * w.brl) / (e.costMonth * 12);
+    out.push('Luz: ' + money(e.costMonth) + '/mês. Lucro: ' + money(0) + '. Negócio impecável.');
+    if (n.prize && w.fiat) {
+      const anos = (n.prize.sats / 1e8 * w.fiat) / (e.costMonth * 12);
       out.push('Se o bloco sair, a conta de luz fica paga por ' + fmtBig(anos) + ' anos.');
     }
   }
@@ -1358,9 +1369,9 @@ function narrate(j) {
   }
   const sh = (f.accounting || {}).acceptedSharesLastDay;
   if (sh > 0) out.push('Já foram ' + nf(sh) + ' shares hoje. Nenhum virou bloco. Ainda.');
-  if (w.sats != null && w.brl) {
-    const v = w.sats / 1e8 * w.brl;
-    out.push('Saldo: ' + brl(v) + (v < 6 ? '. Dá pra um cafezinho? Não.' : '. Dá pra um pão de queijo, no máximo.'));
+  if (w.sats != null && w.fiat) {
+    const v = w.sats / 1e8 * w.fiat;
+    out.push('Saldo: ' + money(v) + (v < 6 ? '. Dá pra um cafezinho? Não.' : '. Dá pra um pão de queijo, no máximo.'));
   }
   if (n.halving) out.push('Faltam ' + nf(n.halving.remaining) + ' blocos pro halving. Aí o prêmio cai pela metade.');
   out.push('Nenhum bloco encontrado hoje. Igual a ontem. E anteontem.');
@@ -1475,7 +1486,7 @@ async function load() {
       celebrate({ worker: 'teste', value: j.farm.best || 1, farm: true, test: true, t: Date.now() }, j);
     }
     const upAt = Math.max(j.okAt || 0, (j.proxy && j.proxy.okAt) || 0);
-    if (upAt) set('upd', 'atualizado ' + new Date(upAt).toLocaleTimeString('pt-BR'));
+    if (upAt) set('upd', 'atualizado ' + new Date(upAt).toLocaleTimeString(LOC));
   } catch (e) {
     set('err', 'Sem conexão com o servidor local.');
   }
@@ -1487,17 +1498,16 @@ load(); setInterval(load, 20000);
 </html>`;
 
 // ---------------------------------------------------------------- resumo para widget
-const fmtNum = (n, d = 0) => Number(n).toLocaleString('pt-BR', { maximumFractionDigits: d });
-function fmtBigBR(n) {
-  for (const [v, w] of [[1e12, 'tri'], [1e9, 'bi'], [1e6, 'mi'], [1e3, 'mil']]) if (n >= v) return fmtNum(n / v, 1) + ' ' + w;
-  return fmtNum(n);
-}
-function fmtHashBR(h) {
-  const u = ['H/s', 'kH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s']; let i = 0;
-  while (h >= 1000 && i < u.length - 1) { h /= 1000; i++; }
-  return fmtNum(h, h < 10 ? 2 : 1) + ' ' + u[i];
-}
-function widgetData() {
+// As chaves do JSON ficam em português (o preset do KWGT usa esses nomes); os valores seguem o idioma.
+function widgetData(lang) {
+  const loc = LOCALES[lang] || LOCALES.en, W = WIDGET[lang] || WIDGET.en;
+  const fmtNum = (n, d = 0) => Number(n).toLocaleString(loc, { maximumFractionDigits: d });
+  const fmtBigW = (n) => { for (const [v, w] of W.big) if (n >= v) return fmtNum(n / v, 1) + ' ' + w; return fmtNum(n); };
+  const fmtHashW = (h) => {
+    const u = ['H/s', 'kH/s', 'MH/s', 'GH/s', 'TH/s', 'PH/s']; let i = 0;
+    while (h >= 1000 && i < u.length - 1) { h /= 1000; i++; }
+    return fmtNum(h, h < 10 ? 2 : 1) + ' ' + u[i];
+  };
   const snap = snapshot();
   const f = snap.farm;
   const holder = snap.hall[0];
@@ -1508,15 +1518,16 @@ function widgetData() {
     recorde: fmtNum(f.best, 2),
     recordeNum: f.best,
     recordista: holder ? holder.worker : '',
-    faltam: f.best > 0 ? fmtBigBR(f.difficulty / f.best) + ' de vezes' : '',
-    hashrate: fmtHashBR(f.hashrate),
+    faltam: f.best > 0 ? fmtBigW(f.difficulty / f.best) + W.times : '',
+    hashrate: fmtHashW(f.hashrate),
     minerando: f.workers.filter((w) => w.state === 'ok' || w.state === 'quiet').length,
-    chance: perYear ? '1 em ' + fmtBigBR(perYear) : '',
-    atualizado: lastAt ? new Date(lastAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+    chance: perYear ? W.oneIn + fmtBigW(perYear) : '',
+    atualizado: lastAt ? new Date(lastAt).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) : '',
   };
 }
 
 // ---------------------------------------------------------------- servidor e coletas
+const pageCache = {};   // página já traduzida, por idioma
 function every(fn, ms) {
   let busy = false;
   const run = async () => {
@@ -1532,7 +1543,7 @@ http.createServer((req, res) => {
   if (req.url.startsWith('/api/widget')) {
     // resumo enxuto e já formatado, para widgets (KWGT etc.)
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify(widgetData()));
+    return res.end(JSON.stringify(widgetData(pickLang(req, LANGUAGE))));
   }
   if (req.url.startsWith('/api/alarm')) {
     // teste manual: /api/alarm?e=T (recorde), P, S, 0, 1 ou 2
@@ -1545,8 +1556,10 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(snapshot()));
   }
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store' });
-  res.end(PAGE);
+  const lang = pickLang(req, LANGUAGE);
+  const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY));
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Language': LOCALES[lang] });
+  res.end(html);
 }).listen(PORT, '0.0.0.0', () => {
   console.log(`Painel de mineração em http://0.0.0.0:${PORT}`);
   every(tickPool, POOL_MS);

@@ -25,7 +25,18 @@ class TestCubo(unittest.TestCase):
             'recentRecords': [],
         }
 
+    def tearDown(self):
+        cubo.LANG = 'en'
+
+    def test_formatacao_en(self):
+        cubo.LANG = 'en'
+        self.assertEqual(cubo.br(1889.37, 2), '1,889.37')
+        self.assertEqual(cubo.diff(0.003214), '0.00321')
+        self.assertEqual(cubo.big(78.5e9), '78.5 B')
+        self.assertEqual(cubo.tx('new'), 'NEW RECORD!')
+
     def test_formatacao(self):
+        cubo.LANG = 'pt'
         self.assertEqual(cubo.br(1889.37, 2), '1.889,37')
         self.assertEqual(cubo.diff(0.003214), '0,00321')
         self.assertEqual(cubo.diff(38.76), '38,76')
@@ -34,11 +45,13 @@ class TestCubo(unittest.TestCase):
 
     def test_telas_240x240(self):
         j = self.sample()
-        for img in (cubo.draw_board(j), cubo.draw_party({'worker': 'vovo', 'value': 38.76}, j)):
-            self.assertEqual(img.size, (240, 240))
-            data = cubo.jpeg(img)
-            self.assertEqual(data[:2], b'\xff\xd8')
-            self.assertLess(len(data), 400 * 1024)
+        for lang in ('pt', 'en'):
+            cubo.LANG = lang
+            for img in (cubo.draw_board(j), cubo.draw_party({'worker': 'vovo', 'value': 38.76}, j)):
+                self.assertEqual(img.size, (240, 240))
+                data = cubo.jpeg(img)
+                self.assertEqual(data[:2], b'\xff\xd8')
+                self.assertLess(len(data), 400 * 1024)
 
     def test_recorde_novo_so_depois_da_primeira_leitura(self):
         enviados = []

@@ -12,6 +12,17 @@ EVERY_S = int(os.environ.get('CUBE_EVERY_S', '300'))   # atualização normal: a
 CHECK_S = 60                                           # recorde novo é checado a cada minuto
 PARTY_S = 10 * 60                                      # tela de recorde fica 10 min
 NAME = 'fazenda.jpg'
+LANG = 'pt' if os.environ.get('LANGUAGE', '').lower().startswith('pt') else 'en'   # pt-BR ou en (padrão)
+
+STRINGS = {
+    'pt': {'farm': 'FAZENDA', 'record': 'RECORDE', 'by': 'por ', 'togo': 'faltam {} de vezes',
+           'nobody': 'ninguém minerando :(', 'new': 'NOVO RECORDE!', 'now': 'agora',
+           'big': ((1e12, 'tri'), (1e9, 'bi'), (1e6, 'mi'), (1e3, 'mil'))},
+    'en': {'farm': 'FARM', 'record': 'RECORD', 'by': 'by ', 'togo': '{} times to go',
+           'nobody': 'nobody mining :(', 'new': 'NEW RECORD!', 'now': 'now',
+           'big': ((1e12, 'T'), (1e9, 'B'), (1e6, 'M'), (1e3, 'k'))},
+}
+def tx(key): return STRINGS[LANG][key]
 STATE = os.path.join(os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(__file__)), 'cubo-state.json')
 
 from PIL import Image, ImageDraw, ImageFont
@@ -42,18 +53,18 @@ def fit(d, text, bold, max_w, start, minimum=10):
     while s > minimum and width(d, text, font(s, bold)) > max_w: s -= 1
     return font(s, bold)
 
-# ---------------------------------------------------------------- formatação pt-BR
+# ---------------------------------------------------------------- formatação (pt-BR: 1.889,37 · en: 1,889.37)
 def br(n, dec=0):
     s = f'{n:,.{dec}f}'
-    return s.replace(',', '#').replace('.', ',').replace('#', '.')
+    return s if LANG == 'en' else s.replace(',', '#').replace('.', ',').replace('#', '.')
 
 def diff(n):
     if n is None: return '–'
-    if n < 1: return br(float(f'{n:.3g}'), 6).rstrip('0').rstrip(',')
+    if n < 1: return br(float(f'{n:.3g}'), 6).rstrip('0').rstrip(',.')
     return br(n, 2 if n < 1e4 else 0)
 
 def big(n):
-    for v, w in ((1e12, 'tri'), (1e9, 'bi'), (1e6, 'mi'), (1e3, 'mil')):
+    for v, w in tx('big'):
         if n >= v: return br(n / v, 1) + ' ' + w
     return br(n)
 
@@ -64,7 +75,7 @@ def hashrate(h):
 
 def ago(ms):
     m = (time.time() * 1000 - ms) / 60000
-    if m < 1: return 'agora'
+    if m < 1: return tx('now')
     if m < 60: return f'{int(m)} min'
     return br(m / 60, 1) + ' h'
 
@@ -72,19 +83,19 @@ def ago(ms):
 def draw_board(j):
     f = j['farm']
     img = Image.new('RGB', (240, 240), BG); d = ImageDraw.Draw(img)
-    d.text((12, 8), 'FAZENDA', font=font(11, True), fill=DIM)
+    d.text((12, 8), tx('farm'), font=font(11, True), fill=DIM)
     hr = hashrate(f.get('hashrate') or 0)
     d.text((228 - width(d, hr, font(11, True)), 8), hr, font=font(11, True), fill=TXT)
 
-    d.text((12, 28), 'RECORDE', font=font(10), fill=DIM)
+    d.text((12, 28), tx('record'), font=font(10), fill=DIM)
     rec = diff(f.get('best') or 0)
     fb = fit(d, rec, True, 216, 40)
     d.text((12, 40), rec, font=fb, fill=GOLD)
     hall = j.get('hall') or []
     holder = hall[0]['worker'] if hall else ''
     D = f.get('difficulty') or 0
-    sub = (('por ' + holder + ' · ') if holder and holder != '—' else '') + \
-          ('faltam ' + big(D / f['best']) + ' de vezes' if f.get('best') else '')
+    sub = ((tx('by') + holder + ' · ') if holder and holder != '—' else '') + \
+          (tx('togo').format(big(D / f['best'])) if f.get('best') else '')
     d.text((12, 88), sub, font=fit(d, sub, False, 216, 12), fill=DIM)
     d.line((12, 109, 228, 109), fill=LINE)
 
@@ -107,7 +118,7 @@ def draw_board(j):
             d.text((228 - width(d, t, ft), y + 2), t, font=ft, fill=GOLD if fresh else DIM)
         y += 20
     if not ws:
-        d.text((12, 130), 'ninguém minerando :(', font=font(13), fill=DIM)
+        d.text((12, 130), tx('nobody'), font=font(13), fill=DIM)
     return img
 
 def draw_party(rec, j):
@@ -116,7 +127,7 @@ def draw_party(rec, j):
         col = (GOLD, OK, WARN, TXT)[i % 4]
         d.rectangle((x + 3, 6 + (i * 7) % 14, x + 9, 10 + (i * 7) % 14), fill=col)
         d.rectangle((x + 6, 222 - (i * 5) % 14, x + 12, 226 - (i * 5) % 14), fill=col)
-    t = 'NOVO RECORDE!'
+    t = tx('new')
     ft = fit(d, t, True, 216, 26)
     d.text(((240 - width(d, t, ft)) / 2, 40), t, font=ft, fill=GOLD)
     v = diff(rec['value'])
@@ -127,7 +138,7 @@ def draw_party(rec, j):
     d.text(((240 - width(d, who, fw)) / 2, 148), who, font=fw, fill=OK)
     D = (j.get('farm') or {}).get('difficulty') or 0
     if D:
-        s = 'faltam ' + big(D / rec['value']) + ' de vezes'
+        s = tx('togo').format(big(D / rec['value']))
         d.text(((240 - width(d, s, font(12))) / 2, 190), s, font=font(12), fill=DIM)
     return img
 

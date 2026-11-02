@@ -32,7 +32,7 @@ test('painel serve a página e as APIs sem internet', async (t) => {
   });
   t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
 
-  const page = await waitFor(() => get(`http://127.0.0.1:${port}/`));
+  const page = await waitFor(() => get(`http://127.0.0.1:${port}/?lang=pt`));
   assert.strictEqual(page.status, 200);
   assert.match(page.body, /Fazenda de/);
   assert.match(page.body, /Quase bloco/);
@@ -44,6 +44,13 @@ test('painel serve a página e as APIs sem internet', async (t) => {
   assert.strictEqual(vovo.bestDifficulty, 38.76);
   assert.ok(api.hall.some((r) => r.value === 38.76), 'recorde não entrou no hall da fama');
 
-  const widget = JSON.parse((await get(`http://127.0.0.1:${port}/api/widget`)).body);
+  const widget = JSON.parse((await get(`http://127.0.0.1:${port}/api/widget?lang=pt`)).body);
   assert.strictEqual(widget.recorde, '38,76');
+  const widgetEn = JSON.parse((await get(`http://127.0.0.1:${port}/api/widget?lang=en`)).body);
+  assert.strictEqual(widgetEn.recorde, '38.76');
+
+  const en = await get(`http://127.0.0.1:${port}/?lang=en`);
+  assert.match(en.body, /<html lang="en">/);
+  assert.match(en.body, /Almost a block/);
+  assert.match(en.body, /const LOC = 'en-US', CUR = 'USD';/);
 });

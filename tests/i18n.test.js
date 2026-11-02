@@ -1,0 +1,47 @@
+// Idiomas: a tradução para o inglês cobre a página inteira e a página traduzida continua válida.
+const test = require('node:test');
+const assert = require('node:assert');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
+const { EN, localizePage, pickLang } = require('../src/i18n');
+
+const src = fs.readFileSync(path.join(__dirname, '../src/painel.js'), 'utf8');
+const PAGE = src.slice(src.indexOf('const PAGE = `') + 14, src.indexOf('</html>`;') + 7);
+const script = (html) => html.slice(html.indexOf('<script>') + 8, html.indexOf('</script>'));
+const noComments = (s) => s.replace(/\/\/[^\n]*/g, '').replace(/<!--[\s\S]*?-->/g, '');
+
+test('todo trecho da tabela EN existe na página em português', () => {
+  const missing = EN.filter(([pt]) => !PAGE.includes(pt)).map(([pt]) => pt);
+  assert.deepStrictEqual(missing, []);
+});
+
+test('o script da página compila nos dois idiomas', () => {
+  for (const lang of ['pt', 'en']) {
+    assert.doesNotThrow(() => new vm.Script(script(localizePage(PAGE, lang, 'USD'))), `script em ${lang}`);
+  }
+});
+
+test('a página em inglês não tem sobras em português', () => {
+  const en = noComments(localizePage(PAGE, 'en', 'USD'));
+  const pt = /[ãõçáéíóúâêô]|\b(faltam|bloco|blocos|agora|parado|nenhum|recorde|fazenda|vezes|hoje|último|carregando|dificuldade|carteira|saldo|melhor|atualizado|teste)\b/i;
+  const literals = [...en.matchAll(/'([^'\n]{2,})'|>([^<>{}\n]{2,})</g)].map((m) => (m[1] || m[2]).trim());
+  assert.deepStrictEqual(literals.filter((l) => pt.test(l)), []);
+});
+
+test('locale e moeda são injetados', () => {
+  assert.match(localizePage(PAGE, 'pt', 'BRL'), /const LOC = 'pt-BR', CUR = 'BRL';/);
+  assert.match(localizePage(PAGE, 'en', 'USD'), /const LOC = 'en-US', CUR = 'USD';/);
+  assert.match(localizePage(PAGE, 'en', 'USD'), /<html lang="en">/);
+});
+
+test('escolha do idioma: ?lang > LANGUAGE do servidor > navegador > inglês', () => {
+  const req = (url, al) => ({ url, headers: al ? { 'accept-language': al } : {} });
+  assert.strictEqual(pickLang(req('/?lang=en', 'pt-BR'), 'pt'), 'en');
+  assert.strictEqual(pickLang(req('/?lang=pt-BR'), ''), 'pt');
+  assert.strictEqual(pickLang(req('/', 'en-US'), 'pt'), 'pt');
+  assert.strictEqual(pickLang(req('/', 'pt-BR,pt;q=0.9,en;q=0.8'), ''), 'pt');
+  assert.strictEqual(pickLang(req('/', 'de-DE,en;q=0.5'), ''), 'en');
+  assert.strictEqual(pickLang(req('/', 'fr-FR'), ''), 'en');
+  assert.strictEqual(pickLang(req('/?lang=xx'), ''), 'en');
+});

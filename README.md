@@ -1,41 +1,51 @@
-# ⛏️ Fazenda de Mineração
+# ⛏️ HomeMinerProxy — Mining Farm
 
-Proxy Stratum e painel para **mineração solo caseira**: Bitaxe, NerdMiner, ESP32, cpuminer no notebook ou no celular. Tudo roda num computador pequeno da casa (Odroid, Raspberry Pi, Orange Pi ou qualquer Linux), **sem dependências** além do Node.js.
+**English** · [Português](README.pt-BR.md)
 
-A ideia é transformar a "loteria do bloco" em algo divertido de acompanhar: cada share aparece na hora, os recordes disparam confete e sirene, e uma tela mostra o abismo entre o nosso melhor hash e o hash do último bloco da rede.
+A Stratum proxy and dashboard for **home solo mining**: Bitaxe, NerdMiner, ESP32 boards, cpuminer on a laptop or phone. Everything runs on a small computer at home (Odroid, Raspberry Pi, Orange Pi or any Linux box), with **no dependencies** besides Node.js.
 
-## Como funciona
+The goal is to turn the "block lottery" into something fun to watch: every share shows up instantly, records trigger confetti and a siren, and one screen shows the gap between your best hash and the hash of the latest block on the network.
+
+## How it works
 
 ```
-Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──► pool
+Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──► pool
                                     │
-                                    └─► calcula a dificuldade de cada share ──► painel web, sirene, cubo
+                                    └─► computes each share's difficulty ──► web dashboard, siren, cube
 ```
 
-- **Proxy Stratum** (`src/proxy.js`): cada minerador se conecta no servidor da casa em vez da pool. O proxy repassa tudo **sem alterar nada** e, no caminho, remonta o cabeçalho do bloco de cada share para calcular a dificuldade atingida. Funciona com qualquer pool e qualquer minerador, sem depender de API de pool nem do firmware do aparelho. A porta escolhe a pool:
+- **Stratum proxy** (`src/proxy.js`): each miner connects to your home server instead of the pool. The proxy forwards everything **unchanged** and, on the way, rebuilds each share's block header to compute the difficulty it reached. It works with any pool and any miner, without relying on pool APIs or on the device firmware. The port picks the pool:
 
-  | Porta | Pool |
+  | Port | Pool |
   |---|---|
   | 3333 | public-pool.io |
-  | 3334 | solo.ckpool.org (bom para Bitaxe) |
-  | 3335 | pool.nerdminers.org (aceita a dificuldade baixíssima dos ESP32) |
+  | 3334 | solo.ckpool.org (good for Bitaxe) |
+  | 3335 | pool.nerdminers.org (accepts the very low difficulty of ESP32 miners) |
   | 3337 | OCEAN |
 
-- **Painel** (`src/painel.js`), em `http://IP-DO-SERVIDOR:3000`, com quatro telas:
-  - **Fazenda:** recordes, hashrate e a lista de workers com o último share.
-  - **Rede Bitcoin:** último bloco, ajuste de dificuldade, halving e prêmio em jogo.
-  - **Histórico:** gráficos, hall da fama e consumo de energia em R$.
-  - **Quase bloco:** nosso melhor hash × hash do último bloco, com os zeros lado a lado.
+- **Dashboard** (`src/painel.js`), at `http://SERVER-IP:3000`, with four screens:
+  - **Farm:** records, hashrate, and the worker list with each worker's latest share.
+  - **Bitcoin network:** latest block, difficulty adjustment, halving, and the prize at stake.
+  - **History:** charts, hall of fame, and power cost.
+  - **Almost a block:** your best hash vs. the latest block hash, leading zeros side by side.
 
-  Para uma tela ligada ao servidor, use `?kiosk`: as telas alternam sozinhas e o cursor some.
-- **Extras opcionais:**
-  - **Sirene:** Arduino com LEDs e alto-falante, ver `extras/sirene`.
-  - **Cubo GeekMagic SmallTV:** placar de 240×240 na mesa (`src/cubo.py`).
-  - **Widget KWGT para Android:** ver `extras/kwgt`.
+  For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden.
+- **Optional extras:**
+  - **Siren:** an Arduino with LEDs and a speaker, see `extras/sirene`.
+  - **GeekMagic SmallTV cube:** a 240×240 desk scoreboard (`src/cubo.py`).
+  - **KWGT widget for Android:** see `extras/kwgt`.
 
-## Instalação
+## Languages
 
-Precisa de Linux com systemd e Node.js 16 ou mais novo.
+The dashboard, cube, widget and installer work in **English** and **Brazilian Portuguese (pt-BR)**.
+
+- **`LANGUAGE=en`** or **`LANGUAGE=pt-BR`** in `/etc/mineracao.env` sets the language. When empty, the dashboard follows the browser, and the cube and widget use English.
+- **`?lang=en`** or **`?lang=pt`** on the dashboard or widget URL overrides the language for that page only.
+- **`CURRENCY=USD`** or **`CURRENCY=BRL`** sets the currency for money values (BTC price, prize, power bill). The default is BRL for pt-BR and USD otherwise.
+
+## Install
+
+Requires Linux with systemd and Node.js 16 or newer.
 
 ```bash
 git clone https://github.com/Modanez/HomeMinerProxy.git
@@ -43,50 +53,54 @@ cd HomeMinerProxy
 sudo bash install.sh
 ```
 
-Na primeira vez, o instalador pergunta o endereço de bitcoin dos mineradores e cria `/etc/mineracao.env`. Todas as opções estão comentadas em `config/mineracao.env.example`. Depois de editar:
+On first run the installer asks for your miners' bitcoin address and creates `/etc/mineracao.env`. Every option is documented in `config/mineracao.env.example`. After editing:
 
 ```bash
 sudo systemctl restart mineracao-proxy mineracao-painel
 ```
 
-Para atualizar, rode `git pull && sudo bash install.sh` de novo. A configuração e os dados (recordes, histórico) são mantidos.
+To update, run `git pull && sudo bash install.sh` again. Your configuration and data (records, history) are kept.
 
-## Apontando os mineradores
+## Pointing your miners
 
-Usuário: `SEU_ENDERECO.nome-do-worker`, com qualquer senha (ex.: `x`). O nome depois do ponto é o que aparece no painel.
+Username: `YOUR_ADDRESS.worker-name`, any password (e.g. `x`). The name after the dot is what shows on the dashboard.
 
-| Minerador | Pool | Porta |
+| Miner | Pool | Port |
 |---|---|---|
-| cpuminer (`minerd`) | `stratum+tcp://IP-DO-SERVIDOR` | 3333 |
-| NerdMiner / ESP32 | `IP-DO-SERVIDOR` | 3335 |
-| Bitaxe | `IP-DO-SERVIDOR` | 3334 (configure `solo.ckpool.org:3333` como pool reserva no AxeOS) |
+| cpuminer (`minerd`) | `stratum+tcp://SERVER-IP` | 3333 |
+| NerdMiner / ESP32 | `SERVER-IP` | 3335 |
+| Bitaxe | `SERVER-IP` | 3334 (set `solo.ckpool.org:3333` as the fallback pool in AxeOS) |
 
-Reserve um IP fixo para o servidor no roteador (DHCP estático): se o IP mudar, todos os mineradores perdem a pool.
-
-Exemplo com cpuminer:
+Give the server a fixed IP in your router (DHCP reservation): if its IP changes, every miner loses its pool.
 
 ```bash
-minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u SEU_ENDERECO.notebook -p x
+minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u YOUR_ADDRESS.laptop -p x
 ```
 
-## Cubo GeekMagic (opcional)
+## GeekMagic cube (optional)
 
-Preencha `CUBE_IP` em `/etc/mineracao.env` e rode o `install.sh` de novo. O placar é atualizado a cada 5 minutos. Um recorde novo aparece na hora, com a tela "NOVO RECORDE!". O cubo precisa estar no firmware original da GeekMagic, que tem o modo álbum de fotos.
+Set `CUBE_IP` in `/etc/mineracao.env` and run `install.sh` again. The scoreboard refreshes every 5 minutes, and a new record shows up right away on a "NEW RECORD!" screen. The cube must run the original GeekMagic firmware, which has the photo album mode.
 
-## Desenvolvimento
+## Development
 
 ```bash
-npm run check   # sintaxe de tudo
-npm test        # testes (Node 18+ e Python 3; os do cubo precisam do Pillow)
+npm run check   # syntax of everything
+npm test        # tests (Node 18+ and Python 3; cube tests need Pillow)
 ```
 
-Os testes conferem a matemática do share com o **bloco gênese** e o **bloco 1** reais (se a ordem dos bytes estiver errada, o hash não bate). Também sobem o proxy entre uma pool falsa e um minerador de teste, e o painel sem acesso à internet.
+What the tests cover:
+- **Share math:** checked against the real **genesis block** and **block 1**. If the byte order were wrong, the hash would not match.
+- **Proxy:** runs between a fake pool and a test miner.
+- **Dashboard:** starts with no internet access.
+- **Translation:** covers the whole page.
 
-## Segurança
+The page text lives in Portuguese in the source code. The English version is generated from the table in `src/i18n.js`. If you change a Portuguese string, update the table: `tests/i18n.test.js` fails when an entry no longer matches.
 
-- Use só o **endereço público** de bitcoin. Nenhuma parte do projeto pede seed ou chave privada.
-- As portas do proxy (3333–3337) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
+## Security
 
-## Licença
+- Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.
+- The proxy ports (3333–3337) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
+
+## License
 
 MIT
