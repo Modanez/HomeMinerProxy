@@ -686,6 +686,8 @@ const PAGE = `<!doctype html>
   header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
   h1 { font-size:22px; } h1 span { color:var(--gold); }
   .upd { color:var(--dim); font-size:13px; white-space:nowrap; }
+  .langsw { color:var(--dim); font-size:12px; text-decoration:none; border:1px solid var(--line); border-radius:6px; padding:2px 7px; white-space:nowrap; }
+  .langsw b { color:var(--gold); font-weight:600; }
   .narr { flex:1; min-width:0; text-align:center; color:var(--gold); font-size:14px; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   .narr.fade { opacity:0; }
   .party { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(14,17,23,.88); }
@@ -830,6 +832,7 @@ const PAGE = `<!doctype html>
   <h1>⛏️ Fazenda de <span>Mineração</span></h1>
   <div class="narr" id="narr"></div>
   <div class="dots" id="dots"></div>
+  <a class="langsw" id="langsw" href="#" title="Switch to English"><b>PT</b> | EN</a>
   <div class="upd" id="upd">carregando…</div>
 </header>
 
@@ -952,6 +955,13 @@ const PAGE = `<!doctype html>
 const LOC = '__LOC__', CUR = '__CUR__';   // preenchidos pelo servidor (idioma e moeda)
 const kiosk = new URLSearchParams(location.search).has('kiosk');
 if (kiosk) document.body.classList.add('kiosk');
+document.getElementById('langsw').addEventListener('click', (ev) => {
+  ev.preventDefault(); ev.stopPropagation();   // no kiosk, o clique na tela também passa de página
+  const next = LOC === 'pt-BR' ? 'en' : 'pt';
+  document.cookie = 'lang=' + next + '; path=/; max-age=31536000; SameSite=Lax';
+  if (!/[?&]lang=/.test(location.search)) return location.reload();
+  location.replace(location.pathname + location.search.replace(/([?&])lang=[^&]*&?/, '$1').replace(/[?&]$/, ''));
+});
 
 const $ = (id) => document.getElementById(id);
 const set = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };

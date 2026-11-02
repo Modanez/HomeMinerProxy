@@ -4,11 +4,13 @@
 
 const LOCALES = { pt: 'pt-BR', en: 'en-US' };
 
-// Escolhe o idioma: ?lang= na URL > LANGUAGE do servidor > idioma do navegador > inglês
+// Escolhe o idioma: ?lang= na URL > botão PT|EN (cookie) > LANGUAGE do servidor > idioma do navegador > inglês
 function pickLang(req, serverLang) {
   const q = new URL(req.url, 'http://x').searchParams.get('lang');
   const norm = (v) => { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; };
   if (norm(q)) return norm(q);
+  const cookie = (String(req.headers.cookie || '').match(/(?:^|;\s*)lang=([^;]*)/) || [])[1];
+  if (norm(cookie)) return norm(cookie);
   if (serverLang) return serverLang;
   const accept = String(req.headers['accept-language'] || '').split(',').map((s) => norm(s.trim())).find(Boolean);
   return accept || 'en';
@@ -21,6 +23,7 @@ const EN = [
   ['<title>Fazenda de Mineração</title>', '<title>Mining Farm</title>'],
   ['<h1>⛏️ Fazenda de <span>Mineração</span></h1>', '<h1>⛏️ Mining <span>Farm</span></h1>'],
   ['<div class="upd" id="upd">carregando…</div>', '<div class="upd" id="upd">loading…</div>'],
+  ['<a class="langsw" id="langsw" href="#" title="Switch to English"><b>PT</b> | EN</a>', '<a class="langsw" id="langsw" href="#" title="Mudar para português">PT | <b>EN</b></a>'],
   ['<h2 class="sect">Fazenda</h2>', '<h2 class="sect">Farm</h2>'],
   ['<div class="label">Recorde (Best Difficulty)</div>', '<div class="label">Record (best difficulty)</div>'],
   ['<div class="label">Hashrate da fazenda</div>', '<div class="label">Farm hashrate</div>'],

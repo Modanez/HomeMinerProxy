@@ -45,3 +45,12 @@ test('escolha do idioma: ?lang > LANGUAGE do servidor > navegador > inglês', ()
   assert.strictEqual(pickLang(req('/', 'fr-FR'), ''), 'en');
   assert.strictEqual(pickLang(req('/?lang=xx'), ''), 'en');
 });
+
+test('botão PT|EN: o cookie vence o LANGUAGE do servidor, mas não o ?lang', () => {
+  const req = (url, cookie) => ({ url, headers: { cookie, 'accept-language': 'pt-BR' } });
+  assert.strictEqual(pickLang(req('/', 'lang=en'), 'pt'), 'en');
+  assert.strictEqual(pickLang(req('/', 'outro=1; lang=pt'), 'en'), 'pt');
+  assert.strictEqual(pickLang(req('/?lang=en', 'lang=pt'), 'pt'), 'en');
+  assert.strictEqual(pickLang(req('/', 'xlang=en'), 'pt'), 'pt');   // nome de cookie parecido não conta
+  assert.strictEqual(pickLang(req('/', 'lang=<script>'), 'pt'), 'pt');
+});
