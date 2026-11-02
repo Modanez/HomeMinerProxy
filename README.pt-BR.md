@@ -40,6 +40,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
 O painel, o cubo, o widget e o instalador funcionam em **português (pt-BR)** e **inglês**.
 
 - **`LANGUAGE=pt-BR`** em `/etc/mineracao.env` fixa o idioma. Vazio, o painel segue o idioma do navegador, e o cubo e o widget ficam em inglês.
+- O botão **PT | EN** no topo do painel troca o idioma e lembra a escolha naquele navegador.
 - **`?lang=pt` ou `?lang=en`** na URL do painel ou do widget força o idioma só ali.
 - **`CURRENCY=BRL`** ou **`CURRENCY=USD`** define a moeda dos valores (cotação, prêmio, conta de luz). O padrão é BRL em pt-BR e USD nos outros casos.
 
@@ -100,6 +101,14 @@ Os textos da página estão em português no código. A versão em inglês é ge
 
 - Use só o **endereço público** de bitcoin. Nenhuma parte do projeto pede seed ou chave privada.
 - As portas do proxy (3333–3337) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
+
+## Apoie o projeto
+
+Se o projeto deixou a sua loteria do bloco mais divertida, doações são bem-vindas. ⚡
+
+**Bitcoin (on-chain):** `bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w`
+
+Ideias, issues e pull requests também são muito bem-vindos.
 
 ## Licença
 

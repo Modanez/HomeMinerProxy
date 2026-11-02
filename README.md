@@ -40,6 +40,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
 The dashboard, cube, widget and installer work in **English** and **Brazilian Portuguese (pt-BR)**.
 
 - **`LANGUAGE=en`** or **`LANGUAGE=pt-BR`** in `/etc/mineracao.env` sets the language. When empty, the dashboard follows the browser, and the cube and widget use English.
+- The **PT | EN** button at the top of the dashboard switches the language and remembers the choice in that browser.
 - **`?lang=en`** or **`?lang=pt`** on the dashboard or widget URL overrides the language for that page only.
 - **`CURRENCY=USD`** or **`CURRENCY=BRL`** sets the currency for money values (BTC price, prize, power bill). The default is BRL for pt-BR and USD otherwise.
 
@@ -100,6 +101,14 @@ The page text lives in Portuguese in the source code. The English version is gen
 
 - Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.
 - The proxy ports (3333–3337) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
+
+## Support the project
+
+If this project made your block lottery more fun, donations are welcome. ⚡
+
+**Bitcoin (on-chain):** `bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w`
+
+Issues, ideas and pull requests are also very welcome.
 
 ## License
 
