@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Python + Pillow (cube tests)
+        run: sudo apt-get update && sudo apt-get install -y python3-pil fonts-dejavu-core
+      - run: npm run check
+      - run: npm test
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t homeminerproxy:ci .
+      - name: Smoke test (dashboard, proxy and cube start)
+        run: |
+          cp config/mineracao.env.example mineracao.env
+          sed -i 's/^BTC_ADDRESS=$/BTC_ADDRESS=bc1qexample/' mineracao.env
+          docker compose up -d proxy painel
+          for i in $(seq 1 30); do curl -sf localhost:3000/api/widget && break; sleep 2; done
+          curl -sf localhost:3000/api/widget
+          curl -sf "localhost:3000/?lang=en" | grep -q "Mining"
+          docker compose exec -T painel wget -qO- http://proxy:3336/stats | grep -q '"routes"'
+          docker run --rm homeminerproxy:ci python3 -c "import cubo; print(cubo.hashrate(1.2e12))"
+      - name: Logs on failure
+        if: failure()
+        run: docker compose logs

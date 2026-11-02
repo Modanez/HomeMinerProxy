@@ -207,7 +207,7 @@ http.createServer((req, res) => {
   const lastHour = Object.values(workers).reduce((n, w) => n + w.window.length, 0);   // hashrate() já podou a janela de 1 h
   const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
   res.end(JSON.stringify({ at: Date.now(), routes: ROUTES, workers: list, recent, totals: { today: today.accepted, lastHour }, bestHash, dayBestHash: dayBest }));
-}).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://127.0.0.1:${STATS_PORT}/stats`));
+}).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
 
 process.on('SIGTERM', () => { saveStats(); process.exit(0); });
 process.on('SIGINT', () => { saveStats(); process.exit(0); });

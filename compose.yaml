@@ -1,0 +1,58 @@
+# HomeMinerProxy with Docker Compose.
+#   cp config/mineracao.env.example mineracao.env   # then set BTC_ADDRESS (and LANGUAGE, TZ…)
+#   docker compose up -d                            # proxy + dashboard
+#   docker compose --profile cubo up -d             # also the GeekMagic cube scoreboard (needs CUBE_IP)
+x-app: &app
+  build: .
+  image: homeminerproxy:latest
+  env_file: mineracao.env
+  volumes:
+    - data:/data
+  restart: unless-stopped
+
+services:
+  proxy:
+    <<: *app
+    command: ["node", "proxy.js"]
+    environment:
+      PROXY_STATS_HOST: 0.0.0.0        # reachable by the dashboard container; port 3336 is not published
+    ports:
+      - "3333:3333"   # public-pool
+      - "3334:3334"   # ckpool solo
+      - "3335:3335"   # nerdminers
+      - "3337:3337"   # OCEAN
+      - "3338:3338"   # atlaspool
+      - "3339:3339"   # ckpool solo EU
+
+  painel:
+    <<: *app
+    command: ["node", "painel.js"]
+    environment:
+      PORT: "3000"
+      PROXY_URL: http://proxy:3336/stats
+    ports:
+      - "3000:3000"   # change the left side to use another port on the host
+    depends_on:
+      - proxy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:3000/api/widget"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+    # Arduino siren: uncomment and adjust the device path
+    # devices:
+    #   - /dev/ttyACM0:/dev/ttyACM0
+    # group_add:
+    #   - dialout
+
+  cubo:
+    <<: *app
+    profiles: ["cubo"]
+    command: ["python3", "cubo.py"]
+    environment:
+      PANEL_URL: http://painel:3000/api/mining
+    depends_on:
+      - painel
+
+volumes:
+  data:

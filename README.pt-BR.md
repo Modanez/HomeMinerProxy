@@ -2,6 +2,8 @@
 
 [English](README.md) · **Português**
 
+[![CI](https://github.com/Modanez/HomeMinerProxy/actions/workflows/ci.yml/badge.svg)](https://github.com/Modanez/HomeMinerProxy/actions/workflows/ci.yml)
+
 Proxy Stratum e painel para **mineração solo caseira**: Bitaxe, NerdMiner, ESP32, cpuminer no notebook ou no celular. Tudo roda num computador pequeno da casa (Odroid, Raspberry Pi, Orange Pi ou qualquer Linux), **sem dependências** além do Node.js.
 
 A ideia é transformar a "loteria do bloco" em algo divertido de acompanhar: cada share aparece na hora, os recordes disparam confete e sirene, e uma tela mostra o abismo entre o nosso melhor hash e o hash do último bloco da rede.
@@ -84,6 +86,21 @@ sudo systemctl restart mineracao-proxy mineracao-painel
 ```
 
 Para atualizar, rode `git pull && sudo bash install.sh` de novo. A configuração e os dados (recordes, histórico) são mantidos.
+
+### Com Docker
+
+```bash
+git clone https://github.com/Modanez/HomeMinerProxy.git
+cd HomeMinerProxy
+cp config/mineracao.env.example mineracao.env   # preencha BTC_ADDRESS e, se quiser, LANGUAGE=pt-BR e TZ=America/Sao_Paulo
+docker compose up -d
+```
+
+O painel fica em `http://IP-DO-SERVIDOR:3000`, e as portas do proxy são as mesmas de cima. Os dados (recordes, histórico) ficam no volume `data`. Para atualizar: `git pull && docker compose up -d --build`.
+
+- **Cubo GeekMagic:** preencha `CUBE_IP` e rode `docker compose --profile cubo up -d`.
+- **Sirene do Arduino:** descomente as linhas `devices` do serviço `painel` no `compose.yaml`.
+- **cpuminer na mesma máquina (`LOCAL_WORKER`):** não funciona dentro do contêiner, porque essa função lê o journal do systemd da máquina. O worker continua aparecendo pelo proxy.
 
 ## Qual pool para cada minerador?
 
