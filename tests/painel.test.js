@@ -1,0 +1,49 @@
+// O painel sobe sem internet, serve a página e as APIs, e recusa subir sem endereço.
+const test = require('node:test');
+const assert = require('node:assert');
+const http = require('http');
+const net = require('net');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const { spawn, spawnSync } = require('child_process');
+
+const PAINEL = path.join(__dirname, '../src/painel.js');
+const OFFLINE = path.join(__dirname, 'helpers/offline.js');
+
+const freePort = () => new Promise((res) => { const s = net.createServer().listen(0, () => { const p = s.address().port; s.close(() => res(p)); }); });
+const get = (url) => new Promise((res, rej) => http.get(url, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => res({ status: r.statusCode, body: b })); }).on('error', rej));
+const waitFor = async (fn, ms = 8000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch (_) { /* tenta de novo */ } if (Date.now() > end) throw new Error('tempo esgotado'); await new Promise((r) => setTimeout(r, 100)); } };
+
+test('sem BTC_ADDRESS o painel não sobe', () => {
+  const env = { ...process.env }; delete env.BTC_ADDRESS;
+  const r = spawnSync(process.execPath, ['-r', OFFLINE, PAINEL], { env, encoding: 'utf8', timeout: 10000 });
+  assert.strictEqual(r.status, 1);
+  assert.match(r.stderr, /BTC_ADDRESS/);
+});
+
+test('painel serve a página e as APIs sem internet', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-'));
+  fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({ vovo: { name: 'vovo', hashRate: 3.5e5, bestDifficulty: 38.76, lastSeen: new Date().toISOString(), pool: 'nerdminers' } }));
+  const p = spawn(process.execPath, ['-r', OFFLINE, PAINEL], {
+    env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'sem-sirene'), CKPOOL_URLS: '', OCEAN_API: '' },
+    stdio: 'ignore',
+  });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  const page = await waitFor(() => get(`http://127.0.0.1:${port}/`));
+  assert.strictEqual(page.status, 200);
+  assert.match(page.body, /Fazenda de/);
+  assert.match(page.body, /Quase bloco/);
+
+  const api = JSON.parse((await get(`http://127.0.0.1:${port}/api/mining`)).body);
+  assert.ok(api.farm, 'sem farm');
+  const vovo = api.farm.workers.find((w) => w.name === 'vovo');
+  assert.ok(vovo, 'worker salvo não apareceu');
+  assert.strictEqual(vovo.bestDifficulty, 38.76);
+  assert.ok(api.hall.some((r) => r.value === 38.76), 'recorde não entrou no hall da fama');
+
+  const widget = JSON.parse((await get(`http://127.0.0.1:${port}/api/widget`)).body);
+  assert.strictEqual(widget.recorde, '38,76');
+});

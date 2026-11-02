@@ -1,0 +1,12 @@
+{
+  "name": "home-miner-proxy",
+  "version": "0.1.0",
+  "description": "Proxy Stratum e painel para mineração solo caseira (Bitaxe, NerdMiner, cpuminer) — sem dependências",
+  "license": "MIT",
+  "private": true,
+  "engines": { "node": ">=16" },
+  "scripts": {
+    "check": "node --check src/painel.js && node --check src/proxy.js && node --check src/stratum.js && python3 -m py_compile src/cubo.py && bash -n install.sh",
+    "test": "node --test tests/*.test.js && python3 -m unittest discover -s tests -p 'test_*.py'"
+  }
+}

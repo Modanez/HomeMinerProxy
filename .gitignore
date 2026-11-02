@@ -1,0 +1,14 @@
+node_modules/
+__pycache__/
+*.pyc
+# dados gerados em tempo de execução
+*-stats.json
+workers.json
+records.json
+history.json
+diffhist.json
+cubo-state.json
+# configuração local (o modelo é config/mineracao.env.example)
+*.env
+!config/*.env.example
+.DS_Store
