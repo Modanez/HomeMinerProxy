@@ -13,7 +13,7 @@ const { pickLang, localizePage, LOCALES, WIDGET } = require('./i18n');
 const PORT = Number(process.env.PORT || 3000);
 // Idioma padrão do painel e do widget: pt-BR ou en. Vazio = idioma do navegador. ?lang=pt|en força na URL.
 const LANGUAGE = normLang(process.env.LANGUAGE);
-// Moeda dos valores em dinheiro (cotação, prêmio, conta de luz): BRL ou USD. A tarifa TARIFA_KWH é nessa moeda.
+// Moeda dos valores em dinheiro (cotação, prêmio, conta de luz): BRL ou USD. O preço do kWh é nessa moeda.
 const CURRENCY = /^(BRL|USD)$/i.test(process.env.CURRENCY || '') ? process.env.CURRENCY.toUpperCase() : (LANGUAGE === 'pt' ? 'BRL' : 'USD');
 function normLang(v) { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; }
 const ADDRESS = (process.env.BTC_ADDRESS || '').trim();
@@ -23,7 +23,8 @@ if (!ADDRESS) {
 }
 const LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
 const ROTATE_S = Number(process.env.ROTATE_S || 20);
-const TARIFA_KWH = Number(process.env.TARIFA_KWH || 0.9);
+// Preço do kWh na moeda CURRENCY. POWER_PRICE_KWH (ou o nome antigo TARIFA_KWH); padrão: R$ 0,90 ou US$ 0,15.
+const TARIFA_KWH = Number(process.env.POWER_PRICE_KWH || process.env.TARIFA_KWH || (CURRENCY === 'BRL' ? 0.9 : 0.15));
 const WATTS = Object.assign({}, safeJson(process.env.WATTS));   // consumo por worker, ex.: '{"bitaxe":20,"nerdminer":1}'
 // Workers que fazem parte da fazenda, com o hashrate nominal (H/s). A API da pool não lista todos,
 // então o painel mostra estes mesmo quando a pool esconde. Para acrescentar ou tirar (valor 0):
@@ -727,6 +728,7 @@ const PAGE = `<!doctype html>
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
   .label { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
   .big { font-size:38px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
+  .grid .big { white-space:nowrap; overflow:hidden; }   /* o fitBig() reduz a fonte quando o número não cabe */
   .big.gold { color:var(--gold); }
   .sub { color:var(--dim); font-size:13px; margin-top:4px; }
   .lead { color:var(--txt); font-size:15px; margin-top:8px; }
@@ -1166,6 +1168,15 @@ function renderFarm(j) {
   $('prog').style.width = pct.toFixed(1) + '%';
 }
 
+// Números grandes ficam numa linha só: se não couberem no card, a fonte diminui até caber
+function fitBig() {
+  document.querySelectorAll('.grid .big').forEach((el) => {
+    el.style.fontSize = '';
+    let size = parseFloat(getComputedStyle(el).fontSize);
+    while (el.scrollWidth > el.clientWidth + 1 && size > 16) { size -= 1; el.style.fontSize = size + 'px'; }
+  });
+}
+
 function renderWallet(w) {
   if (!w) return;
   set('werr', w.error && w.sats === null ? 'Saldo indisponível: ' + w.error : '');
@@ -1489,6 +1500,7 @@ async function load() {
     renderNet(j);
     renderHistory(j);
     renderNear(j);
+    fitBig();
     updateNarr(j);
     checkRecords(j);
     if (testParty && j.farm && j.farm.hasData) {
@@ -1501,7 +1513,7 @@ async function load() {
     set('err', 'Sem conexão com o servidor local.');
   }
 }
-window.addEventListener('resize', () => { fitPages(); if (lastData) { renderHistory(lastData); renderNear(lastData); } });
+window.addEventListener('resize', () => { fitPages(); if (lastData) { renderHistory(lastData); renderNear(lastData); fitBig(); } });
 load(); setInterval(load, 20000);
 </script>
 </body>

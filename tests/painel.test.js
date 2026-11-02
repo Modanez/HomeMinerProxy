@@ -54,3 +54,22 @@ test('painel serve a página e as APIs sem internet', async (t) => {
   assert.match(en.body, /Almost a block/);
   assert.match(en.body, /const LOC = 'en-US', CUR = 'USD';/);
 });
+
+test('conta de luz: moeda e preço do kWh configuráveis', async (t) => {
+  const run = async (extra) => {
+    const port = await freePort();
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-'));
+    const p = spawn(process.execPath, ['-r', OFFLINE, PAINEL], {
+      env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'x'), CKPOOL_URLS: '', OCEAN_API: '', LANGUAGE: '', CURRENCY: '', POWER_PRICE_KWH: '', TARIFA_KWH: '', ...extra },
+      stdio: 'ignore',
+    });
+    t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+    const api = JSON.parse((await waitFor(() => get(`http://127.0.0.1:${port}/api/mining`))).body);
+    const page = (await get(`http://127.0.0.1:${port}/?lang=en`)).body;
+    return { tarifa: api.energy.tarifa, cur: (page.match(/CUR = '(\w+)'/) || [])[1] };
+  };
+  assert.deepStrictEqual(await run({}), { tarifa: 0.15, cur: 'USD' });
+  assert.deepStrictEqual(await run({ LANGUAGE: 'pt-BR' }), { tarifa: 0.9, cur: 'BRL' });
+  assert.deepStrictEqual(await run({ CURRENCY: 'brl', POWER_PRICE_KWH: '1.05' }), { tarifa: 1.05, cur: 'BRL' });
+  assert.deepStrictEqual(await run({ CURRENCY: 'USD', TARIFA_KWH: '0.22' }), { tarifa: 0.22, cur: 'USD' });   // nome antigo continua valendo
+});
