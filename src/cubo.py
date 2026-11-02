@@ -205,6 +205,16 @@ def tick(state):
     if now - state.get('lastAt', 0) >= EVERY_S:
         upload(jpeg(draw_board(j))); state['lastAt'] = now
 
+def wait_panel(timeout_s=120):
+    # No boot, o painel pode levar alguns segundos para abrir a porta: espera em vez de registrar falha.
+    end = time.time() + timeout_s
+    while time.time() < end:
+        try:
+            panel(); return True
+        except Exception:
+            time.sleep(3)
+    return False
+
 def main():
     if '--once' in sys.argv:
         j = panel() if '--json' not in sys.argv else json.load(open(sys.argv[sys.argv.index('--json') + 1]))
@@ -217,6 +227,7 @@ def main():
         sys.exit('Defina CUBE_IP com o IP do cubo (ex.: CUBE_IP=192.168.0.50).')
     state = load_state()
     print(f'cubo {CUBE_IP}: placar a cada {EVERY_S}s', flush=True)
+    wait_panel()
     while True:
         try:
             tick(state); save_state(state)

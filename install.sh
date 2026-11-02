@@ -10,7 +10,8 @@ APP_DIR=${APP_DIR:-/opt/mineracao}
 ENV_FILE=${ENV_FILE:-/etc/mineracao.env}
 HERE=$(cd "$(dirname "$0")" && pwd)
 
-case "${LANGUAGE:-${LANG:-}}" in pt*|PT*) L=pt ;; *) L=en ;; esac
+cfg_lang=$(grep -E '^LANGUAGE=' "$ENV_FILE" 2>/dev/null | cut -d= -f2- || true)   # idioma da configuração existente
+case "${LANGUAGE:-${cfg_lang:-${LANG:-}}}" in pt*|PT*) L=pt ;; *) L=en ;; esac
 m() { if [ "$L" = pt ]; then echo "$1"; else echo "$2"; fi; }   # m "português" "english"
 
 [ "$(id -u)" -eq 0 ] || { m "Rode como root (sudo bash install.sh)" "Run as root (sudo bash install.sh)"; exit 1; }

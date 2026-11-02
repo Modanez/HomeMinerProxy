@@ -69,5 +69,22 @@ class TestCubo(unittest.TestCase):
         self.assertEqual(len(enviados), 2)
 
 
+    def test_espera_o_painel_subir(self):
+        tentativas = []
+        def painel_subindo():
+            tentativas.append(1)
+            if len(tentativas) < 2: raise OSError('Connection refused')
+            return {}
+        cubo.panel = painel_subindo
+        dormir, cubo.time.sleep = cubo.time.sleep, lambda s: None
+        try:
+            self.assertTrue(cubo.wait_panel(timeout_s=5))
+            self.assertEqual(len(tentativas), 2)
+            cubo.panel = lambda: (_ for _ in ()).throw(OSError('fora do ar'))
+            self.assertFalse(cubo.wait_panel(timeout_s=0))
+        finally:
+            cubo.time.sleep = dormir
+
+
 if __name__ == '__main__':
     unittest.main()
