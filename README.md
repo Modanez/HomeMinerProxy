@@ -34,12 +34,16 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
 
 - **Stratum proxy** (`src/proxy.js`): each miner connects to your home server instead of the pool. The proxy forwards everything **unchanged** and, on the way, rebuilds each share's block header to compute the difficulty it reached. It works with any pool and any miner, without relying on pool APIs or on the device firmware. The port picks the pool:
 
-  | Port | Pool |
-  |---|---|
-  | 3333 | public-pool.io |
-  | 3334 | solo.ckpool.org (good for Bitaxe) |
-  | 3335 | pool.nerdminers.org (accepts the very low difficulty of ESP32 miners) |
-  | 3337 | OCEAN |
+  | Port | Pool | Fee |
+  |---|---|---|
+  | 3333 | public-pool.io | 0% |
+  | 3334 | solo.ckpool.org (US) | 2% |
+  | 3335 | pool.nerdminers.org | 0% |
+  | 3337 | OCEAN (shared payouts, not solo) | see ocean.xyz |
+  | 3338 | solo.atlaspool.io (anycast, servers on every continent) | 1.5% of the subsidy |
+  | 3339 | eusolo.ckpool.org (Europe) | 2% |
+
+  Any other Stratum V1 pool can be added with `PROXY_ROUTES` (see the configuration).
 
 - **Dashboard** (`src/painel.js`), at `http://SERVER-IP:3000`, with four screens:
   - **Farm:** records, hashrate, and the worker list with each worker's latest share.
@@ -81,6 +85,18 @@ sudo systemctl restart mineracao-proxy mineracao-painel
 
 To update, run `git pull && sudo bash install.sh` again. Your configuration and data (records, history) are kept.
 
+## Which pool for which miner?
+
+| Miner | Hashrate | Recommended port | Why |
+|---|---|---|---|
+| NerdMiner, ESP32 boards | ~50–400 kH/s | **3335** nerdminers | Accepts their tiny share difficulty. Most other pools reject them ("difficulty too low") |
+| cpuminer on a PC, phone or SBC | ~1–20 MH/s | **3333** public-pool | No fee and a minimum difficulty of 1 |
+| Bitaxe and other small ASICs | ~0.4–10 TH/s | **3334** ckpool or **3338** atlaspool | Proven solo pools. Pick the one with lower latency where you live. The proxy counts accepted and rejected shares per worker (`curl localhost:3336/stats` on the server), so you can compare |
+| Any miner, in Europe | | **3339** ckpool EU | Same pool as 3334, closer servers |
+| You want small, regular payouts instead of the lottery | | **3337** OCEAN | Not solo: rewards are shared among all miners |
+
+AtlasPool requires a minimum difficulty of 2,000 (around 400 GH/s), so ESP32 miners do not work there.
+
 ## Pointing your miners
 
 Username: `YOUR_ADDRESS.worker-name`, any password (e.g. `x`). The name after the dot is what shows on the dashboard.
@@ -119,7 +135,7 @@ The page text lives in Portuguese in the source code. The English version is gen
 ## Security
 
 - Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.
-- The proxy ports (3333–3337) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
+- The proxy ports (3333–3339) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
 
 ## Support the project
 

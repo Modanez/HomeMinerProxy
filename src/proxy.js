@@ -15,6 +15,8 @@ const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
   { listen: 3334, host: 'solo.ckpool.org', port: 3333, label: 'ckpool solo' },
   { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' },
   { listen: 3337, host: 'mine.ocean.xyz', port: 3334, label: 'OCEAN' },
+  { listen: 3338, host: 'solo.atlaspool.io', port: 3333, label: 'atlaspool' },        // dificuldade mínima 2.000: ASICs (Bitaxe), não ESP32
+  { listen: 3339, host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU' },
 ];
 const STATS_PORT = Number(process.env.PROXY_STATS_PORT || 3336);
 const STATS_FILE = process.env.PROXY_STATS_FILE || path.join(process.env.DATA_DIR || __dirname, 'proxy-stats.json');

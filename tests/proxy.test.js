@@ -99,3 +99,21 @@ test('proxy repassa, mede e conta os shares', async (t) => {
   assert.strictEqual(s.recent[0].error, 'Difficulty too low');
   assert.strictEqual(s.recent[1].target, TARGET);
 });
+
+test('rotas padrão: todas as pools, portas sem repetição', async (t) => {
+  const statsPort = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const env = { ...process.env, PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir };
+  delete env.PROXY_ROUTES;
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], { env, stdio: 'ignore' });
+  t.after(() => { proxy.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const s = await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const byPort = Object.fromEntries(s.routes.map((r) => [r.listen, r.host]));
+  assert.strictEqual(new Set(s.routes.map((r) => r.listen)).size, s.routes.length, 'porta repetida');
+  assert.ok(!s.routes.some((r) => r.listen === statsPort));
+  assert.strictEqual(byPort[3333], 'public-pool.io');
+  assert.strictEqual(byPort[3334], 'solo.ckpool.org');
+  assert.strictEqual(byPort[3335], 'pool.nerdminers.org');
+  assert.strictEqual(byPort[3338], 'solo.atlaspool.io');
+  assert.strictEqual(byPort[3339], 'eusolo.ckpool.org');
+});

@@ -34,12 +34,16 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
 
 - **Proxy Stratum** (`src/proxy.js`): cada minerador se conecta no servidor da casa em vez da pool. O proxy repassa tudo **sem alterar nada** e, no caminho, remonta o cabeçalho do bloco de cada share para calcular a dificuldade atingida. Funciona com qualquer pool e qualquer minerador, sem depender de API de pool nem do firmware do aparelho. A porta escolhe a pool:
 
-  | Porta | Pool |
-  |---|---|
-  | 3333 | public-pool.io |
-  | 3334 | solo.ckpool.org (bom para Bitaxe) |
-  | 3335 | pool.nerdminers.org (aceita a dificuldade baixíssima dos ESP32) |
-  | 3337 | OCEAN |
+  | Porta | Pool | Taxa |
+  |---|---|---|
+  | 3333 | public-pool.io | 0% |
+  | 3334 | solo.ckpool.org (EUA) | 2% |
+  | 3335 | pool.nerdminers.org | 0% |
+  | 3337 | OCEAN (pagamento dividido, não é solo) | ver ocean.xyz |
+  | 3338 | solo.atlaspool.io (anycast, com servidor em São Paulo) | 1,5% do subsídio |
+  | 3339 | eusolo.ckpool.org (Europa) | 2% |
+
+  Qualquer outra pool Stratum V1 pode ser acrescentada no `PROXY_ROUTES` (veja a configuração).
 
 - **Painel** (`src/painel.js`), em `http://IP-DO-SERVIDOR:3000`, com quatro telas:
   - **Fazenda:** recordes, hashrate e a lista de workers com o último share.
@@ -81,6 +85,18 @@ sudo systemctl restart mineracao-proxy mineracao-painel
 
 Para atualizar, rode `git pull && sudo bash install.sh` de novo. A configuração e os dados (recordes, histórico) são mantidos.
 
+## Qual pool para cada minerador?
+
+| Minerador | Hashrate | Porta recomendada | Por quê |
+|---|---|---|---|
+| NerdMiner, placas ESP32 | ~50–400 kH/s | **3335** nerdminers | Aceita a dificuldade minúscula dos shares deles. A maioria das outras pools recusa ("difficulty too low") |
+| cpuminer no PC, celular ou placa tipo Raspberry | ~1–20 MH/s | **3333** public-pool | Sem taxa e com dificuldade mínima 1 |
+| Bitaxe e outros ASICs pequenos | ~0,4–10 TH/s | **3334** ckpool ou **3338** atlaspool | Pools solo consagradas. Escolha a de menor latência onde você mora. O proxy conta os shares aceitos e recusados de cada worker (`curl localhost:3336/stats` no servidor), então dá para comparar. No Brasil, a AtlasPool tem servidor em São Paulo |
+| Qualquer minerador, na Europa | | **3339** ckpool EU | A mesma pool da 3334, com servidores mais perto |
+| Você prefere pagamentos pequenos e regulares em vez da loteria | | **3337** OCEAN | Não é solo: a recompensa é dividida entre todos |
+
+A AtlasPool exige dificuldade mínima de 2.000 (uns 400 GH/s), então ESP32 não funciona lá.
+
 ## Apontando os mineradores
 
 Usuário: `SEU_ENDERECO.nome-do-worker`, com qualquer senha (ex.: `x`). O nome depois do ponto é o que aparece no painel.
@@ -119,7 +135,7 @@ Os textos da página estão em português no código. A versão em inglês é ge
 ## Segurança
 
 - Use só o **endereço público** de bitcoin. Nenhuma parte do projeto pede seed ou chave privada.
-- As portas do proxy (3333–3337) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
+- As portas do proxy (3333–3339) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
 
 ## Apoie o projeto
 
