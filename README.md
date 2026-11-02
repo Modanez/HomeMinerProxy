@@ -6,6 +6,24 @@ A Stratum proxy and dashboard for **home solo mining**: Bitaxe, NerdMiner, ESP32
 
 The goal is to turn the "block lottery" into something fun to watch: every share shows up instantly, records trigger confetti and a siren, and one screen shows the gap between your best hash and the hash of the latest block on the network.
 
+![A new farm record: confetti on the dashboard (the Arduino siren plays at the same time)](docs/img/record.gif)
+
+![Farm screen: record, hashrate, odds and every worker with its latest share](docs/img/dashboard.png)
+
+<details>
+<summary>More screenshots</summary>
+
+| Almost a block | History |
+|---|---|
+| ![Our best hash vs. the latest block hash](docs/img/almost-a-block.png) | ![Hashrate, record over time, hall of fame and power cost](docs/img/history.png) |
+
+| Phone | GeekMagic cube |
+|---|---|
+| ![Dashboard on a phone](docs/img/mobile.png) | ![Cube scoreboard and new record screen](docs/img/cube.png) |
+
+The screenshots use demo data.
+</details>
+
 ## How it works
 
 ```
@@ -43,6 +61,7 @@ The dashboard, cube, widget and installer work in **English** and **Brazilian Po
 - The **PT | EN** button at the top of the dashboard switches the language and remembers the choice in that browser.
 - **`?lang=en`** or **`?lang=pt`** on the dashboard or widget URL overrides the language for that page only.
 - **`CURRENCY=USD`** or **`CURRENCY=BRL`** sets the currency for money values (BTC price, prize, power bill). The default is BRL for pt-BR and USD otherwise.
+- **`POWER_PRICE_KWH=0.15`** sets your electricity price per kWh, in that currency (default 0.15 USD or 0.90 BRL). Together with `WATTS` per worker, it drives the power bill estimate.
 
 ## Install
 

@@ -6,6 +6,24 @@ Proxy Stratum e painel para **mineração solo caseira**: Bitaxe, NerdMiner, ESP
 
 A ideia é transformar a "loteria do bloco" em algo divertido de acompanhar: cada share aparece na hora, os recordes disparam confete e sirene, e uma tela mostra o abismo entre o nosso melhor hash e o hash do último bloco da rede.
 
+![Novo recorde da fazenda: confete no painel (a sirene do Arduino toca junto)](docs/img/record.gif)
+
+![Tela da fazenda em português: recorde, hashrate, chance e cada worker com o último share](docs/img/painel.png)
+
+<details>
+<summary>Mais imagens</summary>
+
+| Quase bloco | Histórico |
+|---|---|
+| ![Nosso melhor hash × hash do último bloco](docs/img/almost-a-block.png) | ![Hashrate, evolução do recorde, hall da fama e conta de luz](docs/img/history.png) |
+
+| Celular | Cubo GeekMagic |
+|---|---|
+| ![Painel no celular](docs/img/mobile.png) | ![Placar no cubo e tela de recorde](docs/img/cube.png) |
+
+As imagens usam dados de demonstração. As telas extras estão em inglês; o painel inteiro também funciona em português.
+</details>
+
 ## Como funciona
 
 ```
@@ -43,6 +61,7 @@ O painel, o cubo, o widget e o instalador funcionam em **português (pt-BR)** e 
 - O botão **PT | EN** no topo do painel troca o idioma e lembra a escolha naquele navegador.
 - **`?lang=pt` ou `?lang=en`** na URL do painel ou do widget força o idioma só ali.
 - **`CURRENCY=BRL`** ou **`CURRENCY=USD`** define a moeda dos valores (cotação, prêmio, conta de luz). O padrão é BRL em pt-BR e USD nos outros casos.
+- **`POWER_PRICE_KWH=0.90`** define o preço do kWh da sua conta de luz, nessa moeda. O padrão é R$ 0,90 ou US$ 0,15. Junto com o `WATTS` de cada worker, ele calcula a estimativa da conta de luz.
 
 ## Instalação
 
