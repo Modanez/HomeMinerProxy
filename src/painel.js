@@ -1803,4 +1803,25 @@ http.createServer((req, res) => {
   every(tickOcean, 300e3);
   every(tickProxy, PROXY_MS);
   every(async () => { alarmOpen(); alarmStatus(); }, 60e3);
+  startTelegram();
 });
+
+// ---------------------------------------------------------------- bot do Telegram (opcional)
+function startTelegram() {
+  const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
+  if (!token) return;
+  const hour = (process.env.TELEGRAM_DAILY ?? '21').trim();
+  require('./telegram').start({
+    token,
+    chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
+    lang: LANGUAGE || 'en',
+    snapshot,
+    quiet: quietNow,
+    ignore: ALARM_IGNORE,
+    personal: process.env.TELEGRAM_PERSONAL === '1',
+    dailyHour: /^\d{1,2}$/.test(hour) && Number(hour) < 24 ? Number(hour) : null,
+    panelUrl: (process.env.TELEGRAM_PANEL_URL || '').trim() || null,
+    stateFile: file('telegram.json'),
+    api: process.env.TELEGRAM_API,
+  });
+}

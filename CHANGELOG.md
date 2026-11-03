@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Telegram bot:** alerts for farm records, stopped workers, pool failover and money arriving in the wallet (a found block), a daily summary, and the commands /status, /workers, /luck, /records. Optional, configured with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+
+### Português
+- **Bot do Telegram:** avisos de recorde da fazenda, worker parado, failover de pool e dinheiro entrando na carteira (um bloco achado), resumo diário e os comandos /status, /workers, /sorte, /recordes. Opcional, configurado com `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
+
 ## v0.1.0 — 2026-11-02
 
 First public release / Primeira versão pública.

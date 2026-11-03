@@ -58,6 +58,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
 
   For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden.
 - **Optional extras:**
+  - **Telegram bot:** alerts on your phone for farm records, stopped workers, pool failover and money arriving in the wallet (a found block!), a daily summary, and commands such as `/status` and `/luck`. See [Telegram bot](#telegram-bot-optional).
   - **Siren:** an Arduino with LEDs and a speaker, see `extras/sirene`.
   - **GeekMagic SmallTV cube:** a 240×240 desk scoreboard (`src/cubo.py`).
   - **KWGT widget for Android:** see `extras/kwgt`.
@@ -132,6 +133,22 @@ Give the server a fixed IP in your router (DHCP reservation): if its IP changes,
 ```bash
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u YOUR_ADDRESS.laptop -p x
 ```
+
+## Telegram bot (optional)
+
+1. In Telegram, open **@BotFather**, send `/newbot`, pick a name and copy the token it gives you.
+2. Put it in `/etc/mineracao.env` as `TELEGRAM_BOT_TOKEN=...` and run `sudo systemctl restart mineracao-painel`.
+3. Send `/start` to your bot. It replies with your chat id.
+4. Put that id in `TELEGRAM_CHAT_ID=...` and restart the dashboard again.
+
+The bot sends:
+- **Farm record:** a new best share for the whole farm.
+- **Worker stopped / back:** when a worker goes red on the dashboard, and when it returns.
+- **Pool failover:** when a port moves to its backup pool, and when it moves back.
+- **Money in the wallet:** any payment to your address. A solo block shows up as 🎉 **WE FOUND A BLOCK!**
+- **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`).
+
+Commands: `/status`, `/workers`, `/luck`, `/records`, `/help`. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
 
 ## GeekMagic cube (optional)
 

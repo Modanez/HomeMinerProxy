@@ -58,6 +58,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
 
   Para uma tela ligada ao servidor, use `?kiosk`: as telas alternam sozinhas e o cursor some.
 - **Extras opcionais:**
+  - **Bot do Telegram:** avisos no celular de recorde da fazenda, worker parado, failover de pool e dinheiro entrando na carteira (um bloco achado!), resumo diário e comandos como `/status` e `/sorte`. Veja [Bot do Telegram](#bot-do-telegram-opcional).
   - **Sirene:** Arduino com LEDs e alto-falante, ver `extras/sirene`.
   - **Cubo GeekMagic SmallTV:** placar de 240×240 na mesa (`src/cubo.py`).
   - **Widget KWGT para Android:** ver `extras/kwgt`.
@@ -132,6 +133,22 @@ Reserve um IP fixo para o servidor no roteador (DHCP estático): se o IP mudar, 
 ```bash
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u SEU_ENDERECO.notebook -p x
 ```
+
+## Bot do Telegram (opcional)
+
+1. No Telegram, abra o **@BotFather**, mande `/newbot`, escolha um nome e copie o token que ele devolve.
+2. Coloque em `/etc/mineracao.env` como `TELEGRAM_BOT_TOKEN=...` e rode `sudo systemctl restart mineracao-painel`.
+3. Mande `/start` para o seu bot. Ele responde com o id do chat.
+4. Coloque esse id em `TELEGRAM_CHAT_ID=...` e reinicie o painel de novo.
+
+O bot avisa:
+- **Recorde da fazenda:** um novo melhor share da fazenda inteira.
+- **Worker parado / de volta:** quando um worker fica vermelho no painel, e quando ele volta.
+- **Failover de pool:** quando uma porta vai para a pool reserva, e quando volta para a principal.
+- **Dinheiro na carteira:** qualquer pagamento para o seu endereço. Um bloco solo chega como 🎉 **ACHAMOS UM BLOCO!**
+- **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`).
+
+Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/ajuda`. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
 
 ## Cubo GeekMagic (opcional)
 
