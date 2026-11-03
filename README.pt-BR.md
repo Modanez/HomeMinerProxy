@@ -279,6 +279,11 @@ O que os testes cobrem:
 
 Os textos da página estão em português no código. A versão em inglês é gerada pela tabela em `src/i18n.js`. Se você mudar um texto em português, atualize a tabela: o teste `tests/i18n.test.js` avisa se algum trecho sumir.
 
+Documentação de arquitetura e APIs:
+- **Modelo C4 (Contexto, Contêineres, Componentes e Fluxos):** [`docs/c4/README.pt-BR.md`](docs/c4/README.pt-BR.md)
+- **Registros de Decisão de Arquitetura (ADRs):** [`docs/adr/README.pt-BR.md`](docs/adr/README.pt-BR.md)
+- **Coleções Postman (APIs HTTP):** [`docs/postman/README.pt-BR.md`](docs/postman/README.pt-BR.md)
+
 ## Segurança
 
 - Use só o **endereço público** de bitcoin. Nenhuma parte do projeto pede seed ou chave privada.

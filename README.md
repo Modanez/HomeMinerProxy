@@ -279,6 +279,11 @@ What the tests cover:
 
 The page text lives in Portuguese in the source code. The English version is generated from the table in `src/i18n.js`. If you change a Portuguese string, update the table: `tests/i18n.test.js` fails when an entry no longer matches.
 
+Architecture & API documentation:
+- **C4 Model (Context, Containers, Components & Flows):** [`docs/c4/README.md`](docs/c4/README.md)
+- **Architecture Decision Records (ADRs):** [`docs/adr/README.md`](docs/adr/README.md)
+- **Postman Collections (HTTP APIs):** [`docs/postman/README.md`](docs/postman/README.md)
+
 ## Security
 
 - Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.

@@ -1,0 +1,391 @@
+{
+  "info": {
+    "_postman_id": "8c4b11a0-2026-4d00-9a10-000000000002",
+    "name": "HomeMinerProxy API (pt-BR)",
+    "description": "Coleção HTTP completa do **HomeMinerProxy** (`src/painel.js` e `src/proxy.js`).\n\nInclui:\n- Páginas HTML do Painel (`/`, `/?lang=pt`, `/?lang=en`, `/?kiosk`, `/config`)\n- APIs JSON da Fazenda, Widget e Sirene (`/api/mining`, `/api/widget`, `/api/alarm`)\n- APIs da Tela de Configurações e Testes (`/api/config`, `/api/config/test`)\n- API Interna de Estatísticas do Proxy Stratum (`http://127.0.0.1:3336/stats`)",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://127.0.0.1:3000" },
+    { "key": "proxyStatsUrl", "value": "http://127.0.0.1:3336" },
+    { "key": "settingsPin", "value": "123456" },
+    { "key": "btcAddress", "value": "bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w" },
+    { "key": "cubeIp", "value": "192.168.0.50" },
+    { "key": "telegramBotToken", "value": "" },
+    { "key": "telegramChatId", "value": "" }
+  ],
+  "item": [
+    {
+      "name": "1. Páginas do Painel",
+      "description": "Endpoints HTML servidos pelo `src/painel.js` na porta 3000.",
+      "item": [
+        {
+          "name": "Painel (Idioma Padrão)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('Content-Type é text/html', () => pm.expect(pm.response.headers.get('Content-Type')).to.include('text/html'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/",
+              "host": ["{{baseUrl}}"],
+              "path": [""]
+            },
+            "description": "Retorna o painel web com as 5 telas no idioma padrão do servidor ou do navegador."
+          }
+        },
+        {
+          "name": "Painel (Português — ?lang=pt)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('HTML lang é pt-br', () => pm.expect(pm.response.text()).to.include('<html lang=\"pt-br\">'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?lang=pt",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [{ "key": "lang", "value": "pt" }]
+            },
+            "description": "Força o idioma do painel para português (pt-BR)."
+          }
+        },
+        {
+          "name": "Painel (Inglês — ?lang=en)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('HTML lang é en', () => pm.expect(pm.response.text()).to.include('<html lang=\"en\">'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?lang=en",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [{ "key": "lang", "value": "en" }]
+            },
+            "description": "Força o idioma do painel para inglês (en)."
+          }
+        },
+        {
+          "name": "Painel (Modo Kiosk — ?kiosk)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/?kiosk",
+              "host": ["{{baseUrl}}"],
+              "path": [""],
+              "query": [{ "key": "kiosk", "value": null }]
+            },
+            "description": "Abre o painel em modo Kiosk (alterna as 5 telas sozinho a cada `ROTATE_S` segundos e oculta o cursor do mouse)."
+          }
+        },
+        {
+          "name": "Tela de Configurações (/config)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('X-Frame-Options é DENY', () => pm.expect(pm.response.headers.get('X-Frame-Options')).to.eql('DENY'));"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["config"]
+            },
+            "description": "Serve a página HTML da tela de configurações (`/config`)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. APIs de Dados e Periféricos do Painel",
+      "description": "Endpoints JSON com os dados completos da fazenda, resumo para widgets (KWGT) e acionamento da sirene Arduino.",
+      "item": [
+        {
+          "name": "Snapshot Completo da Mineração (/api/mining)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Contém farm, hall, energy e luck', () => {",
+                  "  pm.expect(j).to.have.property('farm');",
+                  "  pm.expect(j).to.have.property('hall');",
+                  "  pm.expect(j).to.have.property('energy');",
+                  "  pm.expect(j).to.have.property('luck');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/mining",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "mining"]
+            },
+            "description": "Retorna o estado completo da fazenda consumido pelo painel web, pelo cubo (`src/cubo.py`) e pelo gerador de bilhete (`src/ticket.py`)."
+          }
+        },
+        {
+          "name": "Resumo para Widget — Português (/api/widget?lang=pt)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Contém campos do widget', () => {",
+                  "  pm.expect(j).to.have.property('recorde');",
+                  "  pm.expect(j).to.have.property('hashrate');",
+                  "  pm.expect(j).to.have.property('minerando');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/widget?lang=pt",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "widget"],
+              "query": [{ "key": "lang", "value": "pt" }]
+            },
+            "description": "Retorna o JSON enxuto e formatado em português para o widget KWGT no Android."
+          }
+        },
+        {
+          "name": "Resumo para Widget — Inglês (/api/widget?lang=en)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/widget?lang=en",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "widget"],
+              "query": [{ "key": "lang", "value": "en" }]
+            },
+            "description": "Retorna o JSON enxuto e formatado em inglês para widgets."
+          }
+        },
+        {
+          "name": "Acionar Sirene Arduino (/api/alarm?e=T)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Contém sent e connected', () => {",
+                  "  pm.expect(j).to.have.property('sent');",
+                  "  pm.expect(j).to.have.property('connected');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/alarm?e=T",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "alarm"],
+              "query": [
+                {
+                  "key": "e",
+                  "value": "T",
+                  "description": "Código do evento: T (teste), R (recorde da fazenda), P (recorde pessoal), S (share), 0 (verde), 1 (amarelo), 2 (vermelho)"
+                }
+              ]
+            },
+            "description": "Envia um comando de 1 byte para a sirene Arduino (`ALARM_PORT`). Durante o `QUIET_HOURS`, os códigos sonoros (`R`, `P`, `S`, `T`) são enviados em minúsculas (`r`, `p`, `s`, `t`) para acionar apenas os LEDs sem som."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. APIs de Configuração e Testes",
+      "description": "Endpoints tratados por `src/settings.js` para ler, testar e salvar configurações em `DATA_DIR/settings.json`.",
+      "item": [
+        {
+          "name": "Ler Configurações Atuais (/api/config)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Contém values, workers e pin', () => {",
+                  "  pm.expect(j).to.have.property('values');",
+                  "  pm.expect(j).to.have.property('workers');",
+                  "  pm.expect(j).to.have.property('pin');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config"]
+            },
+            "description": "Retorna os valores efetivos da configuração, a lista de workers conhecidos e se há `SETTINGS_PIN` definido. O `TELEGRAM_BOT_TOKEN` nunca sai completo (`{ set: boolean, tail: string }`)."
+          }
+        },
+        {
+          "name": "Salvar Configurações (/api/config)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"values\": {\n    \"BTC_ADDRESS\": \"{{btcAddress}}\",\n    \"LANGUAGE\": \"pt-BR\",\n    \"CURRENCY\": \"BRL\",\n    \"POWER_PRICE_KWH\": \"0.90\",\n    \"LOCAL_WORKER\": \"\",\n    \"ALARM_IGNORE\": [],\n    \"CUBE_IP\": \"{{cubeIp}}\",\n    \"TELEGRAM_BOT_TOKEN\": \"\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\",\n    \"TELEGRAM_DAILY\": \"21\",\n    \"TELEGRAM_PERSONAL\": false,\n    \"TELEGRAM_PANEL_URL\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config"]
+            },
+            "description": "Valida e grava os valores alterados em `DATA_DIR/settings.json`. Exige o `SETTINGS_PIN`. Se algum valor mudou, retorna `{ ok: true, restart: true }` e reinicia o serviço do painel."
+          }
+        },
+        {
+          "name": "Testar Cubo GeekMagic (/api/config/test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"what\": \"cube\",\n  \"values\": {\n    \"CUBE_IP\": \"{{cubeIp}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "test"]
+            },
+            "description": "Testa se o cubo GeekMagic SmallTV responde via HTTP no endereço `CUBE_IP`."
+          }
+        },
+        {
+          "name": "Testar Bot do Telegram (/api/config/test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"what\": \"telegram\",\n  \"values\": {\n    \"TELEGRAM_BOT_TOKEN\": \"{{telegramBotToken}}\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "test"]
+            },
+            "description": "Envia uma mensagem de teste para `TELEGRAM_CHAT_ID` usando o `TELEGRAM_BOT_TOKEN` informado (ou o token já salvo no servidor se deixado em branco)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. API Interna do Proxy Stratum",
+      "description": "Endpoint HTTP local servido pelo `src/proxy.js` em `127.0.0.1:3336`.",
+      "item": [
+        {
+          "name": "Estatísticas Brutas do Proxy (/stats)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Contém routes, workers, recent, totals e hist', () => {",
+                  "  pm.expect(j).to.have.property('routes');",
+                  "  pm.expect(j).to.have.property('workers');",
+                  "  pm.expect(j).to.have.property('recent');",
+                  "  pm.expect(j).to.have.property('totals');",
+                  "  pm.expect(j).to.have.property('hist');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{proxyStatsUrl}}/stats",
+              "host": ["{{proxyStatsUrl}}"],
+              "path": ["stats"]
+            },
+            "description": "Retorna a telemetria em tempo real do proxy Stratum V1: rotas e estado de failover das pools, workers conectados, hashrate na janela de 1h, últimos 100 shares, `bestHash`, `dayBestHash` e o histograma de 40 faixas de dificuldade (`hist`)."
+          }
+        }
+      ]
+    }
+  ]
+}
+

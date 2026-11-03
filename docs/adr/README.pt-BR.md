@@ -1,0 +1,14 @@
+# 📐 Registros de Decisão de Arquitetura (ADRs)
+
+[English](README.md) · **Português**
+
+Este diretório reúne os **Registros de Decisão de Arquitetura (ADRs)** do **HomeMinerProxy**, documentando as principais decisões técnicas, o contexto e os *trade-offs* do projeto.
+
+| ADR | Título | Status |
+|---|---|---|
+| [ADR-0001](0001-zero-dependency-nodejs.pt-BR.md) | Zero dependências npm de terceiros nos serviços Node.js | Aceita |
+| [ADR-0002](0002-transparent-stratum-proxy-and-failover.pt-BR.md) | Proxy Stratum V1 transparente 1:1 com seleção de pool por porta e failover | Aceita |
+| [ADR-0003](0003-flat-json-persistence-and-settings-overlay.pt-BR.md) | Persistência em arquivos JSON e overlay `settings.json` protegido por PIN | Aceita |
+| [ADR-0004](0004-bilingual-pt-source-with-i18n-table.pt-BR.md) | Código-fonte HTML em português com tabela determinística de tradução (`src/i18n.js`) | Aceita |
+| [ADR-0005](0005-python-pillow-for-cube-and-lottery-ticket.pt-BR.md) | Python + Pillow para o placar do cubo GeekMagic e o bilhete de loteria no Telegram | Aceita |
+

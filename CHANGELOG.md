@@ -4,9 +4,11 @@
 
 ### English
 - **Daily ticket on Telegram:** the 21:00 summary now comes with today's lottery-ticket image, and `/ticket` sends it any time. Rendered on the server by `ticket.py` (Pillow); without Pillow the summary stays text only.
+- **Architecture & API docs:** C4 Model diagrams (`docs/c4`), Architecture Decision Records (`docs/adr`) and Postman v2.1 collections + environment (`docs/postman`), all in English and Brazilian Portuguese.
 
 ### Português
 - **Bilhete do dia no Telegram:** o resumo das 21h agora vem com a imagem do bilhete de loteria do dia, e o `/bilhete` manda a qualquer hora. Gerado no servidor pelo `ticket.py` (Pillow); sem Pillow, o resumo continua só em texto.
+- **Documentação de arquitetura e APIs:** diagramas C4 Model (`docs/c4`), Registros de Decisão de Arquitetura (`docs/adr`) e coleções + ambiente Postman v2.1 (`docs/postman`), tudo em inglês e português.
 
 ## v0.2.0 — 2026-11-03
 
