@@ -8,6 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { pickLang, localizePage, LOCALES, WIDGET } = require('./i18n');
+const { luckOf, theoreticalShare } = require('./luck');
 
 // ---------------------------------------------------------------- configuração
 const PORT = Number(process.env.PORT || 3000);
@@ -560,6 +561,12 @@ async function tickProxy() {
       workers: Object.fromEntries(ws.map((w) => [w.name, w])),
       recent: (s.recent || []).slice(0, 30),
       totals: s.totals || null,
+      hist: Array.isArray(s.hist) ? s.hist : null,
+      // portas cuja pool principal está fora do ar (os mineradores dessas portas estão na reserva)
+      failover: (s.routes || []).filter((r) => r.upstreams && r.upstreams[0].down).map((r) => ({
+        listen: r.listen, primary: r.upstreams[0].label, since: r.upstreams[0].since,
+        active: (r.upstreams.slice(1).find((u) => !u.down) || {}).label || null,
+      })),
       bestHash: s.bestHash || null,
       dayBestHash: s.dayBestHash || null,
     };
@@ -634,7 +641,7 @@ function snapshot() {
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
     ocean: OCEAN_API ? { ...ocean } : null,
-    proxy: PROXY_URL ? { okAt: proxy.okAt, error: proxy.error, up: proxyUp(), recent: proxy.recent.slice(0, 10) } : null,
+    proxy: PROXY_URL ? { okAt: proxy.okAt, error: proxy.error, up: proxyUp(), recent: proxy.recent.slice(0, 10), failover: proxyUp() ? proxy.failover || [] : [] } : null,
     error: pool.error,
     staleWarnMs: STALE_WARN_MS,
     rotateS: ROTATE_S,
@@ -660,6 +667,13 @@ function snapshot() {
       bestHash: proxy.bestHash || null,
       dayBestHash: proxy.dayBestHash || null,
     },
+    luck: proxyUp() ? {
+      workers: Object.values(proxy.workers).filter((w) => w.luck && w.luck.work > 0)
+        .map((w) => ({ name: w.name, since: w.luck.since, ...luckOf(w.luck.work, w.luck.best) }))
+        .sort((a, b) => b.factor - a.factor),
+      hist: proxy.hist,
+      theory: proxy.hist ? proxy.hist.map((_, k) => theoreticalShare(k)) : null,
+    } : null,
     hall: [...records].sort((a, b) => b.value - a.value).slice(0, 5),
     recordSteps,
     recentRecords: [...records]
@@ -742,6 +756,14 @@ const PAGE = `<!doctype html>
   td.dim { color:var(--dim); }
   .toggle { text-transform:none; letter-spacing:0; color:var(--gold); margin-left:8px; text-decoration:none; font-size:12px; }
   body.kiosk .toggle { display:none; }
+  .ticket-btn { margin-left:10px; font-size:12px; letter-spacing:0; text-transform:none; color:var(--gold); text-decoration:none; border:1px solid var(--gold); border-radius:6px; padding:2px 8px; }
+  body.kiosk .ticket-btn { display:none; }
+  .ticket { position:fixed; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:rgba(14,17,23,.92); padding:16px; }
+  .ticket.on { display:flex; }
+  .ticket img { max-width:min(92vw, 540px); max-height:78vh; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  .ticket .btns { display:flex; gap:10px; }
+  .ticket button { font:inherit; font-size:14px; padding:8px 16px; border-radius:8px; border:1px solid var(--gold); background:var(--card); color:var(--txt); cursor:pointer; }
+  .ticket button.main { background:var(--gold); color:#14161c; font-weight:700; }
   .pool { font-size:11px; color:var(--dim); margin-left:6px; white-space:nowrap; }
   .last { display:block; font-size:11px; color:var(--dim); white-space:nowrap; }
   .last.fresh { color:var(--gold); }
@@ -751,6 +773,9 @@ const PAGE = `<!doctype html>
   .legend { float:right; text-transform:none; letter-spacing:0; }
   .legend .dot { width:7px; height:7px; margin:0 4px 0 10px; }
   .err { color:var(--warn); margin-top:8px; font-size:13px; }
+  .err:empty { display:none; }
+  body.kiosk #fo:not(:empty) ~ * { display:none; }
+  body.kiosk .card:has(#fo:not(:empty)) .dist-cap { display:none; }   /* no kiosk, o aviso de failover ocupa o lugar da legenda */
   .bar { height:8px; background:var(--line); border-radius:4px; margin-top:10px; overflow:hidden; }
   .bar.thin { height:5px; margin-top:8px; }
   .bar i { display:block; height:100%; background:var(--gold); }
@@ -758,6 +783,16 @@ const PAGE = `<!doctype html>
   .wallet .big { font-size:30px; overflow-wrap:anywhere; }
   .duo { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   .hexcard { margin-bottom:12px; }
+  table.luck td, table.luck th { padding:6px 6px; }
+  .luckbar { height:6px; background:var(--line); border-radius:3px; margin-top:4px; overflow:hidden; }
+  .luckbar i { display:block; height:100%; background:var(--gold); }
+  .lk-hi { color:var(--ok); font-weight:700; } .lk-lo { color:var(--warn); font-weight:700; }
+  .lk-p { font-size:11px; white-space:nowrap; }
+  .luck-duo .lead, body.kiosk .luck-duo .lead { font-size:13px; color:var(--dim); margin:4px 0 6px; }
+  .hist-card .chart { height:240px; }
+  body.kiosk .luck-duo { flex:1; min-height:0; }
+  body.kiosk .hist-card { display:flex; flex-direction:column; }
+  body.kiosk .hist-card .chart { flex:1; height:auto; min-height:0; }
   .hexrow { margin-bottom:6px; }
   .hex { font-family:ui-monospace, "DejaVu Sans Mono", Menlo, monospace; font-size:15px; letter-spacing:.02em; color:var(--dim); word-break:break-all; line-height:1.35; }
   .hex .z, .z { color:var(--gold); font-weight:700; }
@@ -804,6 +839,8 @@ const PAGE = `<!doctype html>
     .legend { float:none; display:block; margin-top:4px; }
     .pool { display:block; margin:1px 0 0 17px; }
     .legend .dot:first-child { margin-left:0; }
+    .lk-p { white-space:normal; }
+    table.luck td, table.luck th { padding:7px 3px; }
   }
   @media (min-width: 641px) and (max-height: 640px) {
     body { padding:10px 14px; }
@@ -859,7 +896,8 @@ const PAGE = `<!doctype html>
     </table>
     <div class="sub" style="margin-top:10px" id="netd">–</div>
     <div class="bar"><i id="prog" style="width:0%"></i></div>
-    <div class="sub" style="margin-top:4px">Distância até um bloco, em escala logarítmica.</div>
+    <div class="sub dist-cap" style="margin-top:4px">Distância até um bloco, em escala logarítmica.</div>
+    <div class="err" id="fo"></div>
     <div class="err" id="err"></div>
   </div>
   <div class="card wallet">
@@ -924,7 +962,7 @@ const PAGE = `<!doctype html>
 
 <!-- Tela 4: quase bloco -->
 <section class="page">
-  <h2 class="sect">Quase bloco</h2>
+  <h2 class="sect">Quase bloco <a class="ticket-btn" id="ticketBtn" href="#">🎟️ Bilhete do dia</a></h2>
   <div class="card hexcard">
     <div class="hexrow"><div class="label" id="qbL1">Hash do último bloco</div><div class="hex" id="qbH1">–</div></div>
     <div class="hexrow"><div class="label" id="qbL2">Nosso melhor hash</div><div class="hex" id="qbH2">–</div></div>
@@ -940,8 +978,30 @@ const PAGE = `<!doctype html>
   <div class="card ruler-card"><div class="label">Régua da dificuldade (escala logarítmica)</div><div id="qbRuler" class="ruler"></div></div>
 </section>
 
+<!-- Tela 5: sorte -->
+<section class="page">
+  <h2 class="sect">Sorte</h2>
+  <div class="duo luck-duo">
+    <div class="card">
+      <div class="label">Medidor de sorte</div>
+      <div class="lead">Melhor share de cada worker comparado com o esperado para o trabalho que ele fez.</div>
+      <table class="luck"><thead><tr><th>Worker</th><th>Melhor</th><th>Esperado</th><th>Sorte</th></tr></thead>
+        <tbody id="lkRows"><tr><td colspan="4" class="sub">aguardando shares pelo proxy…</td></tr></tbody></table>
+    </div>
+    <div class="card hist-card">
+      <div class="label">Distribuição dos shares</div>
+      <div class="chart" id="lkHist"></div>
+      <div class="sub" id="lkHistS">Cada faixa tem metade dos shares da anterior, como a matemática prevê. É a prova de que a loteria é justa.</div>
+    </div>
+  </div>
+</section>
+
 </main>
 <div class="tooltip" id="tip"></div>
+<div class="ticket" id="ticket">
+  <img id="ticketImg" alt="">
+  <div class="btns"><button class="main" id="ticketShare">Compartilhar</button><button id="ticketSave">Baixar imagem</button><button id="ticketClose">Fechar</button></div>
+</div>
 <div class="party" id="party">
   <canvas id="confetti"></canvas>
   <div class="party-box">
@@ -1250,6 +1310,7 @@ function renderNear(j) {
   const b = nb.bestHash, d = nb.dayBestHash;
   if (b) { set('qbL2', 'Nosso melhor hash · ' + b.worker + ' · dificuldade ' + diffTxt(b.diff)); $('qbH2').innerHTML = hexHtml(b.hash); }
   else { set('qbL2', 'Nosso melhor hash'); set('qbH2', 'o proxy ainda não registrou nenhum hash'); }
+  $('ticketBtn').style.display = d || b ? '' : 'none';   // o bilhete precisa de um hash registrado pelo proxy
   if (d) { set('qbL3', 'Melhor de hoje · ' + d.worker + ' · dificuldade ' + diffTxt(d.diff)); $('qbH3').innerHTML = hexHtml(d.hash); }
   else { set('qbL3', 'Melhor de hoje'); set('qbH3', '–'); }
 
@@ -1307,6 +1368,133 @@ function ruler(j, t, best) {
   });
   el.innerHTML = svg + '</svg>';
 }
+
+// ------------------------------------------------ tela 5: sorte
+function renderLuck(j) {
+  const L = j.luck;
+  if (!L) return;
+  const ws = L.workers || [];
+  $('lkRows').innerHTML = ws.length ? ws.map((w) => {
+    const cls = w.factor >= 2 ? 'lk-hi' : w.factor < 0.5 ? 'lk-lo' : '';
+    const pct = Math.round(w.percentile * 100);
+    return '<tr><td>' + esc(w.name) + '</td><td>' + diffTxt(w.best) + '</td><td>' + diffTxt(w.expected) +
+      '</td><td><span class="' + cls + '">' + nf(w.factor, w.factor < 10 ? 2 : 0) + '×</span>' +
+      '<div class="luckbar"><i style="width:' + pct + '%"></i></div><span class="sub lk-p">melhor que ' + pct + '% das fazendas iguais</span></td></tr>';
+  }).join('') : '<tr><td colspan="4" class="sub">aguardando shares pelo proxy…</td></tr>';
+  histChart(L.hist, L.theory);
+}
+
+function histChart(h, th) {
+  const el = $('lkHist');
+  if (!h || !th) return;
+  const total = h.reduce((a, b) => a + b, 0);
+  if (!total) { el.innerHTML = '<div class="empty">os shares aparecem aqui conforme chegam pelo proxy</div>'; return; }
+  let last = h.length - 1; while (last > 0 && !h[last]) last--;
+  const K = Math.max(last + 1, 8);
+  const W = el.clientWidth || 500, H = el.clientHeight || 240, Lm = 40, B = 34, T = 8;
+  const iw = W - Lm - 8, ih = H - B - T, bw = iw / K;
+  const maxLog = Math.log10(Math.max(total * 0.5, h[0], 1)) + 0.2;
+  const y = (v) => T + ih - (v >= 1 ? Math.log10(v) / maxLog * ih : 0);
+  let s = '<svg width="' + W + '" height="' + H + '">';
+  for (let e = 0; e <= Math.floor(maxLog); e++) {
+    const yy = y(Math.pow(10, e)).toFixed(1);
+    s += '<line x1="' + Lm + '" x2="' + (W - 8) + '" y1="' + yy + '" y2="' + yy + '" style="stroke:var(--line)"/><text x="' + (Lm - 6) + '" y="' + (Number(yy) + 4) + '" text-anchor="end">' + fmtBig(Math.pow(10, e)) + '</text>';
+  }
+  let path = '';
+  for (let k = 0; k < K; k++) {
+    const x = Lm + k * bw, c = h[k] || 0, exp = total * th[k];
+    if (c > 0) s += '<rect x="' + (x + 2).toFixed(1) + '" y="' + y(c).toFixed(1) + '" width="' + Math.max(1, bw - 4).toFixed(1) + '" height="' + (T + ih - y(c)).toFixed(1) + '" style="fill:var(--gold);fill-opacity:.85"><title>' + nf(c) + '</title></rect>';
+    if (exp >= 0.5) path += (path ? ' L' : 'M') + (x + bw / 2).toFixed(1) + ' ' + y(Math.max(exp, 1)).toFixed(1);
+    if (k % Math.ceil(K / 6) === 0) s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 18) + '" text-anchor="middle">' + fmtShort(Math.pow(2, k)) + '×</text>';
+  }
+  s += '<path d="' + path + '" style="fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 4"/>';
+  s += '<text x="' + (W - 8) + '" y="' + (H - 2) + '" text-anchor="end">dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria</text>';
+  el.innerHTML = s + '</svg>';
+}
+
+// ------------------------------------------------ bilhete do dia (imagem para compartilhar)
+function drawTicket(j) {
+  const nb = j.nearBlock || {}, t = nb.tip, b = nb.dayBestHash || nb.bestHash;
+  if (!t || !b) return null;
+  const W = 1080, H = 1350, c = document.createElement('canvas');
+  c.width = W; c.height = H;
+  const x = c.getContext('2d'), css = getComputedStyle(document.documentElement);
+  const col = (v, d) => (css.getPropertyValue(v) || d).trim() || d;
+  const BG = col('--bg', '#0e1117'), CARD = col('--card', '#171c26'), GOLD = col('--gold', '#f2a900'), TXT = col('--txt', '#e6e9ef'), DIM = col('--dim', '#8a93a6'), OK = col('--ok', '#3ecf8e'), WARN = col('--warn', '#e5534b');
+  const SANS = '-apple-system, "Segoe UI", Roboto, "DejaVu Sans", sans-serif', MONO = 'ui-monospace, Menlo, "DejaVu Sans Mono", monospace';
+  const text = (s, px, y, color, opt) => {
+    opt = opt || {};
+    x.font = (opt.weight || '400') + ' ' + px + 'px ' + (opt.mono ? MONO : SANS);
+    x.fillStyle = color; x.textAlign = opt.align || 'center';
+    x.fillText(s, opt.align === 'left' ? 90 : W / 2, y);
+  };
+  x.fillStyle = BG; x.fillRect(0, 0, W, H);
+  // bilhete com recortes nas laterais
+  x.fillStyle = CARD; x.beginPath(); x.roundRect(50, 60, W - 100, H - 120, 36); x.fill();
+  x.fillStyle = BG; [430, 1010].forEach((cy) => { x.beginPath(); x.arc(50, cy, 34, 0, 7); x.arc(W - 50, cy, 34, 0, 7); x.fill(); });
+  x.setLineDash([14, 12]); x.strokeStyle = DIM; x.lineWidth = 3;
+  [430, 1010].forEach((cy) => { x.beginPath(); x.moveTo(100, cy); x.lineTo(W - 100, cy); x.stroke(); });
+  x.setLineDash([]);
+
+  const day = new Date(b.at || Date.now());
+  text('⛏️ BILHETE DE LOTERIA DO BITCOIN', 44, 170, GOLD, { weight: '800' });
+  text(day.toLocaleDateString(LOC, { day: '2-digit', month: 'long', year: 'numeric' }), 36, 235, DIM);
+  text('Melhor hash do dia · ' + b.worker, 40, 330, TXT, { weight: '600' });
+  text('dificuldade ' + diffTxt(b.diff), 34, 385, DIM);
+
+  // o hash em duas linhas, zeros em destaque
+  const hz = zeros(b.hash), lines = [b.hash.slice(0, 32), b.hash.slice(32)];
+  x.font = '600 46px ' + MONO; x.textAlign = 'left';
+  const lw = x.measureText('0'.repeat(32)).width, x0 = (W - lw) / 2, cw = lw / 32;
+  lines.forEach((ln, li) => {
+    for (let k = 0; k < ln.length; k++) {
+      x.fillStyle = li * 32 + k < hz ? GOLD : TXT;
+      x.fillText(ln[k], x0 + k * cw, 530 + li * 70);
+    }
+  });
+  const zb = zeros(t.hash);
+  text(hz + ' zeros na frente', 40, 700, GOLD, { weight: '700' });
+  text('o bloco #' + nf(t.height) + ' tinha ' + zb + ' zeros', 34, 755, DIM);
+  text('faltaram ' + (zb - hz) + ' zeros: ' + fmtBig(t.hashDiff / b.diff) + ' de vezes mais difícil', 34, 805, TXT);
+
+  // carimbo
+  const won = b.diff >= (t.target || Infinity);
+  x.save(); x.translate(W / 2, 905); x.rotate(-0.08);
+  x.strokeStyle = won ? OK : WARN; x.lineWidth = 8; x.beginPath(); x.roundRect(-300, -58, 600, 116, 18); x.stroke();
+  x.font = '900 64px ' + SANS; x.fillStyle = won ? OK : WARN; x.textAlign = 'center'; x.textBaseline = 'middle';
+  x.fillText(won ? 'PREMIADO! 🎉' : 'NÃO PREMIADO', 0, 4);
+  x.restore();
+
+  text('Mineração solo em casa: a loteria mais lenta do mundo.', 32, 1090, TXT);
+  text('Dá para jogar também, é de graça e de código aberto:', 30, 1140, DIM);
+  text('github.com/Modanez/HomeMinerProxy', 38, 1210, GOLD, { weight: '700' });
+  return c;
+}
+let ticketBlob = null;
+$('ticketBtn').addEventListener('click', (ev) => {
+  ev.preventDefault(); ev.stopPropagation();
+  const c = lastData && drawTicket(lastData);
+  if (!c) return;
+  c.toBlob((blob) => {
+    ticketBlob = blob;
+    $('ticketImg').src = URL.createObjectURL(blob);
+    const file = new File([blob], 'bilhete.png', { type: 'image/png' });
+    $('ticketShare').style.display = navigator.canShare && navigator.canShare({ files: [file] }) ? '' : 'none';
+    $('ticket').classList.add('on');
+  }, 'image/png');
+});
+$('ticketSave').addEventListener('click', () => {
+  if (!ticketBlob) return;
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(ticketBlob); a.download = 'bilhete-' + new Date().toISOString().slice(0, 10) + '.png'; a.click();
+});
+$('ticketShare').addEventListener('click', () => {
+  if (!ticketBlob) return;
+  const file = new File([ticketBlob], 'bilhete.png', { type: 'image/png' });
+  navigator.share({ files: [file], text: 'Meu bilhete de loteria do Bitcoin de hoje ⛏️ github.com/Modanez/HomeMinerProxy' }).catch(() => {});
+});
+$('ticketClose').addEventListener('click', () => $('ticket').classList.remove('on'));
+$('ticket').addEventListener('click', (ev) => { if (ev.target === $('ticket')) $('ticket').classList.remove('on'); });
 
 function renderHistory(j) {
   const now = Date.now();
@@ -1491,6 +1679,8 @@ async function load() {
     if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; schedule(); }
     const stale = !j.okAt || Date.now() - j.okAt > (j.staleWarnMs || 600000);
     const px = j.proxy && j.proxy.up;
+    set('fo', ((j.proxy && j.proxy.failover) || []).map((f) => '⚠️ ' + f.primary + ' fora do ar desde ' + hora(f.since) +
+      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)).join(' · '));
     set('err', j.error && stale
       ? (px ? 'API da public-pool fora do ar — shares e recordes seguem ao vivo pelo proxy.'
             : 'Pool instável (' + j.error + ') — mostrando dados de ' + (j.okAt ? hora(j.okAt) : '–') + ', tentando de novo…')
@@ -1500,6 +1690,7 @@ async function load() {
     renderNet(j);
     renderHistory(j);
     renderNear(j);
+    renderLuck(j);
     fitBig();
     updateNarr(j);
     checkRecords(j);
@@ -1513,7 +1704,7 @@ async function load() {
     set('err', 'Sem conexão com o servidor local.');
   }
 }
-window.addEventListener('resize', () => { fitPages(); if (lastData) { renderHistory(lastData); renderNear(lastData); fitBig(); } });
+window.addEventListener('resize', () => { fitPages(); if (lastData) { renderHistory(lastData); renderNear(lastData); renderLuck(lastData); fitBig(); } });
 load(); setInterval(load, 20000);
 </script>
 </body>

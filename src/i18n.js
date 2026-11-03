@@ -55,7 +55,6 @@ const EN = [
   ['<div class="k">Memória</div>', '<div class="k">Memory</div>'],
   ['<div class="k">Ligado há</div>', '<div class="k">Uptime</div>'],
   ['<div class="label">Energia (estimativa)</div>', '<div class="label">Energy (estimate)</div>'],
-  ['<h2 class="sect">Quase bloco</h2>', '<h2 class="sect">Almost a block</h2>'],
   ['<div class="label" id="qbL1">Hash do último bloco</div>', '<div class="label" id="qbL1">Latest block hash</div>'],
   ['<div class="label" id="qbL2">Nosso melhor hash</div>', '<div class="label" id="qbL2">Our best hash</div>'],
   ['<div class="label" id="qbL3">Melhor de hoje</div>', '<div class="label" id="qbL3">Best today</div>'],
@@ -170,7 +169,38 @@ const EN = [
   ["'Pool instável (' + j.error + ') — mostrando dados de ' + (j.okAt ? hora(j.okAt) : '–') + ', tentando de novo…'", "'Pool unstable (' + j.error + ') — showing data from ' + (j.okAt ? hora(j.okAt) : '–') + ', retrying…'"],
   ["set('upd', 'atualizado '", "set('upd', 'updated '"],
   ["'Sem conexão com o servidor local.'", "'No connection to the local server.'"],
+  ["' fora do ar desde ' + hora(f.since) +\n      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)",
+    "' down since ' + hora(f.since) +\n      (f.active ? ' — miners on port ' + f.listen + ' moved to backup ' + f.active : ' — no backup available on port ' + f.listen)"],
   ["celebrate({ worker: 'teste',", "celebrate({ worker: 'test',"],
+
+  // ---------- sorte
+  ['<h2 class="sect">Sorte</h2>', '<h2 class="sect">Luck</h2>'],
+  ['<div class="label">Medidor de sorte</div>', '<div class="label">Luck meter</div>'],
+  ['<div class="lead">Melhor share de cada worker comparado com o esperado para o trabalho que ele fez.</div>', '<div class="lead">Each worker\'s best share compared with what its work should have produced.</div>'],
+  ['<th>Worker</th><th>Melhor</th><th>Esperado</th><th>Sorte</th>', '<th>Worker</th><th>Best</th><th>Expected</th><th>Luck</th>'],
+  ['aguardando shares pelo proxy…', 'waiting for shares through the proxy…'],
+  ['<div class="label">Distribuição dos shares</div>', '<div class="label">Share distribution</div>'],
+  ['Cada faixa tem metade dos shares da anterior, como a matemática prevê. É a prova de que a loteria é justa.', 'Each band holds half the shares of the one before, just as the math predicts. Proof that the lottery is fair.'],
+  ['<span class="sub lk-p">melhor que \' + pct + \'% das fazendas iguais</span>', '<span class="sub lk-p">luckier than \' + pct + \'% of identical farms</span>'],
+  ['os shares aparecem aqui conforme chegam pelo proxy', 'shares show up here as they arrive through the proxy'],
+  ['dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria', 'share difficulty ÷ pool target · bars: real shares · dashed: theory'],
+
+  // ---------- bilhete do dia
+  ['<a class="ticket-btn" id="ticketBtn" href="#">🎟️ Bilhete do dia</a>', '<a class="ticket-btn" id="ticketBtn" href="#">🎟️ Today\'s ticket</a>'],
+  ['<h2 class="sect">Quase bloco <a', '<h2 class="sect">Almost a block <a'],
+  ['<button class="main" id="ticketShare">Compartilhar</button><button id="ticketSave">Baixar imagem</button><button id="ticketClose">Fechar</button>',
+    '<button class="main" id="ticketShare">Share</button><button id="ticketSave">Download image</button><button id="ticketClose">Close</button>'],
+  ["'⛏️ BILHETE DE LOTERIA DO BITCOIN'", "'⛏️ BITCOIN LOTTERY TICKET'"],
+  ["'Melhor hash do dia · '", "'Best hash of the day · '"],
+  ["text('dificuldade ' + diffTxt(b.diff)", "text('difficulty ' + diffTxt(b.diff)"],
+  ["hz + ' zeros na frente'", "hz + ' leading zeros'"],
+  ["'o bloco #' + nf(t.height) + ' tinha ' + zb + ' zeros'", "'block #' + nf(t.height) + ' had ' + zb + ' zeros'"],
+  ["'faltaram ' + (zb - hz) + ' zeros: ' + fmtBig(t.hashDiff / b.diff) + ' de vezes mais difícil'", "(zb - hz) + ' zeros short: ' + fmtBig(t.hashDiff / b.diff) + ' times harder'"],
+  ["won ? 'PREMIADO! 🎉' : 'NÃO PREMIADO'", "won ? 'WINNER! 🎉' : 'NOT A WINNER'"],
+  ["'Mineração solo em casa: a loteria mais lenta do mundo.'", "'Home solo mining: the slowest lottery in the world.'"],
+  ["'Dá para jogar também, é de graça e de código aberto:'", "'You can play too. It is free and open source:'"],
+  ["'Meu bilhete de loteria do Bitcoin de hoje ⛏️ github.com/Modanez/HomeMinerProxy'", "'My Bitcoin lottery ticket for today ⛏️ github.com/Modanez/HomeMinerProxy'"],
+  ["'bilhete-' + new Date()", "'ticket-' + new Date()"],
 ];
 
 // Gera a página no idioma e na moeda pedidos (o resultado é guardado em cache por quem chama)

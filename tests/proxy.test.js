@@ -117,3 +117,66 @@ test('rotas padrão: todas as pools, portas sem repetição', async (t) => {
   assert.strictEqual(byPort[3338], 'solo.atlaspool.io');
   assert.strictEqual(byPort[3339], 'eusolo.ckpool.org');
 });
+
+// pool falsa mínima: responde subscribe/authorize e manda um job com uma marca no job_id
+function miniPool(tag) {
+  return net.createServer((c) => {
+    lines(c, (l) => {
+      const m = JSON.parse(l);
+      const send = (o) => c.write(JSON.stringify(o) + '\n');
+      if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+      else if (m.method === 'mining.authorize') {
+        send({ id: m.id, result: true, error: null });
+        send({ id: null, method: 'mining.notify', params: [tag, '00'.repeat(32), '01', '02', [], '20000000', '1d00ffff', '6553f100', true] });
+      }
+    });
+  });
+}
+function mine(port) {
+  return new Promise((resolve, reject) => {
+    const s = net.connect(port, '127.0.0.1');
+    const got = { jobs: [], closed: false, sock: s };
+    lines(s, (l) => { const m = JSON.parse(l); if (m.method === 'mining.notify') got.jobs.push(m.params[0]); });
+    s.on('close', () => { got.closed = true; });
+    s.on('error', reject);
+    s.on('connect', () => {
+      s.write('{"id":1,"method":"mining.subscribe","params":[]}\n{"id":2,"method":"mining.authorize","params":["bc1qteste.esp","x"]}\n');
+      resolve(got);
+    });
+  });
+}
+
+test('failover: pool principal fora vai para a reserva e volta quando ela se recupera', async (t) => {
+  const [primaryPort, listen, statsPort] = [await freePort(), await freePort(), await freePort()];
+  const backup = miniPool('reserva');
+  const backupPort = await new Promise((r) => backup.listen(0, '127.0.0.1', () => r(backup.address().port)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000' },
+    stdio: 'ignore',
+  });
+  let primary = null;
+  t.after(() => { proxy.kill(); backup.close(); if (primary) primary.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+
+  // 1) principal fora (porta fechada): o minerador recebe o job da reserva
+  const a = await mine(listen);
+  await waitFor(() => a.jobs.length);
+  assert.deepStrictEqual(a.jobs, ['reserva']);
+  let s = await getJson(`http://127.0.0.1:${statsPort}/stats`);
+  assert.strictEqual(s.routes[0].upstreams[0].down, true);
+  assert.strictEqual(s.workers.find((w) => w.name === 'esp').pool, 'reserva');
+
+  // 2) a principal volta: a sessão na reserva é encerrada e a próxima conexão vai para a principal
+  primary = miniPool('principal');
+  await new Promise((r) => primary.listen(primaryPort, '127.0.0.1', r));
+  await waitFor(() => a.closed, 5000);
+  const b = await mine(listen);
+  t.after(() => b.sock.destroy());
+  await waitFor(() => b.jobs.length);
+  assert.deepStrictEqual(b.jobs, ['principal']);
+  s = await getJson(`http://127.0.0.1:${statsPort}/stats`);
+  assert.strictEqual(s.routes[0].upstreams[0].down, false);
+  assert.strictEqual(s.workers.find((w) => w.name === 'esp').pool, 'principal');
+});

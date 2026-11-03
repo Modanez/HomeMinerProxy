@@ -1,5 +1,19 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Pool failover:** each port can list backup pools. When the main pool is down, miners go to the backup; the main pool is retested every minute and miners move back when it recovers. The dashboard shows a warning while a backup is in use.
+- Docker image with Docker Compose, GitHub Actions CI, and new ports 3338 (AtlasPool) and 3339 (ckpool EU).
+- **Luck screen:** each worker's best share vs. the statistically expected best for its work, and a histogram of share difficulties against the theoretical curve.
+- **Daily ticket:** the 🎟️ button on "Almost a block" turns today's best hash into a shareable lottery-ticket image.
+
+### Português
+- **Failover de pool:** cada porta pode ter pools reserva. Com a principal fora do ar, os mineradores vão para a reserva; a principal é testada a cada minuto e eles voltam quando ela se recupera. O painel mostra um aviso enquanto a reserva está em uso.
+- Imagem Docker com Docker Compose, CI no GitHub Actions e portas novas 3338 (AtlasPool) e 3339 (ckpool EU).
+- **Tela Sorte:** o melhor share de cada worker contra o melhor esperado pela estatística, e um histograma das dificuldades dos shares contra a curva teórica.
+- **Bilhete do dia:** o botão 🎟️ no "Quase bloco" transforma o melhor hash do dia numa imagem de bilhete de loteria para compartilhar.
+
 ## v0.1.0 — 2026-11-02
 
 First public release / Primeira versão pública.

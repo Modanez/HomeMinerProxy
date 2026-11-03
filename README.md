@@ -47,11 +47,14 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
 
   Any other Stratum V1 pool can be added with `PROXY_ROUTES` (see the configuration).
 
-- **Dashboard** (`src/painel.js`), at `http://SERVER-IP:3000`, with four screens:
+  **Failover:** most ports have a backup pool. If the main pool stops answering, miners that connect are sent to the backup, and the dashboard shows a warning. A health check retests the main pool every minute; when it recovers, miners move back to it. Backups always pay the same address, since the username your miner sends is passed through unchanged.
+
+- **Dashboard** (`src/painel.js`), at `http://SERVER-IP:3000`, with five screens:
   - **Farm:** records, hashrate, and the worker list with each worker's latest share.
   - **Bitcoin network:** latest block, difficulty adjustment, halving, and the prize at stake.
   - **History:** charts, hall of fame, and power cost.
-  - **Almost a block:** your best hash vs. the latest block hash, leading zeros side by side.
+  - **Almost a block:** your best hash vs. the latest block hash, leading zeros side by side. The 🎟️ button turns today's best hash into a lottery-ticket image ("NOT A WINNER", until the day it is) to share or save.
+  - **Luck:** each worker's best share compared with what its work should statistically produce (1× is normal, 2× is twice as lucky), plus a histogram of all share difficulties against the theoretical curve. A big gap from the curve can point to a miner or pool problem.
 
   For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden.
 - **Optional extras:**
