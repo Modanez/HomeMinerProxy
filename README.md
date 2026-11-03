@@ -124,7 +124,7 @@ Username: `YOUR_ADDRESS.worker-name`, any password (e.g. `x`). The name after th
 
 | Miner | Pool | Port |
 |---|---|---|
-| cpuminer (`minerd`) | `stratum+tcp://SERVER-IP` | 3333 |
+| cpuminer (`minerd`), [step by step](#mining-with-cpuminer-step-by-step) | `stratum+tcp://SERVER-IP` | 3333 |
 | NerdMiner / ESP32 | `SERVER-IP` | 3335 |
 | Bitaxe | `SERVER-IP` | 3334 (set `solo.ckpool.org:3333` as the fallback pool in AxeOS) |
 
@@ -133,6 +133,107 @@ Give the server a fixed IP in your router (DHCP reservation): if its IP changes,
 ```bash
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u YOUR_ADDRESS.laptop -p x
 ```
+
+## Mining with cpuminer (step by step)
+
+[cpuminer](https://github.com/pooler/cpuminer) (`minerd`) mines Bitcoin on any CPU: a laptop, an old PC, a Raspberry Pi, an Android phone. Be honest with yourself about the odds: a CPU makes a few MH/s, so a block is a one-in-billions-per-year lottery. It is fun because every share shows up on the dashboard, records included. On this project's farm, a MacBook M2 makes about 9 MH/s, an Android tablet about 4 MH/s and an Odroid-C2 about 2.7 MH/s.
+
+Use port **3333** (public-pool, minimum difficulty 1). In the commands below, replace `SERVER-IP` with the IP of the machine running the proxy, `YOUR_ADDRESS` with your bitcoin address, and `laptop` with the name you want on the dashboard.
+
+<details>
+<summary><b>Linux</b> (Ubuntu, Debian, Armbian, Raspberry Pi OS)</summary>
+
+```bash
+sudo apt install -y git build-essential automake autoconf pkg-config libcurl4-openssl-dev
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./configure CFLAGS="-O3"
+make -j"$(nproc)"
+sudo make install        # installs /usr/local/bin/minerd
+minerd -a sha256d -o stratum+tcp://SERVER-IP:3333 -u YOUR_ADDRESS.laptop -p x
+```
+
+**Run it as a service** (starts at boot, restarts on failure), for example on the same machine as the dashboard. Create `/etc/systemd/system/minerd.service`:
+
+```ini
+[Unit]
+Description=cpuminer
+After=network-online.target mineracao-proxy.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/minerd -a sha256d -o stratum+tcp://127.0.0.1:3333 -u YOUR_ADDRESS.odroid -p x
+Nice=19
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Then `sudo systemctl daemon-reload && sudo systemctl enable --now minerd`. If the service is called `minerd` and runs on the dashboard machine, set `LOCAL_WORKER=odroid` (the worker name) in `/etc/mineracao.env`: the dashboard reads the hashrate straight from its log and shows the CPU temperature next to it.
+</details>
+
+<details>
+<summary><b>macOS</b> (Intel or Apple Silicon)</summary>
+
+Install [Homebrew](https://brew.sh) first, then:
+
+```bash
+xcode-select --install   # compilers, if you don't have them yet
+brew install git automake autoconf pkg-config curl
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./nomacro.pl             # needed with Clang, the macOS compiler
+./configure CFLAGS="-O3"
+make -j"$(sysctl -n hw.ncpu)"
+caffeinate -i ./minerd -a sha256d -o stratum+tcp://SERVER-IP:3333 -u YOUR_ADDRESS.macbook -p x
+```
+
+`caffeinate -i` keeps the Mac awake while it mines. Close the terminal (or press Ctrl+C) to stop.
+</details>
+
+<details>
+<summary><b>Android</b> (Termux)</summary>
+
+Install **Termux from F-Droid** (the Play Store version is outdated), then:
+
+```bash
+pkg update
+pkg install -y git clang make automake autoconf pkg-config libcurl
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./nomacro.pl
+./configure CFLAGS="-O3"
+make -j"$(nproc)"
+termux-wake-lock         # keeps the CPU awake with the screen off
+./minerd -a sha256d -o stratum+tcp://SERVER-IP:3333 -u YOUR_ADDRESS.phone -p x
+```
+
+In Android settings, set Termux's battery usage to **Unrestricted**, otherwise the system kills the miner after a while. Keep the device on the charger and somewhere it can cool down.
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+Download the prebuilt Windows version (`pooler-cpuminer-2.5.1-win64.zip`) from the project's [SourceForge page](https://sourceforge.net/projects/cpuminer/files/), extract it, open a terminal in that folder and run:
+
+```bat
+minerd.exe -a sha256d -o stratum+tcp://SERVER-IP:3333 -u YOUR_ADDRESS.pc -p x
+```
+
+The antivirus may flag any miner as unwanted software. If it does, allow that folder only.
+</details>
+
+**Useful options**
+- `-t 2` uses only 2 threads (the default is every core). This keeps the machine responsive and cooler.
+- `-q` hides the per-thread hashrate lines. Do not use it with `LOCAL_WORKER`, because the dashboard reads those lines.
+- `-R 10` waits 10 seconds before reconnecting after a network error (the default is 30). By default it retries forever, which is what you want.
+
+**Check that it worked:** within a minute, `minerd` prints `accepted: 1/1 (100.00%)` and, on the dashboard, the worker appears with ⚡ (connected through the proxy). A CPU at a few MH/s needs some minutes per share at difficulty 1, so the first one can take a while.
 
 ## Telegram bot (optional)
 

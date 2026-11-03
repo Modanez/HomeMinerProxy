@@ -124,7 +124,7 @@ Usuário: `SEU_ENDERECO.nome-do-worker`, com qualquer senha (ex.: `x`). O nome d
 
 | Minerador | Pool | Porta |
 |---|---|---|
-| cpuminer (`minerd`) | `stratum+tcp://IP-DO-SERVIDOR` | 3333 |
+| cpuminer (`minerd`), [passo a passo](#minerando-com-o-cpuminer-passo-a-passo) | `stratum+tcp://IP-DO-SERVIDOR` | 3333 |
 | NerdMiner / ESP32 | `IP-DO-SERVIDOR` | 3335 |
 | Bitaxe | `IP-DO-SERVIDOR` | 3334 (configure `solo.ckpool.org:3333` como pool reserva no AxeOS) |
 
@@ -133,6 +133,107 @@ Reserve um IP fixo para o servidor no roteador (DHCP estático): se o IP mudar, 
 ```bash
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u SEU_ENDERECO.notebook -p x
 ```
+
+## Minerando com o cpuminer (passo a passo)
+
+O [cpuminer](https://github.com/pooler/cpuminer) (`minerd`) minera bitcoin em qualquer processador: notebook, PC velho, Raspberry Pi, celular Android. Seja honesto com as chances: uma CPU faz poucos MH/s, então um bloco é uma loteria de uma em bilhões por ano. A graça é ver cada share aparecer no painel, com direito a recorde. Na fazenda deste projeto, um MacBook M2 faz uns 9 MH/s, um tablet Android uns 4 MH/s e um Odroid-C2 uns 2,7 MH/s.
+
+Use a porta **3333** (public-pool, dificuldade mínima 1). Nos comandos abaixo, troque `IP-DO-SERVIDOR` pelo IP da máquina que roda o proxy, `SEU_ENDERECO` pelo seu endereço de bitcoin e `notebook` pelo nome que você quer ver no painel.
+
+<details>
+<summary><b>Linux</b> (Ubuntu, Debian, Armbian, Raspberry Pi OS)</summary>
+
+```bash
+sudo apt install -y git build-essential automake autoconf pkg-config libcurl4-openssl-dev
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./configure CFLAGS="-O3"
+make -j"$(nproc)"
+sudo make install        # instala /usr/local/bin/minerd
+minerd -a sha256d -o stratum+tcp://IP-DO-SERVIDOR:3333 -u SEU_ENDERECO.notebook -p x
+```
+
+**Rodar como serviço** (sobe no boot e reinicia se cair), por exemplo na mesma máquina do painel. Crie `/etc/systemd/system/minerd.service`:
+
+```ini
+[Unit]
+Description=cpuminer
+After=network-online.target mineracao-proxy.service
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/minerd -a sha256d -o stratum+tcp://127.0.0.1:3333 -u SEU_ENDERECO.odroid -p x
+Nice=19
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Depois rode `sudo systemctl daemon-reload && sudo systemctl enable --now minerd`. Se o serviço se chama `minerd` e roda na máquina do painel, coloque `LOCAL_WORKER=odroid` (o nome do worker) em `/etc/mineracao.env`: o painel lê o hashrate direto do log e mostra a temperatura da CPU ao lado.
+</details>
+
+<details>
+<summary><b>macOS</b> (Intel ou Apple Silicon)</summary>
+
+Instale o [Homebrew](https://brew.sh) antes e depois rode:
+
+```bash
+xcode-select --install   # compiladores, se ainda não tiver
+brew install git automake autoconf pkg-config curl
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./nomacro.pl             # necessário com o Clang, o compilador do macOS
+./configure CFLAGS="-O3"
+make -j"$(sysctl -n hw.ncpu)"
+caffeinate -i ./minerd -a sha256d -o stratum+tcp://IP-DO-SERVIDOR:3333 -u SEU_ENDERECO.macbook -p x
+```
+
+O `caffeinate -i` impede o Mac de dormir enquanto minera. Para parar, feche o terminal ou aperte Ctrl+C.
+</details>
+
+<details>
+<summary><b>Android</b> (Termux)</summary>
+
+Instale o **Termux pelo F-Droid** (a versão da Play Store está desatualizada) e rode:
+
+```bash
+pkg update
+pkg install -y git clang make automake autoconf pkg-config libcurl
+git clone https://github.com/pooler/cpuminer.git
+cd cpuminer
+./autogen.sh
+./nomacro.pl
+./configure CFLAGS="-O3"
+make -j"$(nproc)"
+termux-wake-lock         # mantém a CPU acordada com a tela apagada
+./minerd -a sha256d -o stratum+tcp://IP-DO-SERVIDOR:3333 -u SEU_ENDERECO.celular -p x
+```
+
+Nas configurações do Android, deixe o uso de bateria do Termux como **Sem restrições**, senão o sistema mata o minerador depois de um tempo. Deixe o aparelho no carregador e num lugar onde ele consiga esfriar.
+</details>
+
+<details>
+<summary><b>Windows</b></summary>
+
+Baixe a versão pronta para Windows (`pooler-cpuminer-2.5.1-win64.zip`) na [página do projeto no SourceForge](https://sourceforge.net/projects/cpuminer/files/), extraia, abra um terminal nessa pasta e rode:
+
+```bat
+minerd.exe -a sha256d -o stratum+tcp://IP-DO-SERVIDOR:3333 -u SEU_ENDERECO.pc -p x
+```
+
+O antivírus pode marcar qualquer minerador como software indesejado. Se acontecer, libere só essa pasta.
+</details>
+
+**Opções úteis**
+- `-t 2` usa só 2 threads (o padrão é usar todos os núcleos). Deixa a máquina mais leve e mais fria.
+- `-q` esconde as linhas de hashrate de cada thread. Não use com `LOCAL_WORKER`, porque o painel lê essas linhas.
+- `-R 10` espera 10 segundos para reconectar depois de um erro de rede (o padrão é 30). Por padrão ele tenta para sempre, que é o que você quer.
+
+**Como saber se funcionou:** o `minerd` mostra `accepted: 1/1 (100.00%)` e, no painel, o worker aparece com ⚡ (conectado pelo proxy). Uma CPU de poucos MH/s leva alguns minutos por share na dificuldade 1, então o primeiro pode demorar.
 
 ## Bot do Telegram (opcional)
 
