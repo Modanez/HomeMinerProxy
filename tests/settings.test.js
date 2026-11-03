@@ -1,0 +1,164 @@
+// Tela de configurações: validação, gravação por cima do .env, PIN e o ciclo salvar → reiniciar.
+const test = require('node:test');
+const assert = require('node:assert');
+const http = require('http');
+const net = require('net');
+const os = require('os');
+const fs = require('fs');
+const path = require('path');
+const { spawn, spawnSync } = require('child_process');
+const st = require('../src/settings');
+
+const ADDR = 'bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w';
+const TOKEN = '123456789:AAHfakeTokenForTestsOnly_abcdefghijklmno';
+const field = (k) => st.FIELDS.find((f) => f.key === k);
+const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'cfg-'));
+
+test('validação dos campos', () => {
+  assert.deepStrictEqual(st.clean(field('BTC_ADDRESS'), ' ' + ADDR.toUpperCase() + ' '), { value: ADDR });
+  assert.deepStrictEqual(st.clean(field('BTC_ADDRESS'), '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2'), { value: '1BvBMSEYstWetqTFn5Au4m4GFg7xJaNVN2' });
+  assert.ok(st.clean(field('BTC_ADDRESS'), 'bc1q; rm -rf /').error);
+  assert.ok(st.clean(field('BTC_ADDRESS'), '').error);
+  assert.deepStrictEqual(st.clean(field('POWER_PRICE_KWH'), '0,90'), { value: '0.9' });
+  assert.ok(st.clean(field('POWER_PRICE_KWH'), '-1').error);
+  assert.deepStrictEqual(st.clean(field('LANGUAGE'), 'pt-BR'), { value: 'pt-BR' });
+  assert.ok(st.clean(field('LANGUAGE'), 'fr').error);
+  assert.deepStrictEqual(st.clean(field('ALARM_IGNORE'), ['macbook', 'macbook', ' tablet ']), { value: 'macbook,tablet' });
+  assert.ok(st.clean(field('ALARM_IGNORE'), ['a b']).error);
+  assert.deepStrictEqual(st.clean(field('CUBE_IP'), '192.168.0.136'), { value: '192.168.0.136' });
+  assert.deepStrictEqual(st.clean(field('CUBE_IP'), 'cubo.local'), { value: 'cubo.local' });
+  assert.ok(st.clean(field('CUBE_IP'), '192.168.0.999').error);
+  assert.ok(st.clean(field('CUBE_IP'), 'http://x').error);
+  assert.deepStrictEqual(st.clean(field('TELEGRAM_BOT_TOKEN'), TOKEN), { value: TOKEN });
+  assert.ok(st.clean(field('TELEGRAM_BOT_TOKEN'), 'abc').error);
+  assert.deepStrictEqual(st.clean(field('TELEGRAM_CHAT_ID'), '42, -100123'), { value: '42,-100123' });
+  assert.ok(st.clean(field('TELEGRAM_CHAT_ID'), '@paulo').error);
+  assert.deepStrictEqual(st.clean(field('TELEGRAM_DAILY'), ''), { value: 'off' });
+  assert.deepStrictEqual(st.clean(field('TELEGRAM_DAILY'), '07'), { value: '7' });
+  assert.ok(st.clean(field('TELEGRAM_DAILY'), '24').error);
+  assert.deepStrictEqual(st.clean(field('TELEGRAM_PERSONAL'), true), { value: '1' });
+  assert.ok(st.clean(field('TELEGRAM_PANEL_URL'), 'javascript:alert(1)').error);
+});
+
+test('só o que mudou vai para o settings.json, por cima do .env', () => {
+  const dir = tmp();
+  const env = { BTC_ADDRESS: ADDR, TARIFA_KWH: '0.90', LANGUAGE: 'pt-BR', CURRENCY: 'BRL', ALARM_IGNORE: 'macbook', CUBE_IP: '192.168.0.136', LOCAL_WORKER: 'odroid' };
+  st.applyOverlay(dir, env);
+  const cur = st.current(env);
+  assert.strictEqual(cur.POWER_PRICE_KWH, '0.90');        // nome antigo (TARIFA_KWH) aparece no campo novo
+  assert.deepStrictEqual(cur.ALARM_IGNORE, ['macbook']);
+  assert.strictEqual(cur.TELEGRAM_DAILY, '21');           // padrão quando não definido
+  assert.deepStrictEqual(cur.TELEGRAM_BOT_TOKEN, { set: false });
+
+  // mandar o formulário inteiro sem mudar nada não grava nada
+  const same = { ...cur, TELEGRAM_BOT_TOKEN: '', TELEGRAM_PERSONAL: false };
+  assert.deepStrictEqual(st.merge(dir, same, { ...env }).overlay, {});
+
+  let r = st.merge(dir, { ...same, CURRENCY: 'USD', POWER_PRICE_KWH: '0,15', TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_DAILY: '' }, env);
+  assert.deepStrictEqual(r.errors, {});
+  assert.deepStrictEqual(r.overlay, { CURRENCY: 'USD', POWER_PRICE_KWH: '0.15', TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_DAILY: 'off' });
+  st.save(dir, r.overlay);
+  assert.strictEqual((fs.statSync(path.join(dir, 'settings.json')).mode & 0o777).toString(8), '600');   // tem o token
+
+  // reinício: o overlay vale por cima do .env, e o token nunca aparece inteiro
+  const env2 = { BTC_ADDRESS: ADDR, TARIFA_KWH: '0.90', LANGUAGE: 'pt-BR', CURRENCY: 'BRL' };
+  st.applyOverlay(dir, env2);
+  assert.strictEqual(env2.CURRENCY, 'USD');
+  const cur2 = st.current(env2);
+  assert.deepStrictEqual(cur2.TELEGRAM_BOT_TOKEN, { set: true, tail: TOKEN.slice(-4) });
+  assert.strictEqual(cur2.TELEGRAM_DAILY, '');
+  assert.ok(!JSON.stringify(cur2).includes(TOKEN));
+
+  // token vazio = manter; voltar a moeda para a do .env tira a chave do arquivo; remover o token
+  r = st.merge(dir, { TELEGRAM_BOT_TOKEN: '', CURRENCY: 'BRL' }, env2);
+  assert.deepStrictEqual(r.overlay, { POWER_PRICE_KWH: '0.15', TELEGRAM_BOT_TOKEN: TOKEN, TELEGRAM_DAILY: 'off' });
+  r = st.merge(dir, { TELEGRAM_BOT_TOKEN: '', TELEGRAM_BOT_TOKEN_clear: true }, env2);
+  assert.ok(!('TELEGRAM_BOT_TOKEN' in r.overlay));            // o .env não tem token: basta tirar do arquivo
+  const env3 = { BTC_ADDRESS: ADDR, TELEGRAM_BOT_TOKEN: TOKEN };   // token no .env: remover pela tela grava vazio por cima
+  st.applyOverlay(tmp(), env3);
+  assert.strictEqual(st.merge(dir, { TELEGRAM_BOT_TOKEN: '', TELEGRAM_BOT_TOKEN_clear: true }, env3).overlay.TELEGRAM_BOT_TOKEN, '');
+  st.applyOverlay(dir, env2);
+  assert.deepStrictEqual(st.merge(dir, { BTC_ADDRESS: 'xyz', CUBE_IP: '1.2.3' }, env2).errors, { BTC_ADDRESS: 'address', CUBE_IP: 'host' });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+test('PIN: certo, errado e bloqueio depois de 5 erros', () => {
+  st.resetPinFails();
+  assert.strictEqual(st.checkPin('1', ''), 'nopin');
+  assert.strictEqual(st.checkPin('123456', '123456'), 'ok');
+  for (let i = 0; i < 5; i++) assert.strictEqual(st.checkPin('000000', '123456'), 'wrong');
+  assert.strictEqual(st.checkPin('123456', '123456'), 'locked');
+  assert.strictEqual(st.checkPin('123456', '123456', Date.now() + 16 * 60e3), 'ok');
+  st.resetPinFails();
+});
+
+test('página nos dois idiomas, sem PIN só leitura', () => {
+  assert.match(st.page('pt', true), /Configurações[\s\S]*Salvar e reiniciar/);
+  assert.match(st.page('en', true), /Settings[\s\S]*Save and restart/);
+  assert.doesNotMatch(st.page('pt', false), /id="save"/);
+  assert.match(st.page('pt', false), /SETTINGS_PIN/);
+});
+
+test('o cubo lê CUBE_IP e LANGUAGE do settings.json', () => {
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ CUBE_IP: '10.0.0.9', LANGUAGE: 'en', BTC_ADDRESS: ADDR }));
+  const r = spawnSync('python3', ['-c', 'import cubo; print(cubo.CUBE_IP, cubo.LANG)'], {
+    cwd: path.join(__dirname, '../src'), env: { ...process.env, DATA_DIR: dir, CUBE_IP: '192.168.0.136', LANGUAGE: 'pt-BR' }, encoding: 'utf8',
+  });
+  if (/No module named 'PIL'/.test(r.stderr)) return;   // sem Pillow nesta máquina
+  assert.strictEqual(r.stdout.trim(), '10.0.0.9 en');
+  fs.rmSync(dir, { recursive: true, force: true });
+});
+
+// ---------------------------------------------------------------- de ponta a ponta no painel
+const freePort = () => new Promise((res) => { const s = net.createServer().listen(0, () => { const p = s.address().port; s.close(() => res(p)); }); });
+const req = (port, method, url, body) => new Promise((res, rej) => {
+  const data = body ? JSON.stringify(body) : null;
+  const r = http.request({ host: '127.0.0.1', port, method, path: url, headers: data ? { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } : {} }, (x) => {
+    let b = ''; x.on('data', (c) => (b += c)); x.on('end', () => res({ status: x.statusCode, body: b }));
+  });
+  r.on('error', rej); r.end(data);
+});
+const waitFor = async (fn, ms = 10000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch (_) { /* ainda subindo */ } if (Date.now() > end) throw new Error('tempo esgotado'); await new Promise((r) => setTimeout(r, 100)); } };
+
+test('salvar pela tela grava, reinicia e o painel volta com o valor novo', async (t) => {
+  const port = await freePort();
+  const dir = tmp();
+  const env = { ...process.env, BTC_ADDRESS: ADDR, PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'x'), CKPOOL_URLS: '', OCEAN_API: '',
+    SETTINGS_PIN: '424242', LANGUAGE: 'pt-BR', CURRENCY: 'BRL', TELEGRAM_BOT_TOKEN: '', TELEGRAM_API: 'http://127.0.0.1:9' };
+  const run = () => spawn(process.execPath, ['-r', path.join(__dirname, 'helpers/offline.js'), path.join(__dirname, '../src/painel.js')], { env, stdio: 'ignore' });
+  let p = run();
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  const pageRes = await waitFor(() => req(port, 'GET', '/config'));
+  assert.strictEqual(pageRes.status, 200);
+  assert.match(pageRes.body, /Configurações/);
+  const main = await req(port, 'GET', '/?lang=pt');
+  assert.match(main.body, /href="\/config"/);
+  const boot1 = JSON.parse((await req(port, 'GET', '/api/mining')).body).boot;
+
+  const cfg = JSON.parse((await req(port, 'GET', '/api/config')).body);
+  assert.strictEqual(cfg.values.BTC_ADDRESS, ADDR);
+  assert.strictEqual(cfg.pin, true);
+
+  assert.strictEqual((await req(port, 'POST', '/api/config', { pin: '1', values: { CURRENCY: 'USD' } })).status, 403);
+  const bad = await req(port, 'POST', '/api/config', { pin: '424242', values: { CURRENCY: 'EUR' } });
+  assert.strictEqual(bad.status, 400);
+  assert.deepStrictEqual(JSON.parse(bad.body).errors, { CURRENCY: 'option' });
+  // sem JSON (formulário de outro site) não passa
+  const form = await new Promise((res) => { const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/api/config', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, (x) => { x.resume(); res(x.statusCode); }); r.end('pin=424242'); });
+  assert.strictEqual(form, 405);
+
+  const exited = new Promise((res) => p.once('exit', res));
+  const ok = await req(port, 'POST', '/api/config', { pin: '424242', values: { CURRENCY: 'USD', ALARM_IGNORE: ['macbook'] } });
+  assert.deepStrictEqual(JSON.parse(ok.body), { ok: true, restart: true });
+  assert.strictEqual(await exited, 0);   // systemd / Docker sobem de novo
+  assert.deepStrictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'settings.json'), 'utf8')), { CURRENCY: 'USD', ALARM_IGNORE: 'macbook' });
+
+  p = run();
+  const snap = await waitFor(async () => JSON.parse((await req(port, 'GET', '/api/mining')).body));
+  assert.notStrictEqual(snap.boot, boot1);   // a página percebe e recarrega
+  const cfg2 = JSON.parse((await req(port, 'GET', '/api/config')).body);
+  assert.strictEqual(cfg2.values.CURRENCY, 'USD');
+  assert.deepStrictEqual(cfg2.values.ALARM_IGNORE, ['macbook']);
+});

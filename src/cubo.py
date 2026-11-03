@@ -5,6 +5,19 @@
 #      python3 cubo.py --once --out teste.jpg   (só gera a imagem, sem enviar)
 import io, json, os, sys, time, uuid, http.client, urllib.request
 
+# Valores salvos na tela de configurações do painel (DATA_DIR/settings.json) valem por cima do .env
+SETTINGS = os.path.join(os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(__file__)), 'settings.json')
+def settings_mtime():
+    try: return os.path.getmtime(SETTINGS)
+    except OSError: return 0
+try:
+    with open(SETTINGS) as f:
+        for k, v in json.load(f).items():
+            if k in ('CUBE_IP', 'LANGUAGE') and isinstance(v, str): os.environ[k] = v
+except (OSError, ValueError, AttributeError):
+    pass
+BOOT_MTIME = settings_mtime()
+
 CUBE_IP = os.environ.get('CUBE_IP', '')                 # IP do cubo na rede de casa (obrigatório para enviar)
 PANEL = os.environ.get('PANEL_URL', 'http://127.0.0.1:3000/api/mining')
 THEME = os.environ.get('CUBE_THEME', '3')            # 3 = álbum no SmallTV Ultra (4 no Pro)
@@ -25,7 +38,10 @@ STRINGS = {
 def tx(key): return STRINGS[LANG][key]
 STATE = os.path.join(os.environ.get('DATA_DIR') or os.path.dirname(os.path.abspath(__file__)), 'cubo-state.json')
 
-from PIL import Image, ImageDraw, ImageFont
+try:
+    from PIL import Image, ImageDraw, ImageFont
+except ImportError:   # sem Pillow: só dá para esperar (o install.sh instala o python3-pil)
+    Image = ImageDraw = ImageFont = None
 
 BG, CARD, LINE = (14, 17, 23), (23, 28, 38), (37, 44, 58)
 TXT, DIM, GOLD = (230, 233, 239), (138, 147, 166), (242, 169, 0)
@@ -224,7 +240,14 @@ def main():
         else: upload(jpeg(img)); print('enviado para', CUBE_IP)
         return
     if not CUBE_IP:
-        sys.exit('Defina CUBE_IP com o IP do cubo (ex.: CUBE_IP=192.168.0.50).')
+        # sem cubo configurado: espera; quando a tela do painel salvar um IP, reinicia e começa
+        print('CUBE_IP vazio: placar desligado, esperando configuração', flush=True)
+        while True:
+            time.sleep(CHECK_S); restart_if_changed()
+    if Image is None:
+        print('Pillow não instalado (apt install python3-pil): placar desligado', flush=True)
+        while True:
+            time.sleep(CHECK_S); restart_if_changed()
     state = load_state()
     print(f'cubo {CUBE_IP}: placar a cada {EVERY_S}s', flush=True)
     wait_panel()
@@ -234,6 +257,12 @@ def main():
         except Exception as e:
             print('falhou:', e, flush=True)
         time.sleep(CHECK_S)
+        restart_if_changed()
+
+def restart_if_changed():
+    if settings_mtime() != BOOT_MTIME:
+        print('configuração mudou: reiniciando', flush=True)
+        os.execv(sys.executable, [sys.executable] + sys.argv)
 
 if __name__ == '__main__':
     main()

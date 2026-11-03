@@ -63,6 +63,14 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
   - **Cubo GeekMagic SmallTV:** placar de 240×240 na mesa (`src/cubo.py`).
   - **Widget KWGT para Android:** ver `extras/kwgt`.
 
+## Tela de configurações
+
+O botão ⚙️ no topo do painel (ou `http://IP-DO-SERVIDOR:3000/config`) muda as opções do dia a dia sem editar arquivo: endereço de bitcoin, idioma, moeda, preço do kWh, o minerador que roda no servidor (`LOCAL_WORKER`), os workers que não acendem a luz vermelha (`ALARM_IGNORE`), o IP do cubo e o bot do Telegram. Tem botões para testar o cubo e para mandar uma mensagem de teste no Telegram.
+
+- **PIN:** para salvar, a tela pede o `SETTINGS_PIN`. O `install.sh` cria um, mostra no final e guarda em `/etc/mineracao.env`. No Docker, defina o `SETTINGS_PIN` no `mineracao.env`.
+- **Onde fica salvo:** em `settings.json`, junto com os recordes e o histórico. Ele vale por cima do `/etc/mineracao.env`; o que você não mudar na tela continua vindo do arquivo.
+- **Para aplicar:** depois de salvar, o painel reinicia sozinho e as páginas abertas recarregam. O cubo percebe a mudança e reinicia também.
+
 ## Idiomas
 
 O painel, o cubo, o widget e o instalador funcionam em **português (pt-BR)** e **inglês**.
@@ -103,6 +111,7 @@ docker compose up -d
 O painel fica em `http://IP-DO-SERVIDOR:3000`, e as portas do proxy são as mesmas de cima. Os dados (recordes, histórico) ficam no volume `data`. Para atualizar: `git pull && docker compose up -d --build`.
 
 - **Cubo GeekMagic:** preencha `CUBE_IP` e rode `docker compose --profile cubo up -d`.
+- **Tela de configurações:** defina `SETTINGS_PIN` no `mineracao.env` para poder salvar.
 - **Sirene do Arduino:** descomente as linhas `devices` do serviço `painel` no `compose.yaml`.
 - **cpuminer na mesma máquina (`LOCAL_WORKER`):** não funciona dentro do contêiner, porque essa função lê o journal do systemd da máquina. O worker continua aparecendo pelo proxy.
 

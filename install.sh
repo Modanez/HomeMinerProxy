@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/cubo.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/settings.js "$HERE"/src/cubo.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -39,6 +39,15 @@ if [ -z "$current" ]; then
   case "$addr" in *[!A-Za-z0-9]*) m "   Endereço com caracteres inválidos: $addr" "   Address has invalid characters: $addr"; exit 1;; esac
   sed -i "s|^BTC_ADDRESS=.*|BTC_ADDRESS=$addr|" "$ENV_FILE"
 fi
+
+# PIN da tela de configurações do painel (criado uma vez; fica no .env)
+if ! grep -qE '^SETTINGS_PIN=.+' "$ENV_FILE"; then
+  pin=$(printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )))
+  sed -i '/^#\?SETTINGS_PIN=/d' "$ENV_FILE"
+  printf '\n# PIN to save the dashboard Settings screen (http://SERVER-IP:3000/config)\nSETTINGS_PIN=%s\n' "$pin" >> "$ENV_FILE"
+  m "   PIN da tela de configurações criado" "   Settings screen PIN created"
+fi
+settings_pin=$(grep -E '^SETTINGS_PIN=' "$ENV_FILE" | cut -d= -f2-)
 
 unit() {   # unit <name> <description> <command> [After=...]
   cat > "/etc/systemd/system/$1.service" <<UNIT
@@ -65,11 +74,13 @@ unit mineracao-proxy  "Mining farm Stratum proxy" "$NODE_BIN $APP_DIR/proxy.js"
 unit mineracao-painel "Mining farm dashboard"     "$NODE_BIN $APP_DIR/painel.js" mineracao-proxy.service
 services="mineracao-proxy mineracao-painel"
 
-if grep -qE '^CUBE_IP=.+' "$ENV_FILE"; then
-  m "==> Cubo GeekMagic configurado: instalando dependências do placar" "==> GeekMagic cube configured: installing scoreboard dependencies"
-  python3 -c "import PIL" 2>/dev/null || apt-get install -y python3-pil
-  [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ] || apt-get install -y fonts-dejavu-core
-  unit mineracao-cubo "Mining farm scoreboard on the GeekMagic cube" "/usr/bin/python3 $APP_DIR/cubo.py" mineracao-painel.service
+# Placar do cubo: o serviço fica sempre instalado e espera até haver um CUBE_IP (no .env ou na tela)
+if command -v python3 >/dev/null; then
+  if command -v apt-get >/dev/null; then
+    python3 -c "import PIL" 2>/dev/null || apt-get install -y -q python3-pil >/dev/null || m "   aviso: não consegui instalar o python3-pil (placar do cubo)" "   warning: could not install python3-pil (cube scoreboard)"
+    [ -f /usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf ] || apt-get install -y -q fonts-dejavu-core >/dev/null || true
+  fi
+  unit mineracao-cubo "Mining farm scoreboard on the GeekMagic cube" "$(command -v python3) $APP_DIR/cubo.py" mineracao-painel.service
   services="$services mineracao-cubo"
 fi
 
@@ -84,5 +95,6 @@ port=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || true)
 echo
 m "Pronto." "Done."
 m "  Painel:  http://${ip:-IP-DO-SERVIDOR}:${port:-3000}" "  Dashboard:  http://${ip:-SERVER-IP}:${port:-3000}"
+m "  Configurações: http://${ip:-IP-DO-SERVIDOR}:${port:-3000}/config  ·  PIN: $settings_pin" "  Settings: http://${ip:-SERVER-IP}:${port:-3000}/config  ·  PIN: $settings_pin"
 m "  Aponte os mineradores para ${ip:-IP-DO-SERVIDOR}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU" \
   "  Point your miners to ${ip:-SERVER-IP}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU"

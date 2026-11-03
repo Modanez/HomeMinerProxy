@@ -63,6 +63,14 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   - **GeekMagic SmallTV cube:** a 240×240 desk scoreboard (`src/cubo.py`).
   - **KWGT widget for Android:** see `extras/kwgt`.
 
+## Settings screen
+
+The ⚙️ button at the top of the dashboard (or `http://SERVER-IP:3000/config`) changes the everyday options without editing files: bitcoin address, language, currency, kWh price, the miner running on the server (`LOCAL_WORKER`), workers that don't trigger the red light (`ALARM_IGNORE`), the cube IP and the Telegram bot. It has buttons to test the cube and to send a Telegram test message.
+
+- **PIN:** saving asks for the `SETTINGS_PIN`. `install.sh` creates it, shows it at the end, and keeps it in `/etc/mineracao.env`. With Docker, set `SETTINGS_PIN` in `mineracao.env` yourself.
+- **Where it is saved:** in `settings.json`, next to the records and history. It takes priority over `/etc/mineracao.env`; anything you don't change on the screen still comes from the file.
+- **Applying:** after saving, the dashboard restarts by itself and open pages reload. The cube notices the change and restarts too.
+
 ## Languages
 
 The dashboard, cube, widget and installer work in **English** and **Brazilian Portuguese (pt-BR)**.
@@ -103,6 +111,7 @@ docker compose up -d
 The dashboard is at `http://SERVER-IP:3000` and the proxy ports are the same as above. Data (records, history) lives in the `data` volume. To update: `git pull && docker compose up -d --build`.
 
 - **GeekMagic cube:** set `CUBE_IP` and run `docker compose --profile cubo up -d`.
+- **Settings screen:** set `SETTINGS_PIN` in `mineracao.env` to be able to save it.
 - **Arduino siren:** uncomment the `devices` lines of the `painel` service in `compose.yaml`.
 - **cpuminer on the same machine (`LOCAL_WORKER`):** not available inside the container, because it reads the host's systemd journal. The worker still shows up through the proxy.
 

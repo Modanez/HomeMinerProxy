@@ -4,9 +4,11 @@
 
 ### English
 - **Telegram bot:** alerts for farm records, stopped workers, pool failover and money arriving in the wallet (a found block), a daily summary, and the commands /status, /workers, /luck, /records. Optional, configured with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
+- **Settings screen** (⚙️ on the dashboard, `/config`): address, language, currency, kWh price, local miner, alarm exceptions, cube IP and Telegram bot, protected by `SETTINGS_PIN`. Values live in `settings.json`, on top of the `.env`, and the dashboard and cube restart by themselves to apply them. The cube service is now always installed and waits until there is an IP.
 
 ### Português
 - **Bot do Telegram:** avisos de recorde da fazenda, worker parado, failover de pool e dinheiro entrando na carteira (um bloco achado), resumo diário e os comandos /status, /workers, /sorte, /recordes. Opcional, configurado com `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
+- **Tela de configurações** (⚙️ no painel, `/config`): endereço, idioma, moeda, preço do kWh, minerador local, exceções do alarme, IP do cubo e bot do Telegram, protegida pelo `SETTINGS_PIN`. Os valores ficam em `settings.json`, por cima do `.env`, e o painel e o cubo reiniciam sozinhos para aplicar. O serviço do cubo agora fica sempre instalado e espera até haver um IP.
 
 ## v0.1.0 — 2026-11-02
 

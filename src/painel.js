@@ -9,6 +9,10 @@ const path = require('path');
 const os = require('os');
 const { pickLang, localizePage, LOCALES, WIDGET } = require('./i18n');
 const { luckOf, theoreticalShare } = require('./luck');
+const settings = require('./settings');
+// Valores salvos na tela de configurações (DATA_DIR/settings.json) valem por cima do .env
+settings.applyOverlay(process.env.DATA_DIR || __dirname);
+const BOOT = Date.now().toString(36);   // muda a cada reinício: a página recarrega sozinha (idioma etc.)
 
 // ---------------------------------------------------------------- configuração
 const PORT = Number(process.env.PORT || 3000);
@@ -638,6 +642,7 @@ function snapshot() {
   const recordSteps = [];
   for (const r of steps) if (r.value > run) { run = r.value; recordSteps.push({ t: new Date(r.at).getTime(), v: r.value, worker: r.worker }); }
   return {
+    boot: BOOT,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
     ocean: OCEAN_API ? { ...ocean } : null,
@@ -703,6 +708,7 @@ const PAGE = `<!doctype html>
   .upd { color:var(--dim); font-size:13px; white-space:nowrap; }
   .langsw { color:var(--dim); font-size:12px; text-decoration:none; border:1px solid var(--line); border-radius:6px; padding:2px 7px; white-space:nowrap; }
   .langsw b { color:var(--gold); font-weight:600; }
+  body.kiosk .gear { display:none; }
   .narr { flex:1; min-width:0; text-align:center; color:var(--gold); font-size:14px; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   .narr.fade { opacity:0; }
   .party { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(14,17,23,.88); }
@@ -878,6 +884,7 @@ const PAGE = `<!doctype html>
   <div class="narr" id="narr"></div>
   <div class="dots" id="dots"></div>
   <a class="langsw" id="langsw" href="#" title="Switch to English"><b>PT</b> | EN</a>
+  <a class="langsw gear" href="/config" title="Configurações">⚙️</a>
   <div class="upd" id="upd">carregando…</div>
 </header>
 
@@ -1689,10 +1696,13 @@ function confetti(ms) {
   confRaf = requestAnimationFrame(frame);
 }
 
+let bootSeen = null;
 async function load() {
   try {
     const r = await fetch('/api/mining');
     const j = await r.json();
+    if (bootSeen && j.boot && j.boot !== bootSeen) return location.reload();   // painel reiniciou (configuração nova)
+    bootSeen = j.boot;
     lastData = j;
     lastOcean = j.ocean;
     if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; schedule(); }
@@ -1772,6 +1782,13 @@ function every(fn, ms) {
 }
 
 http.createServer((req, res) => {
+  if (settings.handle(req, res, {
+    dataDir: process.env.DATA_DIR || __dirname,
+    lang: pickLang(req, LANGUAGE),
+    workers: () => Object.keys(known).sort((a, b) => a.localeCompare(b)),
+    onSaved: () => { console.log('configuração salva pela tela; reiniciando'); process.exit(0); },
+    telegramApi: process.env.TELEGRAM_API,
+  })) return;
   if (req.url.startsWith('/api/widget')) {
     // resumo enxuto e já formatado, para widgets (KWGT etc.)
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });

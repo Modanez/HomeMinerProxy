@@ -23,6 +23,7 @@ const EN = [
   ['<title>Fazenda de Mineração</title>', '<title>Mining Farm</title>'],
   ['<h1>⛏️ Fazenda de <span>Mineração</span></h1>', '<h1>⛏️ Mining <span>Farm</span></h1>'],
   ['<div class="upd" id="upd">carregando…</div>', '<div class="upd" id="upd">loading…</div>'],
+  ['title="Configurações"', 'title="Settings"'],
   ['<a class="langsw" id="langsw" href="#" title="Switch to English"><b>PT</b> | EN</a>', '<a class="langsw" id="langsw" href="#" title="Mudar para português">PT | <b>EN</b></a>'],
   ['<h2 class="sect">Fazenda</h2>', '<h2 class="sect">Farm</h2>'],
   ['<div class="label">Recorde (Best Difficulty)</div>', '<div class="label">Record (best difficulty)</div>'],
