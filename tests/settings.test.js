@@ -152,6 +152,8 @@ test('salvar pela tela grava, reinicia e o painel volta com o valor novo', async
   // sem JSON (formulário de outro site) não passa
   const form = await new Promise((res) => { const r = http.request({ host: '127.0.0.1', port, method: 'POST', path: '/api/config', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } }, (x) => { x.resume(); res(x.statusCode); }); r.end('pin=424242'); });
   assert.strictEqual(form, 405);
+  const tg = await req(port, 'POST', '/api/config/test', { pin: '424242', what: 'telegram', values: { TELEGRAM_CHAT_ID: 'ModanezMinerBot' } });
+  assert.deepStrictEqual(JSON.parse(tg.body).errors, { TELEGRAM_CHAT_ID: 'chatid' });   // nome do bot no lugar do id
 
   const exited = new Promise((res) => p.once('exit', res));
   const ok = await req(port, 'POST', '/api/config', { pin: '424242', values: { CURRENCY: 'USD', ALARM_IGNORE: ['macbook'] } });
