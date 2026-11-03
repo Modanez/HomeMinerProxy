@@ -31,6 +31,10 @@ test('validação dos campos', () => {
   assert.ok(st.clean(field('CUBE_IP'), 'http://x').error);
   assert.deepStrictEqual(st.clean(field('TELEGRAM_BOT_TOKEN'), TOKEN), { value: TOKEN });
   assert.ok(st.clean(field('TELEGRAM_BOT_TOKEN'), 'abc').error);
+  for (const pasted of [' ' + TOKEN + '\n', '"' + TOKEN + '"', 'bot' + TOKEN, 'https://api.telegram.org/bot' + TOKEN + '/getMe', TOKEN.slice(0, 20) + ' ' + TOKEN.slice(20)]) {
+    assert.deepStrictEqual(st.clean(field('TELEGRAM_BOT_TOKEN'), pasted), { value: TOKEN }, pasted);   // do jeito que costuma vir colado
+  }
+  assert.ok(st.clean(field('TELEGRAM_BOT_TOKEN'), 'senhaSalvaDoNavegador123').error);
   assert.deepStrictEqual(st.clean(field('TELEGRAM_CHAT_ID'), '42, -100123'), { value: '42,-100123' });
   assert.ok(st.clean(field('TELEGRAM_CHAT_ID'), '@paulo').error);
   assert.deepStrictEqual(st.clean(field('TELEGRAM_DAILY'), ''), { value: 'off' });

@@ -56,7 +56,14 @@ const ADDRESS_RE = /^(bc1[02-9ac-hj-np-z]{11,87}|tb1[02-9ac-hj-np-z]{11,87}|[13m
 const NAME_RE = /^[\w.\-]{1,64}$/;
 const HOST_RE = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$|^(?=.{1,253}$)[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(?:\.[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)*$/;
 const IPV4_RE = /^(?:(?:25[0-5]|2[0-4]\d|1?\d?\d)\.){3}(?:25[0-5]|2[0-4]\d|1?\d?\d)$/;
-const TOKEN_RE = /^\d{5,15}:[A-Za-z0-9_-]{30,64}$/;
+const TOKEN_RE = /^\d{5,15}:[A-Za-z0-9_-]{30,80}$/;
+// Aceita o token como ele costuma vir colado: com espaços ou quebras de linha, entre aspas,
+// com "bot" na frente ou dentro do link da API (https://api.telegram.org/bot<token>/...).
+function normToken(v) {
+  v = String(v || '').replace(/\s+/g, '').replace(/^["'`]+|["'`]+$/g, '');
+  const m = /(\d{5,15}:[A-Za-z0-9_-]{30,80})/.exec(v);
+  return m ? m[1] : v.replace(/^bot/i, '');
+}
 
 // Normaliza e valida um valor vindo do formulário. Devolve { value } ou { error: códigoDoErro }.
 function clean(field, raw) {
@@ -86,6 +93,7 @@ function clean(field, raw) {
       return v === '' || (HOST_RE.test(v) && (!numeric || IPV4_RE.test(v))) ? { value: v } : { error: 'host' };
     }
     case 'secret':
+      v = normToken(v);
       return v === '' || TOKEN_RE.test(v) ? { value: v } : { error: 'token' };
     case 'chatids': {
       const list = v.split(',').map((s) => s.trim()).filter(Boolean);
@@ -170,7 +178,8 @@ function testCube(host, timeoutMs = 6000) {
 
 function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
   const ids = String(chatIds || '').split(',').map((s) => s.trim()).filter(Boolean);
-  if (!TOKEN_RE.test(String(token || '')) || !ids.length) return Promise.resolve({ ok: false, error: 'missing' });
+  token = normToken(token);
+  if (!TOKEN_RE.test(token) || !ids.length) return Promise.resolve({ ok: false, error: 'missing' });
   const send = (chat_id) => new Promise((resolve) => {
     const u = new URL(`${api.replace(/\/$/, '')}/bot${token}/sendMessage`);
     const body = JSON.stringify({ chat_id, text });
@@ -210,7 +219,7 @@ const T = {
     saved: 'Salvo! Reiniciando o painel…', back2: 'Pronto. Voltando ao painel…', nothing: 'Nada mudou.',
     cubeOk: 'O cubo respondeu.', cubeFail: 'O cubo não respondeu nesse IP.',
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', name: 'Nome inválido', host: 'IP inválido', token: 'Token inválido (formato 123456:ABC…)', chatid: 'Use só números, separados por vírgula', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'Use só números, separados por vírgula', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
@@ -235,7 +244,7 @@ const T = {
     saved: 'Saved! Restarting the dashboard…', back2: 'Done. Going back to the dashboard…', nothing: 'Nothing changed.',
     cubeOk: 'The cube answered.', cubeFail: 'The cube did not answer at that IP.',
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', name: 'Invalid name', host: 'Invalid IP', token: 'Invalid token (format 123456:ABC…)', chatid: 'Numbers only, comma separated', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'Numbers only, comma separated', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -255,7 +264,7 @@ function page(lang, hasPin) {
     } else if (f.type === 'bool') {
       input = `<label class="inline"><input type="checkbox" name="${f.key}"> ${S.yes}</label>`;
     } else if (f.type === 'secret') {
-      input = `<input type="password" name="${f.key}" autocomplete="off" spellcheck="false"><div class="hint" id="${f.key}_state"></div>` +
+      input = `<div class="pw"><input type="password" name="${f.key}" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="ghost eye" data-eye="${f.key}">👁</button></div><div class="hint" id="${f.key}_state"></div>` +
         `<label class="inline" id="${f.key}_clearbox" hidden><input type="checkbox" name="${f.key}_clear"> ${S.tokenClear}</label>`;
     } else {
       const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : '';
@@ -288,13 +297,15 @@ function page(lang, hasPin) {
   button:disabled { opacity:.5; cursor:default; }
   .bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; } .bar .f { flex:1; min-width:160px; margin:0; }
   #msg { margin-top:12px; font-size:14px; min-height:20px; } #msg.ok { color:var(--ok); } #msg.bad { color:var(--warn); }
+  [hidden] { display:none !important; }
+  .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
 </style></head><body>
 <h1><a href="/">${S.back}</a>⚙️ ${S.title}</h1>
 <form id="form" autocomplete="off">
 ${groups}
 <fieldset><legend>${S.pin}</legend>
-${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="off"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
+${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
 <div id="msg"></div>
 </fieldset>
 </form>
@@ -348,6 +359,7 @@ form.addEventListener('submit', async (ev) => {
     say(M.back2, true); setTimeout(() => { location.href = '/'; }, 800);
   } catch (_) { say('?', false); } finally { b.disabled = false; }
 });
+for (const b of form.querySelectorAll('[data-eye]')) b.addEventListener('click', () => { const e = el(b.dataset.eye); e.type = e.type === 'password' ? 'text' : 'password'; });
 for (const t of form.querySelectorAll('[data-test]')) t.addEventListener('click', async () => {
   t.disabled = true;
   try {
