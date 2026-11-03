@@ -788,6 +788,7 @@ const PAGE = `<!doctype html>
   .luckbar i { display:block; height:100%; background:var(--gold); }
   .lk-hi { color:var(--ok); font-weight:700; } .lk-lo { color:var(--warn); font-weight:700; }
   .lk-p { font-size:11px; white-space:nowrap; }
+  .hist-axis { font-size:11px; text-align:right; margin-top:2px; }
   .luck-duo .lead, body.kiosk .luck-duo .lead { font-size:13px; color:var(--dim); margin:4px 0 6px; }
   .hist-card .chart { height:240px; }
   body.kiosk .luck-duo { flex:1; min-height:0; }
@@ -862,7 +863,12 @@ const PAGE = `<!doctype html>
     .hall li { padding:6px 0; }
   }
   @media (max-width: 380px) {
+    table.luck th:nth-child(3), table.luck td:nth-child(3) { display:none; }   /* "esperado" não cabe */
     .grid { grid-template-columns:1fr; }
+    th, td { font-size:12px; padding:6px 2px; }
+    th { letter-spacing:0; }
+    .card { padding:10px; }
+    .pool { font-size:10px; margin-left:15px; }
   }
 </style>
 </head>
@@ -991,6 +997,7 @@ const PAGE = `<!doctype html>
     <div class="card hist-card">
       <div class="label">Distribuição dos shares</div>
       <div class="chart" id="lkHist"></div>
+      <div class="sub hist-axis">dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria</div>
       <div class="sub" id="lkHistS">Cada faixa tem metade dos shares da anterior, como a matemática prevê. É a prova de que a loteria é justa.</div>
     </div>
   </div>
@@ -1340,31 +1347,43 @@ function renderNear(j) {
 }
 
 function ruler(j, t, best) {
-  const el = $('qbRuler'); const W = el.clientWidth || 600, H = el.clientHeight || 120;
+  const el = $('qbRuler'); el.style.height = '';
+  const W = el.clientWidth || 600;
+  let H = el.clientHeight || 120;
   const max = Math.log10(t.hashDiff * 3), x = (v) => 14 + (W - 28) * Math.max(0, Math.log10(Math.max(v, 1))) / max;
   const ticks = [[1, '1'], [1e3, 'mil'], [1e6, 'milhão'], [1e9, 'bilhão'], [1e12, 'trilhão'], [1e15, 'quatrilhão']].filter(([v]) => Math.log10(v) <= max);
-  const mid = H * 0.55;
+  // recordes dos workers: rótulos em cima da linha, em quantas fileiras forem precisas para não sobrepor
+  const marks = (j.farm.workers || []).filter((w) => Number(w.bestDifficulty) >= 1 && !w.inactive)
+    .map((w) => ({ v: Number(w.bestDifficulty), l: w.name })).sort((a, b) => a.v - b.v);
+  const rowEnd = [];   // onde termina o último rótulo de cada fileira
+  for (const m of marks) {
+    m.x = x(m.v);
+    const half = m.l.length * 3.4 + 6;
+    m.row = rowEnd.findIndex((e) => m.x - half > e);
+    if (m.row < 0) { m.row = rowEnd.length; rowEnd.push(0); }
+    rowEnd[m.row] = m.x + half;
+  }
+  const mid = Math.max(H * 0.55, 16 + rowEnd.length * 14);
+  if (mid + 30 > H) { H = Math.ceil(mid + 30); el.style.height = H + 'px'; }   // muitos workers juntos: a régua cresce
   let svg = '<svg viewBox="0 0 ' + W + ' ' + H + '"><line x1="14" x2="' + (W - 14) + '" y1="' + mid + '" y2="' + mid + '" stroke="var(--line)" stroke-width="4" stroke-linecap="round"/>';
   svg += '<line x1="14" x2="' + x(best) + '" y1="' + mid + '" y2="' + mid + '" stroke="var(--gold)" stroke-width="4" stroke-linecap="round"/>';
-  for (const [v, l] of ticks) svg += '<line x1="' + x(v) + '" x2="' + x(v) + '" y1="' + (mid + 5) + '" y2="' + (mid + 11) + '" stroke="var(--dim)"/><text x="' + x(v) + '" y="' + (mid + 24) + '" fill="var(--dim)" font-size="11" text-anchor="middle">' + l + '</text>';
-  // marcadores: recordes dos workers (embaixo), alvo da rede e hash do bloco (em cima)
-  const marks = (j.farm.workers || []).filter((w) => Number(w.bestDifficulty) >= 1 && !w.inactive)
-    .map((w) => ({ v: Number(w.bestDifficulty), l: w.name, c: 'var(--txt)' })).sort((a, b) => a.v - b.v);
-  const rowEnd = [-1e9, -1e9, -1e9];   // onde termina o último rótulo de cada linha (evita sobrepor)
-  for (const m of marks) {
-    const mx = x(m.v), half = m.l.length * 3.6 + 7;
-    let row = rowEnd.findIndex((e) => mx - half > e);
-    if (row < 0) row = rowEnd.indexOf(Math.min(...rowEnd));
-    rowEnd[row] = mx + half;
-    const ty = mid - 12 - row * 14;
-    svg += '<circle cx="' + mx + '" cy="' + mid + '" r="5" fill="var(--gold)" stroke="var(--bg)" stroke-width="2"/>' +
-      '<text x="' + mx + '" y="' + ty + '" fill="' + m.c + '" font-size="11" text-anchor="middle">' + esc(m.l) + '</text>';
+  let tickEnd = -1e9;   // rótulos da escala que não cabem (tela estreita) ficam só com o traço
+  for (const [v, l] of ticks) {
+    const hw = l.length * 3.3, tx = Math.min(x(v), W - hw), fits = tx - hw - 6 > tickEnd;
+    if (fits) tickEnd = tx + hw;
+    svg += '<line x1="' + x(v) + '" x2="' + x(v) + '" y1="' + (mid + 5) + '" y2="' + (mid + 11) + '" stroke="var(--dim)"/>' +
+      (fits ? '<text x="' + tx + '" y="' + (mid + 24) + '" fill="var(--dim)" font-size="11" text-anchor="middle">' + l + '</text>' : '');
   }
+  for (const m of marks) {
+    svg += '<circle cx="' + m.x + '" cy="' + mid + '" r="5" fill="var(--gold)" stroke="var(--bg)" stroke-width="2"/>' +
+      '<text x="' + m.x + '" y="' + (mid - 12 - m.row * 14) + '" fill="var(--txt)" font-size="11" text-anchor="middle">' + esc(m.l) + '</text>';
+  }
+  // alvo da rede e hash do bloco
   const top = [[t.target, 'alvo da rede', 'var(--dim)'], [t.hashDiff, 'bloco #' + nf(t.height), 'var(--ok)']];
   top.forEach(([v, l, c], k) => {
     const mx = x(v);
     svg += '<line x1="' + mx + '" x2="' + mx + '" y1="' + (mid - 8) + '" y2="' + (mid + 8) + '" stroke="' + c + '" stroke-width="3"/>' +
-      '<text x="' + Math.min(mx, W - 40) + '" y="' + (k ? mid - 26 : mid - 12) + '" fill="' + c + '" font-size="11" text-anchor="middle">' + esc(l) + '</text>';
+      '<text x="' + Math.min(mx, W - l.length * 3.4) + '" y="' + (k ? mid - 26 : mid - 12) + '" fill="' + c + '" font-size="11" text-anchor="middle">' + esc(l) + '</text>';
   });
   el.innerHTML = svg + '</svg>';
 }
@@ -1372,7 +1391,7 @@ function ruler(j, t, best) {
 // ------------------------------------------------ tela 5: sorte
 function renderLuck(j) {
   const L = j.luck;
-  if (!L) return;
+  if (!L) { $('lkHist').innerHTML = '<div class="empty">os shares aparecem aqui conforme chegam pelo proxy</div>'; return; }
   const ws = L.workers || [];
   $('lkRows').innerHTML = ws.length ? ws.map((w) => {
     const cls = w.factor >= 2 ? 'lk-hi' : w.factor < 0.5 ? 'lk-lo' : '';
@@ -1391,8 +1410,9 @@ function histChart(h, th) {
   if (!total) { el.innerHTML = '<div class="empty">os shares aparecem aqui conforme chegam pelo proxy</div>'; return; }
   let last = h.length - 1; while (last > 0 && !h[last]) last--;
   const K = Math.max(last + 1, 8);
-  const W = el.clientWidth || 500, H = el.clientHeight || 240, Lm = 40, B = 34, T = 8;
+  const W = el.clientWidth || 500, H = el.clientHeight || 240, Lm = 40, B = 22, T = 8;
   const iw = W - Lm - 8, ih = H - B - T, bw = iw / K;
+  const step = Math.ceil(K / Math.max(2, Math.min(6, Math.floor(iw / 60))));   // rótulos do eixo x sem encostar
   const maxLog = Math.log10(Math.max(total * 0.5, h[0], 1)) + 0.2;
   const y = (v) => T + ih - (v >= 1 ? Math.log10(v) / maxLog * ih : 0);
   let s = '<svg width="' + W + '" height="' + H + '">';
@@ -1405,10 +1425,9 @@ function histChart(h, th) {
     const x = Lm + k * bw, c = h[k] || 0, exp = total * th[k];
     if (c > 0) s += '<rect x="' + (x + 2).toFixed(1) + '" y="' + y(c).toFixed(1) + '" width="' + Math.max(1, bw - 4).toFixed(1) + '" height="' + (T + ih - y(c)).toFixed(1) + '" style="fill:var(--gold);fill-opacity:.85"><title>' + nf(c) + '</title></rect>';
     if (exp >= 0.5) path += (path ? ' L' : 'M') + (x + bw / 2).toFixed(1) + ' ' + y(Math.max(exp, 1)).toFixed(1);
-    if (k % Math.ceil(K / 6) === 0) s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 18) + '" text-anchor="middle">' + fmtShort(Math.pow(2, k)) + '×</text>';
+    if (k % step === 0) s += '<text x="' + (x + bw / 2).toFixed(1) + '" y="' + (H - 6) + '" text-anchor="middle">' + fmtShort(Math.pow(2, k)) + '×</text>';
   }
   s += '<path d="' + path + '" style="fill:none;stroke:var(--ok);stroke-width:2;stroke-dasharray:5 4"/>';
-  s += '<text x="' + (W - 8) + '" y="' + (H - 2) + '" text-anchor="end">dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria</text>';
   el.innerHTML = s + '</svg>';
 }
 
