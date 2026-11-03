@@ -256,9 +256,9 @@ O bot avisa:
 - **Worker parado / de volta:** quando um worker fica vermelho no painel, e quando ele volta.
 - **Failover de pool:** quando uma porta vai para a pool reserva, e quando volta para a principal.
 - **Dinheiro na carteira:** qualquer pagamento para o seu endereço. Um bloco solo chega como 🎉 **ACHAMOS UM BLOCO!**
-- **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`).
+- **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`), com a imagem do bilhete de loteria do dia.
 
-Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/ajuda`. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
+Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
 
 ## Cubo GeekMagic (opcional)
 

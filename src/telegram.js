@@ -7,6 +7,8 @@
 const https = require('https');
 const http = require('http');
 const fs = require('fs');
+const path = require('path');
+const { spawn } = require('child_process');
 
 // ---------------------------------------------------------------- textos
 const STRINGS = {
@@ -38,10 +40,12 @@ const STRINGS = {
     luckRow: (w, f, p) => `${w}: <b>${f}×</b> · melhor que ${p}% das fazendas iguais`,
     recordsTitle: '<b>Hall da fama</b>',
     recordsEmpty: 'Nenhum recorde ainda.',
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/ajuda · esta lista',
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
+    ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
+    noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -73,15 +77,17 @@ const STRINGS = {
     luckRow: (w, f, p) => `${w}: <b>${f}×</b> · better than ${p}% of identical farms`,
     recordsTitle: '<b>Hall of fame</b>',
     recordsEmpty: 'No records yet.',
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/help · this list',
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/ticket · today\'s lottery ticket\n/help · this list',
+    ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
+    noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
 };
-const ALIASES = { sorte: 'luck', recordes: 'records', ajuda: 'help', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
+const ALIASES = { sorte: 'luck', recordes: 'records', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
 
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -216,6 +222,29 @@ function dailyText(snap, opts = {}) {
   return T.dailyTitle(date) + '\n\n' + statusText(snap, opts);
 }
 
+// Melhor hash de hoje (o bilhete só sai com um share de hoje e o hash do último bloco)
+function todayBest(snap, today = new Date().toLocaleDateString('sv')) {
+  const nb = snap.nearBlock || {};
+  return nb.tip && nb.dayBestHash && nb.dayBestHash.date === today ? nb.dayBestHash : null;
+}
+
+// Gera o PNG do bilhete com o ticket.py (Pillow, o mesmo do placar do cubo). Sem Python ou Pillow: null.
+function ticketImage(snap, lang, opts = {}) {
+  return new Promise((resolve) => {
+    let p;
+    try {
+      p = spawn(opts.python || 'python3', [opts.script || path.join(__dirname, 'ticket.py'), '--lang', lang], { stdio: ['pipe', 'pipe', 'ignore'] });
+    } catch (_) { return resolve(null); }
+    const out = [];
+    const timer = setTimeout(() => p.kill(), opts.timeoutMs || 30000);
+    p.on('error', () => { clearTimeout(timer); resolve(null); });
+    p.stdout.on('data', (c) => out.push(c));
+    p.on('close', (code) => { clearTimeout(timer); const png = Buffer.concat(out); resolve(code === 0 && png.length > 100 ? png : null); });
+    p.stdin.on('error', () => {});
+    p.stdin.end(JSON.stringify(snap));
+  });
+}
+
 // "/sorte@MeuBot arg" → "luck"
 function parseCommand(text) {
   const m = /^\/([a-zA-Z_]+)(?:@\S+)?/.exec(String(text || '').trim());
@@ -246,6 +275,26 @@ function apiCall(base, token, method, body, timeoutMs = 15000) {
   });
 }
 
+// Upload de foto (multipart/form-data, sem dependências)
+function apiPhoto(base, token, fields, png, timeoutMs = 30000) {
+  return new Promise((resolve, reject) => {
+    const boundary = '----fazenda' + Date.now().toString(16);
+    const parts = [];
+    for (const [k, v] of Object.entries(fields)) if (v !== undefined) parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="bilhete.png"\r\nContent-Type: image/png\r\n\r\n`), png, Buffer.from(`\r\n--${boundary}--\r\n`));
+    const body = Buffer.concat(parts);
+    const u = new URL(`${base}/bot${token}/sendPhoto`);
+    const req = (u.protocol === 'http:' ? http : https).request(u, { method: 'POST', timeout: timeoutMs, headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': body.length } }, (res) => {
+      let b = '';
+      res.on('data', (c) => (b += c));
+      res.on('end', () => { let j = null; try { j = JSON.parse(b); } catch (_) { /* inválida */ } if (j && j.ok) resolve(j.result); else reject(new Error((j && j.description) || `HTTP ${res.statusCode}`)); });
+    });
+    req.on('timeout', () => req.destroy(new Error('tempo esgotado')));
+    req.on('error', reject);
+    req.end(body);
+  });
+}
+
 // ---------------------------------------------------------------- o bot
 // opts: token, chatIds[], lang, snapshot(), quiet(), ignore[], personal, dailyHour (null = sem resumo),
 //       panelUrl, stateFile, api (base da API; muda nos testes), tickMs, warmupMs, log
@@ -270,6 +319,12 @@ function start(opts) {
     chat_id: chatId, text, parse_mode: 'HTML', disable_web_page_preview: true, disable_notification: !!silent,
   }).catch((e) => log('falha ao enviar: ' + e.message));
   const broadcast = (text, silent) => Promise.all(chatIds.map((id) => send(id, text, silent)));
+  // foto com legenda; se a foto falhar, manda só o texto (a legenda do Telegram vai até 1024 caracteres)
+  const sendPhoto = (chatId, png, caption, silent) => apiPhoto(base, opts.token, {
+    chat_id: chatId, caption: caption.length <= 1024 ? caption : undefined, parse_mode: 'HTML', disable_notification: silent ? 'true' : undefined,
+  }, png).then(() => (caption.length > 1024 ? send(chatId, caption, silent) : null))
+    .catch((e) => { log('falha ao enviar o bilhete: ' + e.message); return send(chatId, caption, silent); });
+  const ticketFor = (snap) => (todayBest(snap) ? ticketImage(snap, lang, { python: opts.python, script: opts.ticketScript }) : Promise.resolve(null));
 
   // comandos
   async function handle(msg) {
@@ -284,6 +339,12 @@ function start(opts) {
     }
     const snap = opts.snapshot();
     const o = fopts();
+    if (cmd === 'ticket') {
+      const png = await ticketFor(snap), b = todayBest(snap);
+      if (!png) return send(id, T.noTicket);
+      const fm = formatter(lang);
+      return sendPhoto(id, png, T.ticketCaption(fm.diff(b.diff), escHtml(b.worker)));
+    }
     const text = cmd === 'status' ? statusText(snap, o)
       : cmd === 'workers' ? workersText(snap, o)
         : cmd === 'luck' ? luckText(snap, o)
@@ -327,7 +388,8 @@ function start(opts) {
     const now = new Date(), day = now.toLocaleDateString('sv');
     if (opts.dailyHour != null && now.getHours() === opts.dailyHour && state.lastDaily !== day) {
       state.lastDaily = day; save();
-      broadcast(dailyText(snap, fopts()), silent);
+      const text = dailyText(snap, fopts());
+      ticketFor(snap).then((png) => Promise.all(chatIds.map((id) => (png ? sendPhoto(id, png, text, silent) : send(id, text, silent)))));
     }
   }
 
@@ -346,4 +408,4 @@ function start(opts) {
   };
 }
 
-module.exports = { start, digest, diffEvents, statusText, workersText, luckText, recordsText, dailyText, parseCommand, formatter, STRINGS };
+module.exports = { start, todayBest, ticketImage, digest, diffEvents, statusText, workersText, luckText, recordsText, dailyText, parseCommand, formatter, STRINGS };

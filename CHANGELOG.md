@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Daily ticket on Telegram:** the 21:00 summary now comes with today's lottery-ticket image, and `/ticket` sends it any time. Rendered on the server by `ticket.py` (Pillow); without Pillow the summary stays text only.
+
+### Português
+- **Bilhete do dia no Telegram:** o resumo das 21h agora vem com a imagem do bilhete de loteria do dia, e o `/bilhete` manda a qualquer hora. Gerado no servidor pelo `ticket.py` (Pillow); sem Pillow, o resumo continua só em texto.
+
 ## v0.2.0 — 2026-11-03
 
 ### English

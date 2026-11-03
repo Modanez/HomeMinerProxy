@@ -256,9 +256,9 @@ The bot sends:
 - **Worker stopped / back:** when a worker goes red on the dashboard, and when it returns.
 - **Pool failover:** when a port moves to its backup pool, and when it moves back.
 - **Money in the wallet:** any payment to your address. A solo block shows up as 🎉 **WE FOUND A BLOCK!**
-- **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`).
+- **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`), with today's lottery ticket image attached.
 
-Commands: `/status`, `/workers`, `/luck`, `/records`, `/help`. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
+Commands: `/status`, `/workers`, `/luck`, `/records`, `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
 
 ## GeekMagic cube (optional)
 

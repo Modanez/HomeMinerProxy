@@ -16,7 +16,10 @@ const snap = (o = {}) => ({
   proxy: { failover: o.failover || [] },
   wallet: { okAt: 1, sats: o.sats ?? 9248 },
   luck: { workers: [{ name: 'vovo', factor: 2.69, percentile: 0.77 }] },
-  nearBlock: { dayBestHash: { worker: 'odroid', diff: 5.22, date: '2026-11-02' } },
+  nearBlock: {
+    tip: { height: 974200, hash: '00000000000000000000' + 'ab'.repeat(22), hashDiff: 6.08e14, target: 1.484e14 },
+    dayBestHash: { worker: 'odroid', diff: 5.22, hash: '00000000' + 'cd'.repeat(28), at: Date.parse('2026-11-02T15:00:00Z'), date: o.dayDate || '2026-11-02' },
+  },
 });
 
 test('comandos em português e inglês, com ou sem @bot', () => {
@@ -24,6 +27,8 @@ test('comandos em português e inglês, com ou sem @bot', () => {
   assert.strictEqual(tg.parseCommand('/luck@FazendaBot'), 'luck');
   assert.strictEqual(tg.parseCommand('/RECORDES'), 'records');
   assert.strictEqual(tg.parseCommand('/ajuda'), 'help');
+  assert.strictEqual(tg.parseCommand('/bilhete'), 'ticket');
+  assert.strictEqual(tg.parseCommand('/ticket'), 'ticket');
   assert.strictEqual(tg.parseCommand('/status agora'), 'status');
   assert.strictEqual(tg.parseCommand('oi'), null);
   assert.strictEqual(tg.parseCommand('/rm -rf'), null);
@@ -108,15 +113,19 @@ function fakeTelegram() {
   let id = 1;
   const server = http.createServer((req, res) => {
     let b = '';
-    req.on('data', (c) => (b += c));
+    const chunks = [];
+    req.on('data', (c) => chunks.push(c));
     req.on('end', () => {
+      const multipart = /^multipart/.test(req.headers['content-type'] || '');
+      b = Buffer.concat(chunks).toString(multipart ? 'latin1' : 'utf8');   // latin1 preserva os bytes do PNG
       const method = req.url.split('/').pop();
-      const body = b ? JSON.parse(b) : {};
+      const body = multipart ? { raw: Buffer.from(b, 'latin1').toString('utf8') } : b ? JSON.parse(b) : {};
       calls.push({ url: req.url, method, body });
       const reply = (result) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, result })); };
       if (!req.url.startsWith('/botTOKEN123/')) { res.writeHead(401); return res.end(JSON.stringify({ ok: false, description: 'Unauthorized' })); }
       if (method === 'getMe') return reply({ username: 'FazendaBot' });
       if (method === 'sendMessage') { sent.push(body); return reply({ message_id: sent.length }); }
+      if (method === 'sendPhoto') { sent.push({ photo: true, raw: body.raw }); return reply({ message_id: sent.length }); }
       if (method === 'getUpdates') {
         const ups = queue.splice(0).filter((u) => u.update_id >= (body.offset || 0));
         return ups.length ? reply(ups) : setTimeout(() => reply([]), 100);
@@ -138,7 +147,7 @@ test('bot responde só ao chat configurado e manda os avisos', async (t) => {
 
   await waitFor(() => api.calls.some((c) => c.method === 'setMyCommands'));
   const cmds = api.calls.find((c) => c.method === 'setMyCommands').body.commands.map((c) => c.command);
-  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'ajuda']);
+  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'bilhete', 'ajuda']);
 
   api.push(999, '/status');   // estranho: ignorado
   api.push(42, '/status');
@@ -184,4 +193,44 @@ test('o painel liga o bot quando há TELEGRAM_BOT_TOKEN', async (t) => {
   api.push(42, '/ajuda');
   await waitFor(() => api.sent.length >= 1, 10000);
   assert.match(api.sent[0].text, /\/sorte · medidor de sorte/);
+});
+
+const hasPillow = require('child_process').spawnSync('python3', ['-c', 'import PIL']).status === 0;
+
+test('bilhete do dia em PNG pelo ticket.py', { skip: !hasPillow && 'sem Pillow' }, async () => {
+  const today = new Date().toLocaleDateString('sv');
+  const png = await tg.ticketImage(snap({ dayDate: today }), 'pt');
+  assert.ok(png && png.subarray(1, 4).toString() === 'PNG');
+  assert.strictEqual(png.readUInt32BE(16), 1080);
+  assert.strictEqual(png.readUInt32BE(20), 1350);
+  assert.strictEqual(await tg.ticketImage({ nearBlock: {} }, 'en'), null);   // sem dados: sem bilhete
+  assert.strictEqual(await tg.ticketImage(snap(), 'pt', { python: 'python-que-nao-existe' }), null);
+  assert.ok(tg.todayBest(snap({ dayDate: today })));
+  assert.strictEqual(tg.todayBest(snap({ dayDate: '2020-01-01' })), null);   // melhor de outro dia não vira bilhete
+});
+
+test('/bilhete e resumo diário mandam a foto do bilhete', { skip: !hasPillow && 'sem Pillow' }, async (t) => {
+  const api = await fakeTelegram();
+  const today = new Date().toLocaleDateString('sv');
+  let current = snap({ dayDate: '2020-01-01' });
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'pt', snapshot: () => current, api: api.url, pollS: 0, warmupMs: 1e9, dailyHour: new Date().getHours(), log: () => {} });
+  t.after(() => { bot.stop(); api.server.close(); });
+
+  api.push(42, '/bilhete');   // ainda sem share de hoje
+  await waitFor(() => api.sent.length >= 1);
+  assert.match(api.sent[0].text, /Ainda não há bilhete hoje/);
+
+  current = snap({ dayDate: today });
+  api.push(42, '/bilhete');
+  await waitFor(() => api.sent.length >= 2, 15000);
+  assert.ok(api.sent[1].photo);
+  assert.match(api.sent[1].raw, /name="chat_id"\r\n\r\n42/);
+  assert.match(api.sent[1].raw, /PNG\r\n\x1a\n[\s\S]*IHDR/);
+  assert.match(api.sent[1].raw, /Bilhete de hoje: melhor hash <b>5,22<\/b> \(odroid\)/);
+
+  bot.tick();   // hora do resumo: foto com o resumo na legenda
+  await waitFor(() => api.sent.length >= 3, 15000);
+  assert.ok(api.sent[2].photo);
+  assert.match(api.sent[2].raw, /Resumo do dia/);
+  assert.match(api.sent[2].raw, /name="parse_mode"\r\n\r\nHTML/);
 });
