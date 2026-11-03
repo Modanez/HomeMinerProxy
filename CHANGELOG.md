@@ -1,14 +1,22 @@
 # Changelog
 
-## Unreleased
+## v0.2.0 — 2026-11-03
 
 ### English
-- **Telegram bot:** alerts for farm records, stopped workers, pool failover and money arriving in the wallet (a found block), a daily summary, and the commands /status, /workers, /luck, /records. Optional, configured with `TELEGRAM_BOT_TOKEN` and `TELEGRAM_CHAT_ID`.
-- **Settings screen** (⚙️ on the dashboard, `/config`): address, language, currency, kWh price, local miner, alarm exceptions, cube IP and Telegram bot, protected by `SETTINGS_PIN`. Values live in `settings.json`, on top of the `.env`, and the dashboard and cube restart by themselves to apply them. The cube service is now always installed and waits until there is an IP.
+- **Telegram bot:** alerts for farm records, stopped workers, pool failover and money arriving in the wallet (a found block gets its own message), a daily summary, and the commands /status, /workers, /luck, /records, /help. Silent during `QUIET_HOURS`. Long polling, so nothing on your network needs to be exposed.
+- **Settings screen** (⚙️ on the dashboard, `/config`): bitcoin address, language, currency, kWh price, local miner, alarm exceptions, cube IP and the Telegram bot, with buttons to test the cube and send a Telegram test message. Saving requires `SETTINGS_PIN`. Values live in `settings.json`, on top of `/etc/mineracao.env`, and the dashboard and cube restart by themselves to apply them.
+- **cpuminer guide** in the README: build and run on Linux, macOS, Android (Termux) and Windows, plus a systemd unit for running it next to the dashboard.
+- The cube service is now always installed and waits until there is a `CUBE_IP` (set it in the `.env` or on the settings screen).
+
+**Upgrading:** `cd HomeMinerProxy && git pull && sudo bash install.sh`. The installer creates the settings PIN and shows it at the end (it is also in `/etc/mineracao.env`). With Docker, set `SETTINGS_PIN` in `mineracao.env` and run `docker compose up -d --build`. Nothing in your existing configuration changes.
 
 ### Português
-- **Bot do Telegram:** avisos de recorde da fazenda, worker parado, failover de pool e dinheiro entrando na carteira (um bloco achado), resumo diário e os comandos /status, /workers, /sorte, /recordes. Opcional, configurado com `TELEGRAM_BOT_TOKEN` e `TELEGRAM_CHAT_ID`.
-- **Tela de configurações** (⚙️ no painel, `/config`): endereço, idioma, moeda, preço do kWh, minerador local, exceções do alarme, IP do cubo e bot do Telegram, protegida pelo `SETTINGS_PIN`. Os valores ficam em `settings.json`, por cima do `.env`, e o painel e o cubo reiniciam sozinhos para aplicar. O serviço do cubo agora fica sempre instalado e espera até haver um IP.
+- **Bot do Telegram:** avisos de recorde da fazenda, worker parado, failover de pool e dinheiro entrando na carteira (bloco achado tem mensagem própria), resumo diário e os comandos /status, /workers, /sorte, /recordes, /ajuda. Sem som no `QUIET_HOURS`. Usa long polling, então nada da sua rede precisa ficar exposto.
+- **Tela de configurações** (⚙️ no painel, `/config`): endereço de bitcoin, idioma, moeda, preço do kWh, minerador local, exceções do alarme, IP do cubo e o bot do Telegram, com botões para testar o cubo e mandar uma mensagem de teste no Telegram. Para salvar, pede o `SETTINGS_PIN`. Os valores ficam em `settings.json`, por cima do `/etc/mineracao.env`, e o painel e o cubo reiniciam sozinhos para aplicar.
+- **Guia do cpuminer** no README: compilar e rodar no Linux, macOS, Android (Termux) e Windows, e um serviço systemd para rodar junto do painel.
+- O serviço do cubo agora fica sempre instalado e espera até haver um `CUBE_IP` (no `.env` ou na tela de configurações).
+
+**Para atualizar:** `cd HomeMinerProxy && git pull && sudo bash install.sh`. O instalador cria o PIN da tela de configurações e mostra no final (ele também fica em `/etc/mineracao.env`). No Docker, defina `SETTINGS_PIN` no `mineracao.env` e rode `docker compose up -d --build`. Nada da configuração atual muda.
 
 ## v0.1.0 — 2026-11-02
 
