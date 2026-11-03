@@ -19,9 +19,12 @@
    - When the user saves changes on `/config`, `src/settings.js` writes only the modified keys to `DATA_DIR/settings.json` (atomically via `.tmp` + `fs.renameSync` with mode `0600`).
    - On startup, both `src/painel.js` (`settings.applyOverlay`) and `src/cubo.py` overlay `settings.json` on top of `process.env` / `os.environ`.
 3. **PIN Protection & Brute-Force Lockout**:
-   - Saving or testing on `/config` requires `SETTINGS_PIN`, compared using `crypto.timingSafeEqual` over SHA-256 digests (`checkPin`).
+   - Saving, testing, or exporting/restoring backups on `/config` requires `SETTINGS_PIN`, compared using `crypto.timingSafeEqual` over SHA-256 digests (`checkPin`).
    - After 5 failed attempts within 15 minutes, the endpoint locks out further attempts (`HTTP 429`).
    - Secrets (`TELEGRAM_BOT_TOKEN`) are never returned in plaintext by `GET /api/config` (only `{ set: true, tail: "last4" }`).
+4. **Single-File JSON Backup & Restore (`/api/config/backup` and `/api/config/restore`)**:
+   - `exportBackup` bundles `settings.json`, `workers.json`, `records.json`, `history.json`, `proxy-stats.json`, `telegram.json`, and `cubo-state.json` into a single versioned JSON payload (`version: 1`).
+   - `restoreBackup` validates each section against a strict schema and writes only to a hardcoded allow-list of filenames (`BACKUP_FILES`) via atomic `.tmp` + `fs.renameSync`, triggering a dashboard restart so restored state is loaded cleanly.
 
 ## Consequences
 

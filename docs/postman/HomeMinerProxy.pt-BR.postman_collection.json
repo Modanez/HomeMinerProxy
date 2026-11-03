@@ -298,7 +298,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"values\": {\n    \"BTC_ADDRESS\": \"{{btcAddress}}\",\n    \"LANGUAGE\": \"pt-BR\",\n    \"CURRENCY\": \"BRL\",\n    \"POWER_PRICE_KWH\": \"0.90\",\n    \"LOCAL_WORKER\": \"\",\n    \"ALARM_IGNORE\": [],\n    \"CUBE_IP\": \"{{cubeIp}}\",\n    \"TELEGRAM_BOT_TOKEN\": \"\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\",\n    \"TELEGRAM_DAILY\": \"21\",\n    \"TELEGRAM_PERSONAL\": false,\n    \"TELEGRAM_PANEL_URL\": \"\"\n  }\n}"
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"values\": {\n    \"BTC_ADDRESS\": \"{{btcAddress}}\",\n    \"LANGUAGE\": \"pt-BR\",\n    \"CURRENCY\": \"BRL\",\n    \"POWER_PRICE_KWH\": \"0.90\",\n    \"LOCAL_WORKER\": \"\",\n    \"ALARM_IGNORE\": [],\n    \"WATTS\": {\n      \"bitaxe\": 20,\n      \"nerdminer\": 1\n    },\n    \"EXPECTED\": {\n      \"bitaxe\": \"1.2T\",\n      \"nerdminer\": \"350k\"\n    },\n    \"CUBE_IP\": \"{{cubeIp}}\",\n    \"TELEGRAM_BOT_TOKEN\": \"\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\",\n    \"TELEGRAM_DAILY\": \"21\",\n    \"TELEGRAM_PERSONAL\": false,\n    \"TELEGRAM_PANEL_URL\": \"\"\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/config",
@@ -306,6 +306,61 @@
               "path": ["api", "config"]
             },
             "description": "Valida e grava os valores alterados em `DATA_DIR/settings.json`. Exige o `SETTINGS_PIN`. Se algum valor mudou, retorna `{ ok: true, restart: true }` e reinicia o serviço do painel."
+          }
+        },
+        {
+          "name": "Exportar Backup (/api/config/backup)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
+                  "const j = pm.response.json();",
+                  "pm.test('Retorna ok e objeto backup v1', () => {",
+                  "  pm.expect(j.ok).to.eql(true);",
+                  "  pm.expect(j.backup.version).to.eql(1);",
+                  "  pm.expect(j.backup).to.have.property('data');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/backup",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "backup"]
+            },
+            "description": "Exporta um backup completo em arquivo JSON único (`version: 1`) contendo `settings`, `workers`, `records`, `history`, `proxyStats`, `telegram` e `cubo`. Exige o `SETTINGS_PIN`."
+          }
+        },
+        {
+          "name": "Restaurar Backup (/api/config/restore)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"backup\": {\n    \"app\": \"home-miner-proxy\",\n    \"version\": 1,\n    \"data\": {\n      \"settings\": {\n        \"CURRENCY\": \"BRL\",\n        \"WATTS\": \"{\\\"bitaxe\\\":20}\"\n      },\n      \"records\": [\n        {\n          \"worker\": \"bitaxe\",\n          \"value\": 4096,\n          \"at\": \"2026-11-03T12:00:00.000Z\"\n        }\n      ]\n    }\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/restore",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "restore"]
+            },
+            "description": "Valida e restaura os dados de um backup em `DATA_DIR` e reinicia o serviço do painel. Exige o `SETTINGS_PIN`."
           }
         },
         {

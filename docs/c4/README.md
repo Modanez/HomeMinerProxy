@@ -160,7 +160,7 @@ flowchart TB
 - **[`src/painel.js`](../../src/painel.js)**: Core orchestrator, background polling loops (`every`), state aggregation (`workersView`, `snapshot`), Arduino serial controller (`alarm`), and embedded SPA HTML/CSS/JS.
 - **[`src/luck.js`](../../src/luck.js)**: Statistical model (`luckOf`, `theoreticalShare`) comparing a worker's best share against the median expected best share (`W / ln 2`) and computing the theoretical power-of-two histogram (`2^-(k+1)`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Language negotiation (`?lang` > `lang` cookie > `LANGUAGE` env > `Accept-Language` > `'en'`) and deterministic PT -> EN page translation (`localizePage`).
-- **[`src/settings.js`](../../src/settings.js)**: Renders `/config`, validates fields (`clean`), enforces SHA-256 timing-safe `SETTINGS_PIN` verification with brute-force lockout (`checkPin`), persists `settings.json`, and tests Cube/Telegram connectivity.
+- **[`src/settings.js`](../../src/settings.js)**: Renders `/config`, validates fields (`clean`, including per-worker `WATTS` and `EXPECTED` hashrate maps), enforces SHA-256 timing-safe `SETTINGS_PIN` verification with brute-force lockout (`checkPin`), persists `settings.json`, exports/restores full farm JSON backups (`exportBackup`, `restoreBackup`), and tests Cube/Telegram connectivity.
 - **[`src/telegram.js`](../../src/telegram.js)**: Long-polling client (`getUpdates`), state diffing engine (`digest`, `diffEvents`), command handlers (`/status`, `/workers`, `/luck`, `/records`, `/ticket`, `/help`), and child-process bridge to `src/ticket.py`.
 
 ---

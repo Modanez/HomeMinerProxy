@@ -31,11 +31,13 @@ This directory contains the **Postman v2.1 collections** and environment file co
 - `GET /api/widget?lang=en` & `GET /api/widget?lang=pt` — Pre-formatted compact JSON for mobile widgets (KWGT).
 - `GET /api/alarm?e=T` — Sends a command to the Arduino USB siren (`T` test, `R` farm record, `P` personal record, `S` share, `0` green, `1` yellow, `2` red).
 
-### 3. Settings APIs (`:3000`)
-- `GET /api/config` — Returns current effective settings (masking `TELEGRAM_BOT_TOKEN` to its last 4 chars), known worker names, and whether `SETTINGS_PIN` is set.
+### 3. Settings & Backup APIs (`:3000`)
+- `GET /api/config` — Returns current effective settings (including `WATTS` and `EXPECTED` maps, and masking `TELEGRAM_BOT_TOKEN` to its last 4 chars), known worker names, and whether `SETTINGS_PIN` is set.
 - `POST /api/config` — Validates and saves settings to `DATA_DIR/settings.json` (requires `pin`) and restarts the dashboard when values change.
 - `POST /api/config/test` (`what: "cube"`) — Tests HTTP reachability of the GeekMagic SmallTV cube (`CUBE_IP`).
 - `POST /api/config/test` (`what: "telegram"`) — Sends a test message through the Telegram Bot API using the provided or stored token and `TELEGRAM_CHAT_ID`.
+- `POST /api/config/backup` — Exports a full JSON backup (`version: 1`) containing `settings`, `workers`, `records`, `history`, `proxyStats`, `telegram`, and `cubo` (requires `pin`).
+- `POST /api/config/restore` — Validates and restores a JSON backup to `DATA_DIR` (requires `pin`) and restarts the dashboard.
 
 ### 4. Stratum Proxy Internal API (`127.0.0.1:3336`)
 - `GET /stats` — Raw real-time proxy statistics per worker, route/upstream failover health, last-hour share count, `bestHash`, `dayBestHash`, and the 40-bucket difficulty histogram (`hist`).

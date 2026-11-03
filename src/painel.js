@@ -1785,7 +1785,7 @@ http.createServer((req, res) => {
   if (settings.handle(req, res, {
     dataDir: process.env.DATA_DIR || __dirname,
     lang: pickLang(req, LANGUAGE),
-    workers: () => Object.keys(known).sort((a, b) => a.localeCompare(b)),
+    workers: () => [...new Set([...Object.keys(known), ...Object.keys(EXPECTED).filter((k) => EXPECTED[k] > 0), ...Object.keys(WATTS)])].sort((a, b) => a.localeCompare(b)),
     onSaved: () => { console.log('configuração salva pela tela; reiniciando'); process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
   })) return;

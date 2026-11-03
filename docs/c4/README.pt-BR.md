@@ -160,7 +160,7 @@ flowchart TB
 - **[`src/painel.js`](../../src/painel.js)**: Orquestrador principal, loops de coleta (`every`), agregação de estado (`workersView`, `snapshot`), controle serial do Arduino (`alarm`) e SPA HTML/CSS/JS embutida.
 - **[`src/luck.js`](../../src/luck.js)**: Modelo estatístico (`luckOf`, `theoreticalShare`) que compara o melhor share de cada worker com a mediana esperada para o trabalho realizado (`W / ln 2`) e calcula a curva teórica do histograma (`2^-(k+1)`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Seleção de idioma (`?lang` > cookie `lang` > variável `LANGUAGE` > `Accept-Language` > `'en'`) e tradução determinística PT -> EN da página (`localizePage`).
-- **[`src/settings.js`](../../src/settings.js)**: Renderiza `/config`, valida os campos (`clean`), verifica o `SETTINGS_PIN` em tempo constante via SHA-256 com bloqueio contra força bruta (`checkPin`), grava `settings.json` e testa a comunicação com o Cubo e o Telegram.
+- **[`src/settings.js`](../../src/settings.js)**: Renderiza `/config`, valida os campos (`clean`, incluindo mapas por worker de `WATTS` e `EXPECTED`), verifica o `SETTINGS_PIN` em tempo constante via SHA-256 com bloqueio contra força bruta (`checkPin`), grava `settings.json`, exporta/restaura backups completos da fazenda (`exportBackup`, `restoreBackup`) e testa a comunicação com o Cubo e o Telegram.
 - **[`src/telegram.js`](../../src/telegram.js)**: Cliente de *long polling* (`getUpdates`), motor de detecção de eventos (`digest`, `diffEvents`), tratamento de comandos (`/status`, `/workers`, `/sorte`, `/recordes`, `/bilhete`, `/ajuda`) e integração via subprocesso com `src/ticket.py`.
 
 ---
