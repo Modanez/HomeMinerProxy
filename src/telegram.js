@@ -29,6 +29,7 @@ const STRINGS = {
     dayBest: (d, w) => `Melhor hash do dia: <b>${d}</b> (${w})`,
     farmRecord: (d, w) => `Recorde da fazenda: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Mais sortudo: ${w} (${f}×)`,
+    poolPing: (ms, sc) => `⚡ Ping da pool: <b>${ms} ms</b> (${sc === 'great' ? '🟢 ótimo' : sc === 'good' ? '🟡 bom' : '🔴 ruim'})`,
     failoverNow: (port, primary, active) => `⚠️ porta ${port}: ${primary} fora, usando ${active || '–'}`,
     stoppedNow: (list) => `🔴 Parados: ${list}`,
     panel: 'Abrir o painel',
@@ -83,6 +84,7 @@ const STRINGS = {
     dayBest: (d, w) => `Best hash today: <b>${d}</b> (${w})`,
     farmRecord: (d, w) => `Farm record: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Luckiest: ${w} (${f}×)`,
+    poolPing: (ms, sc) => `⚡ Pool ping: <b>${ms} ms</b> (${sc === 'great' ? '🟢 great' : sc === 'good' ? '🟡 good' : '🔴 poor'})`,
     failoverNow: (port, primary, active) => `⚠️ port ${port}: ${primary} down, using ${active || '–'}`,
     stoppedNow: (list) => `🔴 Stopped: ${list}`,
     panel: 'Open the dashboard',
@@ -233,6 +235,7 @@ function statusText(snap, opts = {}) {
   if (day && day.date === (opts.today || new Date().toLocaleDateString('sv'))) lines.push(T.dayBest(fm.diff(day.diff), escHtml(day.worker)));
   if (top) lines.push(T.farmRecord(fm.diff(top.value), escHtml(top.worker)));
   if (luck) lines.push(T.luckiest(escHtml(luck.name), fm.num(luck.factor, 2)));
+  if ((snap.proxy || {}).pingMs != null) lines.push(T.poolPing(snap.proxy.pingMs, snap.proxy.pingScore));
   for (const r of (snap.proxy || {}).failover || []) lines.push(T.failoverNow(r.listen, escHtml(r.primary), escHtml(r.active)));
   if (stale.length) lines.push(T.stoppedNow(stale.map((w) => escHtml(w.name)).join(', ')));
   if (opts.panelUrl) lines.push(`\n<a href="${escHtml(opts.panelUrl)}">${T.panel}</a>`);
@@ -523,7 +526,7 @@ function start(opts) {
         if (stopped) return;
         if (e.status === 401 || e.status === 404) { log('token recusado pelo Telegram; confira TELEGRAM_BOT_TOKEN'); return; }
         log('sem conexão com o Telegram (' + e.message + '); tento de novo em 30 s');
-        await new Promise((r) => timers.push(setTimeout(r, 30e3)));
+        await new Promise((r) => timers.push(setTimeout(r, opts.retryMs || 30e3)));
       }
     }
   }

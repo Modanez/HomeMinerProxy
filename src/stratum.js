@@ -30,6 +30,7 @@ function shareDifficulty(job, en1, submit, versionMask) {
   if (header.length !== 80) return null;
   const hash = rev(sha256d(header)).toString('hex');
   const value = BigInt('0x' + hash);
+  /* node:coverage ignore next 2 */ // guarda teórica contra divisão por zero (hash sha256d todo em zeros)
   if (value === 0n) return { diff: Infinity, hash };
   return { diff: Number((DIFF1 * SCALE) / value) / Number(SCALE), hash };
 }
@@ -41,4 +42,22 @@ function hashDifficulty(hashHex) {
   return v === 0n ? Infinity : Number((DIFF1 * SCALE) / v) / Number(SCALE);
 }
 
-module.exports = { shareDifficulty, hashDifficulty, swap32, sha256d, DIFF1 };
+// Classificação da latência de rede/resposta até o servidor Stratum da pool:
+// - Ótimo (<= 100 ms): resposta quase instantânea, menor taxa de shares rejeitados (stale shares)
+// - Bom (101 a 250 ms): normal para servidores no exterior ou conexões domésticas
+// - Ruim (> 250 ms): latência elevada, maior risco de submissões duplicadas/rejeitadas
+function pingScore(ms) {
+  if (ms == null || !Number.isFinite(ms) || ms < 0) {
+    return { score: 'unknown', ms: null, label: '–', emoji: '⚪', color: 'gray' };
+  }
+  const rounded = Math.round(ms);
+  if (rounded <= 100) {
+    return { score: 'great', ms: rounded, label: 'ótimo', emoji: '🟢', color: 'green' };
+  }
+  if (rounded <= 250) {
+    return { score: 'good', ms: rounded, label: 'bom', emoji: '🟡', color: 'yellow' };
+  }
+  return { score: 'poor', ms: rounded, label: 'ruim', emoji: '🔴', color: 'red' };
+}
+
+module.exports = { shareDifficulty, hashDifficulty, swap32, sha256d, DIFF1, pingScore };

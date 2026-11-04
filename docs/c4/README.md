@@ -105,7 +105,7 @@ flowchart TB
 ### Container Inventory
 | Container | Runtime | Entrypoint | Responsibility |
 |---|---|---|---|
-| **`mineracao-proxy`** | Node.js (>=16, zero deps) | [`src/proxy.js`](../../src/proxy.js) | Listens on ports `3333–3339`, forwards Stratum V1 traffic 1:1, reconstructs 80-byte block headers to compute share difficulty/hash, manages pool failover/failback, persists `proxy-stats.json`, and serves `http://127.0.0.1:3336/stats`. |
+| **`mineracao-proxy`** | Node.js (>=16, zero deps) | [`src/proxy.js`](../../src/proxy.js) | Listens on ports `3333–3339`, forwards Stratum V1 traffic 1:1, reconstructs 80-byte block headers to compute share difficulty/hash, measures connection latency (ping) and quality score (great/good/poor), manages pool failover/failback, persists `proxy-stats.json`, and serves `http://127.0.0.1:3336/stats`. |
 | **`mineracao-painel`** | Node.js (>=16, zero deps) | [`src/painel.js`](../../src/painel.js) | Serves the bilingual web UI (`/`, `/config`) and JSON APIs (`/api/mining`, `/api/widget`, `/api/alarm`, `/api/plug`, `/api/config`), polls local proxy and external APIs, drives the Arduino siren, and runs the Telegram bot. |
 | **`mineracao-cubo`** | Python 3 + Pillow | [`src/cubo.py`](../../src/cubo.py) | Polls `/api/mining` every minute, renders a 240×240 scoreboard JPEG every 5 minutes (or a 10-minute celebration screen immediately upon a new farm record), and uploads it to the GeekMagic cube. |
 | **`ticket.py`** | Python 3 + Pillow | [`src/ticket.py`](../../src/ticket.py) | Spawned on-demand by the Telegram bot (`src/telegram.js`) to render the 1080×1350 daily lottery ticket PNG from the `/api/mining` snapshot. |
@@ -135,7 +135,7 @@ flowchart LR
     StatsStore --> StatsHTTP
 ```
 
-- **[`src/stratum.js`](../../src/stratum.js)**: Pure cryptographic math (`sha256d`, `swap32`, `shareDifficulty`, `hashDifficulty`) that rebuilds the coinbase transaction, Merkle root, version mask (`BIP310`), and 80-byte block header to compute exact share difficulty and explorer-format block hash.
+- **[`src/stratum.js`](../../src/stratum.js)**: Pure cryptographic math (`sha256d`, `swap32`, `shareDifficulty`, `hashDifficulty`) and latency scoring (`pingScore`) that rebuilds the coinbase transaction, Merkle root, version mask (`BIP310`), and 80-byte block header to compute exact share difficulty, explorer-format block hash, and network connection quality score (great/good/poor).
 - **Session State Machine (`session` in [`src/proxy.js`](../../src/proxy.js))**: Buffers initial miner messages until the upstream socket connects, tracks `mining.subscribe` (`extranonce1`), `mining.configure` (`version-rolling.mask`), `mining.notify` (up to 32 active jobs), `mining.set_difficulty`, and correlates `mining.submit` requests with upstream responses.
 - **Health & Failover Manager (`healthCheck`, `probe`)**: Marks unresponsive pools as down, routes miners to backup pools without altering their payout address, probes down pools every 60s, and closes backup sessions on recovery so miners reconnect to the primary pool.
 

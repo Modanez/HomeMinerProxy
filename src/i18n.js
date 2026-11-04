@@ -9,10 +9,11 @@ function pickLang(req, serverLang) {
   const q = new URL(req.url, 'http://x').searchParams.get('lang');
   const norm = (v) => { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; };
   if (norm(q)) return norm(q);
-  const cookie = (String(req.headers.cookie || '').match(/(?:^|;\s*)lang=([^;]*)/) || [])[1];
+  const headers = (req && req.headers) || {};
+  const cookie = (String(headers.cookie || '').match(/(?:^|;\s*)lang=([^;]*)/) || [])[1];
   if (norm(cookie)) return norm(cookie);
   if (serverLang) return serverLang;
-  const accept = String(req.headers['accept-language'] || '').split(',').map((s) => norm(s.trim())).find(Boolean);
+  const accept = String(headers['accept-language'] || '').split(',').map((s) => norm(s.trim())).find(Boolean);
   return accept || 'en';
 }
 
@@ -216,6 +217,14 @@ const EN = [
   ["'Dá para jogar também, é de graça e de código aberto:'", "'You can play too. It is free and open source:'"],
   ["'Meu bilhete de loteria do Bitcoin de hoje ⛏️ github.com/Modanez/HomeMinerProxy'", "'My Bitcoin lottery ticket for today ⛏️ github.com/Modanez/HomeMinerProxy'"],
   ["'bilhete-' + new Date()", "'ticket-' + new Date()"],
+  ["const pScoreMap = { great: 'ótimo', good: 'bom', poor: 'ruim' };", "const pScoreMap = { great: 'great', good: 'good', poor: 'poor' };"],
+  ["' · Ping da pool: '", "' · Pool ping: '"],
+  ["'Eficiência: '", "'Efficiency: '"],
+  ["' sessão(ões)'", "' session(s)'"],
+  ['<li>nenhum evento ainda</li>', '<li>no events yet</li>'],
+  ['Eventos recentes</summary>', 'Recent events</summary>'],
+  ["' no ar · '", "' up · '"],
+  ["' · fila '", "' · queue '"],
 ];
 
 // Gera a página no idioma, moeda e tema pedidos (o resultado é guardado em cache por quem chama)
@@ -230,8 +239,8 @@ function localizePage(page, lang, currency, theme = 'obsidian') {
 
 // Textos do widget (/api/widget)
 const WIDGET = {
-  pt: { big: [[1e12, 'tri'], [1e9, 'bi'], [1e6, 'mi'], [1e3, 'mil']], times: ' de vezes', oneIn: '1 em ' },
-  en: { big: [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']], times: ' times to go', oneIn: '1 in ' },
+  pt: { big: [[1e12, 'tri'], [1e9, 'bi'], [1e6, 'mi'], [1e3, 'mil']], times: ' de vezes', oneIn: '1 em ', ping: { great: 'ótimo', good: 'bom', poor: 'ruim' } },
+  en: { big: [[1e12, 'T'], [1e9, 'B'], [1e6, 'M'], [1e3, 'k']], times: ' times to go', oneIn: '1 in ', ping: { great: 'great', good: 'good', poor: 'poor' } },
 };
 
 module.exports = { pickLang, localizePage, EN, LOCALES, WIDGET };

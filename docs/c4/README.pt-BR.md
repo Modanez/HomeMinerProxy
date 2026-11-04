@@ -105,7 +105,7 @@ flowchart TB
 ### Inventário de Contêineres
 | Contêiner | Runtime | Ponto de Entrada | Responsabilidade |
 |---|---|---|---|
-| **`mineracao-proxy`** | Node.js (>=16, sem deps) | [`src/proxy.js`](../../src/proxy.js) | Escuta nas portas `3333–3339`, repassa o tráfego Stratum V1 1:1, remonta o cabeçalho de 80 bytes para calcular dificuldade e hash de cada share, gerencia failover/failback de pools, persiste `proxy-stats.json` e expõe `http://127.0.0.1:3336/stats`. |
+| **`mineracao-proxy`** | Node.js (>=16, sem deps) | [`src/proxy.js`](../../src/proxy.js) | Escuta nas portas `3333–3339`, repassa o tráfego Stratum V1 1:1, remonta o cabeçalho de 80 bytes para calcular dificuldade e hash de cada share, mede a latência da conexão (ping) e score (ótimo/bom/ruim), gerencia failover/failback de pools, persiste `proxy-stats.json` e expõe `http://127.0.0.1:3336/stats`. |
 | **`mineracao-painel`** | Node.js (>=16, sem deps) | [`src/painel.js`](../../src/painel.js) | Serve a interface web bilíngue (`/`, `/config`) e APIs JSON (`/api/mining`, `/api/widget`, `/api/alarm`, `/api/plug`, `/api/config`), consulta o proxy local e APIs externas, aciona a sirene no Arduino e executa o bot do Telegram. |
 | **`mineracao-cubo`** | Python 3 + Pillow | [`src/cubo.py`](../../src/cubo.py) | Consulta `/api/mining` a cada minuto, desenha o placar JPEG 240×240 a cada 5 minutos (ou a tela de comemoração por 10 minutos assim que sai novo recorde da fazenda) e faz o upload para o cubo GeekMagic. |
 | **`ticket.py`** | Python 3 + Pillow | [`src/ticket.py`](../../src/ticket.py) | Chamado sob demanda pelo bot do Telegram (`src/telegram.js`) para renderizar o PNG 1080×1350 do bilhete de loteria do dia a partir do JSON de `/api/mining`. |
@@ -135,7 +135,7 @@ flowchart LR
     StatsStore --> StatsHTTP
 ```
 
-- **[`src/stratum.js`](../../src/stratum.js)**: Matemática criptográfica pura (`sha256d`, `swap32`, `shareDifficulty`, `hashDifficulty`) que remonta a transação coinbase, Merkle root, máscara de versão (`BIP310`) e o cabeçalho de 80 bytes do bloco para calcular a dificuldade exata atingida e o hash no formato dos exploradores.
+- **[`src/stratum.js`](../../src/stratum.js)**: Matemática criptográfica pura (`sha256d`, `swap32`, `shareDifficulty`, `hashDifficulty`) e pontuação de latência (`pingScore`) que remonta a transação coinbase, Merkle root, máscara de versão (`BIP310`) e o cabeçalho de 80 bytes do bloco para calcular a dificuldade exata atingida, o hash no formato dos exploradores e o score de qualidade da conexão (ótimo/bom/ruim).
 - **Máquina de Estados da Sessão (`session` em [`src/proxy.js`](../../src/proxy.js))**: Enfileira as mensagens iniciais do minerador até a conexão com a pool abrir, acompanha `mining.subscribe` (`extranonce1`), `mining.configure` (`version-rolling.mask`), `mining.notify` (até 32 jobs ativos), `mining.set_difficulty` e correlaciona cada `mining.submit` com a resposta da pool.
 - **Gerenciador de Saúde e Failover (`healthCheck`, `probe`)**: Marca pools que não respondem como fora do ar, direciona os mineradores para as pools reserva sem alterar o endereço de pagamento, testa as pools caídas a cada 60s e encerra as sessões na reserva quando a principal volta para forçar a reconexão na principal.
 

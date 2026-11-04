@@ -481,6 +481,7 @@
                   "  pm.expect(j).to.have.property('workers');",
                   "  pm.expect(j).to.have.property('recent');",
                   "  pm.expect(j).to.have.property('totals');",
+                  "  pm.expect(j.totals).to.have.property('pingScore');",
                   "  pm.expect(j).to.have.property('hist');",
                   "  pm.expect(j).to.have.property('week');",
                   "});"
@@ -496,7 +497,7 @@
               "host": ["{{proxyStatsUrl}}"],
               "path": ["stats"]
             },
-            "description": "Returns real-time Stratum V1 proxy telemetry: upstream routes & failover status, connected workers, 1h share window hashrate, recent 100 shares, `bestHash`, `dayBestHash`, and the 40-bucket difficulty histogram (`hist`)."
+            "description": "Returns real-time Stratum V1 proxy telemetry: upstream routes, pool ping latency (pingMs) & quality score (great/good/poor), failover status, connected workers, 1h share window hashrate, recent shares, `bestHash`, `dayBestHash`, and the 40-bucket difficulty histogram (`hist`)."
           }
         }
       ]

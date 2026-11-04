@@ -37,8 +37,11 @@ test('proxy repassa, mede e conta os shares', async (t) => {
       if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'deadbeef', 4], error: null });
       else if (m.method === 'mining.authorize') {
         send({ id: m.id, result: true, error: null });
+        send({ id: null, method: 'mining.set_extranonce', params: ['deadbeef'] });
         send({ id: null, method: 'mining.set_difficulty', params: [TARGET] });
         send({ id: null, method: 'mining.notify', params: job });
+      } else if (m.method === 'mining.configure') {
+        send({ id: m.id, result: { 'version-rolling': true, 'version-rolling.mask': '1fffe000' } });
       } else if (m.method === 'mining.submit') {
         submits++;
         send(submits === 1 ? { id: m.id, result: true, error: null } : { id: m.id, result: null, error: [23, 'Difficulty too low', null] });
@@ -48,6 +51,16 @@ test('proxy repassa, mede e conta os shares', async (t) => {
   const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
   const [listen, statsPort] = [await freePort(), await freePort()];
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  fs.writeFileSync(path.join(dir, 'proxy-stats.json'), JSON.stringify({
+    savedAt: Date.now() - 86400e3,
+    workers: { salvo: { name: 'salvo', bestEver: 10, online: 1 } },
+    today: { date: '2020-01-01', accepted: 5 },
+    week: { key: '2020-01-01', workers: { salvo: { shares: 1, work: 1, best: 1 } } },
+    lastWeek: { key: '2019-12-25', workers: {} },
+    bestHash: { worker: 'salvo', diff: 0.000001, hash: '00', at: 1 },
+    dayBestHash: { worker: 'salvo', diff: 0.000001, hash: '00', at: 1, date: '2020-01-01' },
+    hist: new Array(40).fill(0),
+  }));
   const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
     env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'teste' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir },
     stdio: 'ignore',
@@ -63,6 +76,7 @@ test('proxy repassa, mede e conta os shares', async (t) => {
   const sent = [
     '{"id":1,"method":"mining.subscribe","params":["teste/1.0"]}',
     '{"id":2,"method":"mining.authorize","params":["bc1qteste.vovo","x"]}',
+    '{"id":10,"method":"mining.configure","params":[["version-rolling"],{"version-rolling.mask":"1fffe000"}]}',
   ];
   for (const l of sent) miner.write(l + '\n');
   await waitFor(() => fromPool.some((l) => l.includes('mining.notify')));

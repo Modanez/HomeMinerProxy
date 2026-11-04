@@ -1,7 +1,7 @@
 // Testes da matemática do share com blocos reais: se a ordem dos bytes estiver errada, o hash não bate.
 const test = require('node:test');
 const assert = require('node:assert');
-const { shareDifficulty, hashDifficulty, swap32 } = require('../src/stratum');
+const { shareDifficulty, hashDifficulty, swap32, pingScore } = require('../src/stratum');
 
 // Transação coinbase do bloco gênese e do bloco 1
 const GENESIS_CB = '01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff4d04ffff001d0104455468652054696d65732030332f4a616e2f32303039204368616e63656c6c6f72206f6e206272696e6b206f66207365636f6e64206261696c6f757420666f722062616e6b73ffffffff0100f2052a01000000434104678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5fac00000000';
@@ -58,5 +58,47 @@ test('cabeçalho com tamanho errado devolve null', () => {
 
 test('hashDifficulty: dificuldade 1 é o alvo mínimo do Bitcoin', () => {
   assert.strictEqual(hashDifficulty('00000000ffff' + '0'.repeat(52)), 1);
+  assert.strictEqual(hashDifficulty('0'.repeat(64)), Infinity);
   assert.ok(Math.abs(hashDifficulty(GENESIS_HASH) - 2536.426) < 0.01);
+});
+
+test('version rolling: branches com vbits sem mask ou mask sem vbits', () => {
+  const p = asStratum(GENESIS_CB, 80);
+  const base = { coinb1: p.coinb1, coinb2: p.coinb2, branches: [], prevhash: '0'.repeat(64), nbits: '1d00ffff', version: '20000000' };
+  const submitWithVbits = ['u', 'j', p.en2, '495fab29', '7c2bac1d', '00ffe000'];
+  const submitWithoutVbits = ['u', 'j', p.en2, '495fab29', '7c2bac1d'];
+
+  // vbits presente, mas versionMask ausente
+  const r1 = shareDifficulty(base, p.en1, submitWithVbits, null);
+  // versionMask presente, mas vbits ausente
+  const r2 = shareDifficulty(base, p.en1, submitWithoutVbits, '1fffe000');
+  assert.strictEqual(r1.hash, r2.hash);
+});
+
+test('pingScore: classifica latência em ótimo, bom e ruim', () => {
+  assert.deepStrictEqual(pingScore(null), { score: 'unknown', ms: null, label: '–', emoji: '⚪', color: 'gray' });
+  assert.deepStrictEqual(pingScore(NaN), { score: 'unknown', ms: null, label: '–', emoji: '⚪', color: 'gray' });
+  assert.deepStrictEqual(pingScore(-10), { score: 'unknown', ms: null, label: '–', emoji: '⚪', color: 'gray' });
+
+  const otimo = pingScore(45.2);
+  assert.strictEqual(otimo.score, 'great');
+  assert.strictEqual(otimo.label, 'ótimo');
+  assert.strictEqual(otimo.emoji, '🟢');
+  assert.strictEqual(otimo.ms, 45);
+
+  const limiteOtimo = pingScore(100);
+  assert.strictEqual(limiteOtimo.score, 'great');
+
+  const bom = pingScore(150);
+  assert.strictEqual(bom.score, 'good');
+  assert.strictEqual(bom.label, 'bom');
+  assert.strictEqual(bom.emoji, '🟡');
+
+  const limiteBom = pingScore(250);
+  assert.strictEqual(limiteBom.score, 'good');
+
+  const ruim = pingScore(320);
+  assert.strictEqual(ruim.score, 'poor');
+  assert.strictEqual(ruim.label, 'ruim');
+  assert.strictEqual(ruim.emoji, '🔴');
 });

@@ -23,11 +23,11 @@ const THEME = settings.normTheme(process.env.THEME);
 const CURRENCY = /^(BRL|USD)$/i.test(process.env.CURRENCY || '') ? process.env.CURRENCY.toUpperCase() : (LANGUAGE === 'pt' ? 'BRL' : 'USD');
 function normLang(v) { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; }
 const ADDRESS = (process.env.BTC_ADDRESS || '').trim();
-if (!ADDRESS) {
+if (!ADDRESS && require.main === module) {
   console.error('Set BTC_ADDRESS (the address your miners use as username) / Defina BTC_ADDRESS. See config/mineracao.env.example.');
   process.exit(1);
 }
-const LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
+let LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
 const ROTATE_S = Number(process.env.ROTATE_S || 20);
 // Mostrar saldo e movimentação da carteira no painel (0 esconde; os avisos do Telegram continuam)
 const SHOW_WALLET = process.env.SHOW_WALLET !== '0';
@@ -41,31 +41,38 @@ const EXPECTED = Object.assign({}, safeJson(process.env.EXPECTED));
 const WATTS_DEFAULT = Number(process.env.WATTS_DEFAULT || 5);
 const TUYA_WORKER = (process.env.TUYA_WORKER || '').trim();
 const TUYA_WATCHDOG_MIN = Number(process.env.TUYA_WATCHDOG_MIN || 0);
-const TUYA_PLUGS = require('./tuya').normalizePlugs(process.env.TUYA_PLUGS, {
-  deviceId: process.env.TUYA_DEVICE_ID,
-  worker: TUYA_WORKER,
-  watchdogMin: TUYA_WATCHDOG_MIN,
-}).list;
-const tuyaClient = TUYA_PLUGS.length ? require('./tuya').createClient({
-  clientId: process.env.TUYA_CLIENT_ID,
-  secret: process.env.TUYA_SECRET,
-  deviceId: TUYA_PLUGS[0].deviceId,
-  region: process.env.TUYA_REGION || 'us',
-  apiBase: process.env.TUYA_API,
-  allowNoDevice: true,
-}) : null;
-const tuyaPlugsState = new Map(TUYA_PLUGS.map((p) => [p.deviceId, { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 }]));
+let TUYA_PLUGS = [];
+let tuyaClient = null;
+let tuyaPlugsState = new Map();
+function initTuya() {
+  TUYA_PLUGS = require('./tuya').normalizePlugs(process.env.TUYA_PLUGS, {
+    deviceId: process.env.TUYA_DEVICE_ID,
+    worker: TUYA_WORKER,
+    watchdogMin: TUYA_WATCHDOG_MIN,
+  }).list;
+  tuyaClient = TUYA_PLUGS.length ? require('./tuya').createClient({
+    clientId: process.env.TUYA_CLIENT_ID,
+    secret: process.env.TUYA_SECRET,
+    deviceId: TUYA_PLUGS[0].deviceId,
+    region: process.env.TUYA_REGION || 'us',
+    apiBase: process.env.TUYA_API,
+    allowNoDevice: true,
+  }) : null;
+  tuyaPlugsState = new Map(TUYA_PLUGS.map((p) => [p.deviceId, { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 }]));
+  return { plugs: TUYA_PLUGS, client: tuyaClient, state: tuyaPlugsState };
+}
+initTuya();
 
-const POOL_API = 'https://public-pool.io:40557/api';
+const POOL_API = () => process.env.POOL_API || 'https://public-pool.io:40557/api';
 // Pools no formato ckpool, consultadas junto com a public-pool:
 //   pool.nerdminers.org: NerdMiners e ESP32 (dificuldade ultrabaixa, sem taxa)
 //   solo.ckpool.org:     ASICs como o Bitaxe (taxa de 2% só se achar bloco)
 // Workers que aparecerem em qualquer uma entram sozinhos no painel. CKPOOL_URLS= vazio desliga.
-const CKPOOL_URLS = (process.env.CKPOOL_URLS ?? [
+const CKPOOL_URLS = () => (process.env.CKPOOL_URLS ?? [
   `https://pool.nerdminers.org/users/${ADDRESS}`,
   `https://solo.ckpool.org/users/${ADDRESS}`,
 ].join(',')).split(',').map((u) => u.trim()).filter(Boolean);
-const MEMPOOL = 'https://mempool.space/api';
+const MEMPOOL = () => process.env.MEMPOOL_API || 'https://mempool.space/api';
 const DIFF1 = 0x00000000ffff0000000000000000000000000000000000000000000000000000n;
 // dificuldade que um hash "atingiu" (a mesma conta que a pool faz com os shares)
 function hashDiff(hex) {
@@ -127,9 +134,10 @@ function getJson(url) {
 }
 
 async function getJsonRetry(url, tries = 3) {
+  const baseDelay = Number(process.env.RETRY_BASE_MS ?? 2000);
   for (let i = 1; ; i++) {
     try { return await getJson(url); }
-    catch (e) { if (i >= tries) throw e; await sleep(2000 * i); }
+    catch (e) { if (i >= tries) throw e; await sleep(baseDelay * i); }
   }
 }
 
@@ -138,7 +146,7 @@ let pool = { at: 0, okAt: 0, error: null, client: null, difficulty: FALLBACK_DIF
 let poolActive = [];
 let ckpools = {};   // url -> { okAt, error, active: [nomes] }
 // OCEAN (pool que divide recompensas, pagamento direto na coinbase). OCEAN_API= vazio desliga.
-const OCEAN_API = process.env.OCEAN_API ?? 'https://api.ocean.xyz/v1';
+const OCEAN_API = () => process.env.OCEAN_API ?? 'https://api.ocean.xyz/v1';
 let ocean = { okAt: 0, error: null, active: [], unpaidSats: null, nextBlockSats: null, lastShareAt: null };
 
 // Proxy Stratum local (proxy.js): vê cada share de quem minera através dele, em tempo real
@@ -146,10 +154,10 @@ let ocean = { okAt: 0, error: null, active: [], unpaidSats: null, nextBlockSats:
 // então só é usado a partir de PROXY_MIN_SHARES (com alvo 1, o macbook manda ~8 por hora).
 const PROXY_MIN_SHARES = Number(process.env.PROXY_MIN_SHARES || 20);
 const proxyHashrate = (w) => (w && w.shares1h >= PROXY_MIN_SHARES && w.hashrate > 0 ? w.hashrate : 0);
-const PROXY_URL = process.env.PROXY_URL ?? 'http://127.0.0.1:3336/stats';
+const PROXY_URL = () => process.env.PROXY_URL ?? 'http://127.0.0.1:3336/stats';
 const PROXY_MS = 15e3;
 let proxy = { okAt: 0, error: null, workers: {}, recent: [], totals: null, accepted: null };
-const proxyUp = () => !!PROXY_URL && Date.now() - proxy.okAt < 2 * 60e3;
+const proxyUp = () => !!PROXY_URL() && Date.now() - proxy.okAt < 2 * 60e3;
 
 // A API da pool só lista sessões ativas; o painel guarda todo worker que já apareceu.
 // Para esquecer um worker, apague-o de workers.json e reinicie o serviço.
@@ -235,7 +243,9 @@ function workersView() {
     const viaProxy = proxied.has(name);   // ⚡ na tela, mesmo quando o hashrate vem do log local
     const pw = proxy.workers[name];       // último share visto pelo proxy (fica mesmo depois de desconectar)
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
-    return { ...k, name, hashRate, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff };
+    const pxw = proxied.get(name);
+    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null } : {};
+    return { ...k, name, hashRate, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx };
   }).sort((a, b) => b.hashRate - a.hashRate);
 }
 
@@ -247,10 +257,10 @@ const topRecord = () => records.reduce((m, r) => Math.max(m, r.value), 0);
 async function tickPool() {
   pool.at = Date.now();
   try {
-    const client = await getJsonRetry(`${POOL_API}/client/${ADDRESS}`);
+    const client = await getJsonRetry(`${POOL_API()}/client/${ADDRESS}`);
     if (Date.now() - (pool.netAt || 0) > NETDIFF_MS) {
       try {
-        const net = await getJsonRetry(`${POOL_API}/network`, 2);
+        const net = await getJsonRetry(`${POOL_API()}/network`, 2);
         const d = Number(net.difficulty);
         if (d > 0) { pool.difficulty = d; pool.netAt = Date.now(); }
       } catch (_) { /* mantém a última dificuldade */ }
@@ -294,7 +304,7 @@ let wallet = { at: 0, okAt: 0, sats: null, pendingSats: 0, txCount: 0, brl: null
 async function tickWallet() {
   wallet.at = Date.now();
   try {
-    const a = await getJsonRetry(`${MEMPOOL}/address/${ADDRESS}`);
+    const a = await getJsonRetry(`${MEMPOOL()}/address/${ADDRESS}`);
     const cs = a.chain_stats || {}, ms = a.mempool_stats || {};
     wallet.sats = (cs.funded_txo_sum || 0) - (cs.spent_txo_sum || 0);
     wallet.pendingSats = (ms.funded_txo_sum || 0) - (ms.spent_txo_sum || 0);
@@ -305,8 +315,9 @@ async function tickWallet() {
     wallet.error = e.message;
   }
   // Cotação: CoinGecko e, se falhar, Binance (BTC/BRL e BTC/USDT). Mantém a última se ambas falharem.
+  const geckoUrl = process.env.COINGECKO_API || 'https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl,usd&include_24hr_change=true';
   try {
-    const p = await getJsonRetry('https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=brl,usd&include_24hr_change=true', 2);
+    const p = await getJsonRetry(geckoUrl, 2);
     if (!(p.bitcoin && p.bitcoin.brl)) throw new Error('sem cotação');
     wallet.brl = p.bitcoin.brl;
     wallet.usd = p.bitcoin.usd;
@@ -315,7 +326,8 @@ async function tickWallet() {
   } catch (_) {
     for (const [sym, key, chg] of [['BTCBRL', 'brl', 'change24h'], ['BTCUSDT', 'usd', 'changeUsd24h']]) {
       try {
-        const b = await getJsonRetry(`https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`, 2);
+        const binanceUrl = process.env.BINANCE_API ? `${process.env.BINANCE_API}?symbol=${sym}` : `https://api.binance.com/api/v3/ticker/24hr?symbol=${sym}`;
+        const b = await getJsonRetry(binanceUrl, 2);
         const v = Number(b.lastPrice);
         if (v > 0) { wallet[key] = v; wallet[chg] = Number(b.priceChangePercent); }
       } catch (_) { /* mantém a última cotação */ }
@@ -330,7 +342,7 @@ async function tickNetwork() {
   net.at = Date.now();
   const errs = [];
   try {
-    const blocks = await getJsonRetry(`${MEMPOOL}/v1/blocks`, 2);
+    const blocks = await getJsonRetry(`${MEMPOOL()}/v1/blocks`, 2);
     if (Array.isArray(blocks) && blocks.length) {
       const b = blocks[0];
       const ex = b.extras || {};
@@ -347,7 +359,7 @@ async function tickNetwork() {
     }
   } catch (e) { errs.push('blocos: ' + e.message); }
   try {
-    const a = await getJsonRetry(`${MEMPOOL}/v1/difficulty-adjustment`, 2);
+    const a = await getJsonRetry(`${MEMPOOL()}/v1/difficulty-adjustment`, 2);
     net.adj = {
       change: Number(a.difficultyChange),
       progress: Number(a.progressPercent),
@@ -357,7 +369,7 @@ async function tickNetwork() {
     };
   } catch (e) { errs.push('ajuste: ' + e.message); }
   try {
-    const f = await getJsonRetry(`${MEMPOOL}/v1/fees/recommended`, 2);
+    const f = await getJsonRetry(`${MEMPOOL()}/v1/fees/recommended`, 2);
     net.fees = { fast: f.fastestFee, halfHour: f.halfHourFee, hour: f.hourFee, economy: f.economyFee ?? f.economy_fee, min: f.minimumFee };
   } catch (e) { errs.push('taxas: ' + e.message); }
   net.error = errs.length ? errs.join(' · ') : null;
@@ -387,7 +399,7 @@ async function tickDiffHist() {
   if (diffHist.list.length && Date.now() - diffHist.okAt < DIFFHIST_MS) return;
   for (const u of ['/v1/mining/difficulty-adjustments', '/v1/mining/difficulty-adjustments/all', '/v1/mining/hashrate/all']) {
     try {
-      const list = normDiff(await getJsonRetry(MEMPOOL + u, 2));
+      const list = normDiff(await getJsonRetry(MEMPOOL() + u, 2));
       if (list && list.length > 10) {
         diffHist = { okAt: Date.now(), list };
         saveJson('diffhist.json', diffHist);
@@ -421,7 +433,7 @@ function parseHashrate(v) {
 }
 
 async function tickCkpools() {
-  for (const url of CKPOOL_URLS) await tickCkpool(url);
+  for (const url of CKPOOL_URLS()) await tickCkpool(url);
 }
 
 async function tickCkpool(url) {
@@ -462,12 +474,12 @@ async function tickCkpool(url) {
 const OCEAN_HR_KEYS = ['hashrate_10800', 'hashrate_10800s', 'hashrate_7200', 'hashrate_7200s', 'hashrate_3600', 'hashrate_3600s', 'hashrate_300', 'hashrate_300s'];
 
 async function oceanGet(path) {
-  try { const r = await getJsonRetry(`${OCEAN_API}/${path}/${ADDRESS}`, 2); return (r && r.result) || r || {}; }
+  try { const r = await getJsonRetry(`${OCEAN_API()}/${path}/${ADDRESS}`, 2); return (r && r.result) || r || {}; }
   catch (e) { if (/HTTP 404/.test(e.message)) return {}; throw e; }   // endereço nunca minerou lá
 }
 
 async function tickOcean() {
-  if (!OCEAN_API) return;
+  if (!OCEAN_API()) return;
   try {
     const now = Date.now();
     const d = await oceanGet('user_hashrate_full');
@@ -506,14 +518,14 @@ async function tickOcean() {
 // ---------------------------------------------------------------- sirene (Arduino)
 let alarmFd = null, alarmTry = 0, lastTotalShares = null;
 
-function alarmOpen() {
+function alarmOpen(port = ALARM_PORT, sttyRunner = null) {
   if (alarmFd !== null || Date.now() - alarmTry < 60e3) return;
   alarmTry = Date.now();
-  if (!fs.existsSync(ALARM_PORT)) return;
-  // -hupcl: não reinicia o Arduino toda vez que a porta fecha
-  execFile('stty', ['-F', ALARM_PORT, '9600', 'raw', '-echo', '-hupcl'], (err) => {
+  if (!fs.existsSync(port)) return;
+  const runStty = sttyRunner || ((cb) => execFile('stty', ['-F', port, '9600', 'raw', '-echo', '-hupcl'], cb));
+  runStty((err) => {
     if (err) return;
-    try { alarmFd = fs.openSync(ALARM_PORT, 'r+'); } catch (_) { alarmFd = null; }
+    try { alarmFd = fs.openSync(port, 'r+'); } catch (_) { alarmFd = null; }
   });
 }
 
@@ -539,32 +551,36 @@ function alarmStatus() {
 const { execFile } = require('child_process');
 let local = { at: 0, hashrate: 0, lastShare: null, running: false };
 
-function tickLocal() {
+function parseMinerdLog(out) {
+  const perThread = {};
+  let lastTs = 0, lastShare = null;
+  for (const line of (out || '').split('\n')) {
+    const ts = (line.match(/^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]/) || [])[1];
+    const t = ts ? new Date(ts.replace(' ', 'T')).getTime() : 0;
+    const m = line.match(/thread (\d+): \d+ hashes, ([\d.]+) khash\/s/);
+    if (m && t && Date.now() - t < 5 * 60e3) { perThread[m[1]] = Number(m[2]) * 1000; lastTs = t; }
+    if (t && line.includes('accepted:')) lastShare = t;
+  }
+  const hashrate = Object.values(perThread).reduce((s, v) => s + v, 0);
+  return { lastTs, hashrate, lastShare };
+}
+
+function tickLocal(runner = null) {
   return new Promise((resolve) => {
-    execFile('journalctl', ['-u', 'minerd', '--since', '-3 hours', '-o', 'cat', '--no-pager'],
-      { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, (err, out) => {
-        if (err || !out) { local.running = false; return resolve(); }
-        const perThread = {};
-        let lastTs = 0, lastShare = null;
-        for (const line of out.split('\n')) {
-          const ts = (line.match(/^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]/) || [])[1];
-          const t = ts ? new Date(ts.replace(' ', 'T')).getTime() : 0;
-          const m = line.match(/thread (\d+): \d+ hashes, ([\d.]+) khash\/s/);
-          // hashrate só das últimas 5 min de log (a janela longa é para achar o último share)
-          if (m && t && Date.now() - t < 5 * 60e3) { perThread[m[1]] = Number(m[2]) * 1000; lastTs = t; }
-          if (t && line.includes('accepted:')) lastShare = t;
-        }
-        const hashrate = Object.values(perThread).reduce((s, v) => s + v, 0);
-        local = { at: lastTs, hashrate, lastShare: lastShare || local.lastShare, running: hashrate > 0 };
-        resolve();
-      });
+    const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '--since', '-3 hours', '-o', 'cat', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
+    fn((err, out) => {
+      if (err || !out) { local.running = false; return resolve(); }
+      const p = parseMinerdLog(out);
+      local = { at: p.lastTs, hashrate: p.hashrate, lastShare: p.lastShare || local.lastShare, running: p.hashrate > 0 };
+      resolve();
+    });
   });
 }
 
 async function tickProxy() {
-  if (!PROXY_URL) return;
+  if (!PROXY_URL()) return;
   try {
-    const s = await getJson(PROXY_URL);
+    const s = await getJson(PROXY_URL());
     const ws = s.workers || [];
     const accepted = ws.reduce((n, w) => n + (w.accepted || 0), 0);
     if (proxy.accepted !== null && accepted > proxy.accepted) alarm('S');
@@ -589,6 +605,8 @@ async function tickProxy() {
       workers: Object.fromEntries(ws.map((w) => [w.name, w])),
       recent: (s.recent || []).slice(0, 30),
       totals: s.totals || null,
+      events: Array.isArray(s.events) ? s.events.slice(0, 30) : [],
+      process: s.process || null,
       hist: Array.isArray(s.hist) ? s.hist : null,
       // portas cuja pool principal está fora do ar (os mineradores dessas portas estão na reserva)
       failover: (s.routes || []).filter((r) => r.upstreams && r.upstreams[0].down).map((r) => ({
@@ -606,16 +624,16 @@ async function tickProxy() {
   }
 }
 
-function readTempC() {
+function readTempC(file = TEMP_FILE) {
   try {
-    const v = Number(fs.readFileSync(TEMP_FILE, 'utf8').trim());
+    const v = Number(fs.readFileSync(file, 'utf8').trim());
     return v > 0 ? v / 1000 : null;
   } catch (_) { return null; }
 }
 
-function readCpuPct() {
+function readCpuPct(file = '/proc/stat') {
   try {
-    const f = fs.readFileSync('/proc/stat', 'utf8').split('\n')[0].trim().split(/\s+/).slice(1).map(Number);
+    const f = fs.readFileSync(file, 'utf8').split('\n')[0].trim().split(/\s+/).slice(1).map(Number);
     const idle = f[3] + (f[4] || 0);
     const total = f.reduce((s, v) => s + v, 0);
     let pct = null;
@@ -625,9 +643,9 @@ function readCpuPct() {
   } catch (_) { return null; }
 }
 
-function readMem() {
+function readMem(file = '/proc/meminfo') {
   try {
-    const t = fs.readFileSync('/proc/meminfo', 'utf8');
+    const t = fs.readFileSync(file, 'utf8');
     const g = (k) => Number((t.match(new RegExp('^' + k + ':\\s+(\\d+)', 'm')) || [])[1]) * 1024;
     const total = g('MemTotal'), avail = g('MemAvailable');
     if (total > 0 && avail >= 0) return { used: total - avail, total };
@@ -727,8 +745,19 @@ function snapshot(internal = false) {
     boot: BOOT,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
-    ocean: OCEAN_API ? { ...ocean, ...(SHOW_WALLET || internal ? {} : { unpaidSats: null }) } : null,
-    proxy: PROXY_URL ? { okAt: proxy.okAt, error: proxy.error, up: proxyUp(), recent: proxy.recent.slice(0, 10), failover: proxyUp() ? proxy.failover || [] : [] } : null,
+    ocean: OCEAN_API() ? { ...ocean, ...(SHOW_WALLET || internal ? {} : { unpaidSats: null }) } : null,
+    proxy: PROXY_URL() ? {
+      okAt: proxy.okAt,
+      error: proxy.error,
+      up: proxyUp(),
+      recent: proxy.recent.slice(0, 10),
+      events: proxyUp() ? proxy.events || [] : [],
+      process: proxyUp() ? proxy.process || null : null,
+      efficiency: proxyUp() && proxy.totals ? proxy.totals.efficiency : null,
+      failover: proxyUp() ? proxy.failover || [] : [],
+      pingMs: proxyUp() && proxy.totals ? proxy.totals.pingMs : null,
+      pingScore: proxyUp() && proxy.totals ? proxy.totals.pingScore : 'unknown',
+    } : null,
     error: pool.error,
     staleWarnMs: STALE_WARN_MS,
     rotateS: ROTATE_S,
@@ -1047,6 +1076,10 @@ const PAGE = `<!doctype html>
     <div class="sub dist-cap" style="margin-top:4px">Distância até um bloco, em escala logarítmica.</div>
     <div class="err" id="fo"></div>
     <div class="err" id="err"></div>
+    <div class="sub" style="margin-top:8px" id="pxinfo"></div>
+    <details style="margin-top:6px"><summary class="sub" style="cursor:pointer">Eventos recentes</summary>
+      <ul class="sub" id="evs" style="list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto"></ul>
+    </details>
   </div>
   <div class="card wallet">
     <div><div class="label">Carteira</div><div class="big gold" id="wbtc">–</div><div class="sub" id="wsats">–</div></div>
@@ -1341,6 +1374,21 @@ $('toggleOld').addEventListener('click', (ev) => {
 });
 let lastOcean = null;
 
+function renderProxyExtras(p) {
+  const info = $('pxinfo'), ul = $('evs');
+  if (!info || !ul) return;
+  if (!p || !p.up) { info.textContent = ''; ul.innerHTML = ''; return; }
+  const pr = p.process, parts = [];
+  if (p.efficiency != null) parts.push('Eficiência: ' + nf(p.efficiency, 1) + '%');
+  if (pr) {
+    const up = pr.uptimeS >= 86400 ? Math.floor(pr.uptimeS / 86400) + 'd ' + Math.floor(pr.uptimeS % 86400 / 3600) + 'h' : pr.uptimeS >= 3600 ? Math.floor(pr.uptimeS / 3600) + 'h ' + Math.floor(pr.uptimeS % 3600 / 60) + 'min' : Math.floor(pr.uptimeS / 60) + 'min';
+    parts.push('Proxy: ' + up + ' no ar · ' + pr.rssMB + ' MB · CPU ' + nf(pr.cpuPct, 1) + '% · ' + pr.sessions + ' sessão(ões)' + (pr.queueBytes > 0 ? ' · fila ' + pr.queueBytes + ' B' : ''));
+  }
+  info.textContent = parts.join(' · ');
+  const icon = { worker_up: '🟢', worker_down: '🔴', pool_up: '🟢', pool_down: '🔴', failover: '🔁', reject: '⚠️' };
+  ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
+}
+
 function renderFarm(j) {
   const f = j.farm, a = f.accounting || {}, D = f.difficulty;
   if (!f.hasData) return;
@@ -1381,13 +1429,19 @@ function renderFarm(j) {
     }
     const seen = w.state === 'unknown' ? 'não listado' : ago(w.lastSeen);
     const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + '</span>' : '';
+    const det = [w.ip, w.shareDiff ? 'diff ' + nf(w.shareDiff, 0) : null].filter(Boolean).join(' · ');
+    const netInfo = det ? ' <span class="sub" title="extranonce1: ' + esc(w.extranonce1 || '–') + '">' + esc(det) + '</span>' : '';
     const trophy = j.championship && j.championship.leader && j.championship.leader.name === w.name ? ' 🏆' : '';
-    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + temp +
+    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + netInfo + temp +
       '</td><td' + dim + '>' + hr + '</td><td>' + best +
       '</td><td' + dim + '>' + seen + '</td></tr>';
   }).join('') : '<tr><td colspan="4" class="sub">nenhum worker enviou shares ainda</td></tr>';
 
-  set('netd', 'Dificuldade da rede: ' + fmtBig(D));
+  const pScoreMap = { great: 'ótimo', good: 'bom', poor: 'ruim' };
+  const pingTxt = (j.proxy && j.proxy.pingMs != null)
+    ? ' · Ping da pool: ' + j.proxy.pingMs + ' ms (' + (j.proxy.pingScore === 'great' ? '🟢 ' : j.proxy.pingScore === 'good' ? '🟡 ' : '🔴 ') + (pScoreMap[j.proxy.pingScore] || '–') + ')'
+    : '';
+  set('netd', 'Dificuldade da rede: ' + fmtBig(D) + pingTxt);
   const pct = f.best > 1 ? Math.min(100, Math.log10(f.best) / Math.log10(D) * 100) : 0;
   $('prog').style.width = pct.toFixed(1) + '%';
 }
@@ -1990,6 +2044,7 @@ async function load() {
     const px = j.proxy && j.proxy.up;
     set('fo', ((j.proxy && j.proxy.failover) || []).map((f) => '⚠️ ' + f.primary + ' fora do ar desde ' + hora(f.since) +
       (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)).join(' · '));
+    renderProxyExtras(j.proxy);
     set('err', j.error && stale
       ? (px ? 'API da public-pool fora do ar — shares e recordes seguem ao vivo pelo proxy.'
             : 'Pool instável (' + j.error + ') — mostrando dados de ' + (j.okAt ? hora(j.okAt) : '–') + ', tentando de novo…')
@@ -2036,6 +2091,10 @@ function widgetData(lang) {
   const lastAt = Math.max(snap.okAt || 0, (snap.proxy && snap.proxy.okAt) || 0, ...snap.ckpools.map((p) => p.okAt || 0));
   const secs = f.hashrate > 0 ? f.difficulty * SHARE_HASHES / f.hashrate : 0;
   const perYear = secs ? 1 / (1 - Math.exp(-31557600 / secs)) : 0;
+  const px = snap.proxy;
+  const pingScore = px && px.pingScore;
+  const pingMs = px && px.pingMs;
+  const pingLabel = (W.ping && W.ping[pingScore]) || pingScore || '';
   return {
     recorde: fmtNum(f.best, 2),
     recordeNum: f.best,
@@ -2045,28 +2104,21 @@ function widgetData(lang) {
     minerando: f.workers.filter((w) => w.state === 'ok' || w.state === 'quiet').length,
     chance: perYear ? W.oneIn + fmtBigW(perYear) : '',
     atualizado: lastAt ? new Date(lastAt).toLocaleTimeString(loc, { hour: '2-digit', minute: '2-digit' }) : '',
+    ping: pingMs != null ? `${pingMs} ms (${pingLabel})` : '',
+    pingMs: pingMs != null ? pingMs : null,
+    pingScore: pingScore || 'unknown',
   };
 }
 
 // ---------------------------------------------------------------- servidor e coletas
 const pageCache = {};   // página já traduzida, por idioma
-function every(fn, ms) {
-  let busy = false;
-  const run = async () => {
-    if (busy) return;
-    busy = true;
-    try { await fn(); } catch (_) { /* a próxima rodada tenta de novo */ } finally { busy = false; }
-  };
-  run();
-  setInterval(run, ms);
-}
 
-http.createServer((req, res) => {
+function requestHandler(req, res) {
   if (settings.handle(req, res, {
     dataDir: process.env.DATA_DIR || __dirname,
     lang: pickLang(req, LANGUAGE),
     workers: () => [...new Set([...Object.keys(known), ...Object.keys(proxy.workers || {}), ...Object.keys(EXPECTED).filter((k) => EXPECTED[k] > 0)])].sort((a, b) => a.localeCompare(b)),
-    onSaved: () => { console.log('configuração salva pela tela; reiniciando'); process.exit(0); },
+    onSaved: () => { console.log('configuração salva pela tela; reiniciando'); if (require.main === module) process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
     tuyaApi: process.env.TUYA_API,
   })) return;
@@ -2120,28 +2172,57 @@ http.createServer((req, res) => {
   const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY, THEME));
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Language': LOCALES[lang] });
   res.end(html);
-}).listen(PORT, '0.0.0.0', () => {
-  console.log(`Painel de mineração em http://0.0.0.0:${PORT}`);
-  every(tickPool, POOL_MS);
-  every(tickWallet, WALLET_MS);
-  every(tickNetwork, NET_MS);
-  every(tickDiffHist, 3600e3);
-  every(tickLocal, 60e3);
-  every(tickCkpools, 120e3);
-  every(tickOcean, 300e3);
-  every(tickProxy, PROXY_MS);
-  if (tuyaClient) every(tickTuya, 30e3);
-  every(async () => { alarmOpen(); alarmStatus(); }, 60e3);
-  startTelegram();
-  startMqtt();
-});
+}
+
+function start(port = PORT, host = '0.0.0.0') {
+  const server = http.createServer(requestHandler);
+  const timers = [];
+  function everyTimer(fn, ms) {
+    let busy = false;
+    const run = async () => {
+      if (busy) return;
+      busy = true;
+      try { await fn(); } catch (_) { /* a próxima rodada tenta de novo */ } finally { busy = false; }
+    };
+    run();
+    timers.push(setInterval(run, ms));
+  }
+  return new Promise((resolve, reject) => {
+    server.on('error', reject);
+    server.listen(port, host, () => {
+      console.log(`Painel de mineração em http://${host}:${port}`);
+      everyTimer(tickPool, POOL_MS);
+      everyTimer(tickWallet, WALLET_MS);
+      everyTimer(tickNetwork, NET_MS);
+      everyTimer(tickDiffHist, 3600e3);
+      everyTimer(tickLocal, 60e3);
+      everyTimer(tickCkpools, 120e3);
+      everyTimer(tickOcean, 300e3);
+      everyTimer(tickProxy, PROXY_MS);
+      if (tuyaClient) everyTimer(tickTuya, 30e3);
+      everyTimer(async () => { alarmOpen(); alarmStatus(); }, 60e3);
+      const tgBot = startTelegram();
+      const mqttClient = startMqtt();
+      resolve({
+        server,
+        timers,
+        stop() {
+          timers.forEach((t) => clearInterval(t));
+          if (tgBot && tgBot.stop) tgBot.stop();
+          if (mqttClient && mqttClient.stop) mqttClient.stop();
+          return new Promise((res) => server.close(res));
+        }
+      });
+    });
+  });
+}
 
 // ---------------------------------------------------------------- bot do Telegram (opcional)
 function startTelegram() {
   const token = (process.env.TELEGRAM_BOT_TOKEN || '').trim();
   if (!token) return;
   const hour = (process.env.TELEGRAM_DAILY ?? '21').trim();
-  require('./telegram').start({
+  return require('./telegram').start({
     token,
     chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
     lang: LANGUAGE || 'en',
@@ -2162,7 +2243,7 @@ function startTelegram() {
 function startMqtt() {
   const url = (process.env.MQTT_URL || '').trim();
   if (!url) return;
-  require('./mqtt').start({
+  return require('./mqtt').start({
     url,
     user: (process.env.MQTT_USER || '').trim(),
     pass: process.env.MQTT_PASS || '',
@@ -2174,3 +2255,78 @@ function startMqtt() {
     personal: process.env.TELEGRAM_PERSONAL === '1',
   });
 }
+
+if (require.main === module) {
+  start();
+}
+
+function _setTuyaForTest(client, plugs, stateMap) {
+  tuyaClient = client;
+  if (plugs) TUYA_PLUGS = plugs;
+  if (stateMap) tuyaPlugsState = stateMap;
+}
+
+module.exports = {
+  requestHandler,
+  start,
+  snapshot,
+  widgetData,
+  workersView,
+  farmHashrate,
+  topRecord,
+  addRecord,
+  rememberWorkers,
+  hashDiff,
+  timeMachine,
+  normDiff,
+  parseHashrate,
+  safeJson,
+  loadJson,
+  saveJson,
+  energy,
+  quietNow,
+  alarm,
+  alarmOpen,
+  alarmStatus,
+  health,
+  readTempC,
+  readCpuPct,
+  readMem,
+  sampleHistory,
+  tickPool,
+  tickWallet,
+  tickNetwork,
+  tickDiffHist,
+  tickLocal,
+  tickCkpools,
+  tickOcean,
+  tickProxy,
+  tickTuya,
+  getJson,
+  getJsonRetry,
+  initTuya,
+  CKPOOL_URLS,
+  parseMinerdLog,
+  startTelegram,
+  startMqtt,
+  _setLocalForTest: (l) => { local = l; },
+  _setLocalWorkerForTest: (w) => { LOCAL_WORKER = w; },
+  _resetAlarmTryForTest: () => { alarmTry = 0; alarmFd = null; },
+  _setTuyaForTest,
+  _state: () => ({
+    pool,
+    wallet,
+    net,
+    diffHist,
+    proxy,
+    ocean,
+    ckpools,
+    known,
+    records,
+    history,
+    achievements,
+    tuyaPlugsState,
+    tuyaClient,
+    TUYA_PLUGS,
+  }),
+};

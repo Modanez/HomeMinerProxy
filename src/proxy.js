@@ -35,6 +35,15 @@ const RECENT_MAX = 100;                 // últimos shares guardados para o pain
 function safeJson(s) { try { return s ? JSON.parse(s) : null; } catch (_) { return null; } }
 const log = (...a) => console.log(new Date().toISOString(), ...a);
 
+// Linha do tempo de eventos (conexões, falhas de pool, rejeições): só em memória, os mais novos primeiro
+const EVENTS_MAX = 100;
+const events = [];
+function addEvent(type, msg, extra) {
+  events.unshift({ at: Date.now(), type, msg, ...extra });
+  if (events.length > EVENTS_MAX) events.length = EVENTS_MAX;
+}
+const cleanIp = (a) => (a ? String(a).replace(/^::ffff:/, '') : null);
+
 // ---------------------------------------------------------------- estatísticas
 // workers[nome] = { name, pool, accepted, rejected, lastShareAt, lastShareDiff, bestEver, bestSession,
 //                   connectedSince, online, window: [[ts, dificuldadeAlvo], ...] }
@@ -72,6 +81,7 @@ try {
   const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
   workers = saved.workers || {};
   recent = Array.isArray(saved.recent) ? saved.recent : [];
+  if (Array.isArray(saved.events)) events.push(...saved.events.slice(0, EVENTS_MAX));
   if (saved.today && saved.today.date === dayKey()) today = saved.today;
   if (saved.lastWeek && saved.lastWeek.workers) lastWeek = saved.lastWeek;
   if (saved.week && saved.week.workers) { week = saved.week; rollWeek(); }
@@ -85,15 +95,18 @@ function worker(name, pool) {
   const w = workers[name] || (workers[name] = {
     name, pool, accepted: 0, rejected: 0, lastShareAt: null, lastShareDiff: null,
     bestEver: 0, bestSession: 0, connectedSince: null, online: 0, window: [], lastReject: null,
+    pingMs: null, pingScore: 'unknown',
   });
   w.pool = pool;
+  if (w.pingMs === undefined) w.pingMs = null;
+  if (w.pingScore === undefined) w.pingScore = 'unknown';
   return w;
 }
 
 function saveStats() {
   const out = {};
   for (const [k, w] of Object.entries(workers)) { const { window, ...rest } = w; out[k] = rest; }
-  try { fs.writeFileSync(STATS_FILE, JSON.stringify({ savedAt: Date.now(), workers: out, recent, today, week, lastWeek, bestHash, dayBestHash, hist })); } catch (_) { /* segue */ }
+  try { fs.writeFileSync(STATS_FILE, JSON.stringify({ savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist })); } catch (_) { /* segue */ }
 }
 setInterval(saveStats, 60e3).unref();
 
@@ -106,31 +119,44 @@ function hashrate(w) {
   return work / (Math.min(span, HASHRATE_WINDOW_MS) / 1000);
 }
 
-const { shareDifficulty } = require('./stratum');
+const { shareDifficulty, pingScore } = require('./stratum');
 
 // ---------------------------------------------------------------- saúde das pools (failover)
 const upstreamsOf = (route) => [{ host: route.host, port: route.port, label: route.label }, ...(route.backup || [])];
-const health = {};   // "host:porta" -> { down, since, error }
+const health = {};   // "host:porta" -> { down, since, error, pingMs }
 const hkey = (u) => `${u.host}:${u.port}`;
 const isDown = (u) => !!(health[hkey(u)] && health[hkey(u)].down);
 function markDown(u, error) {
   const h = health[hkey(u)];
   if (h && h.down) { h.error = error; return; }
-  health[hkey(u)] = { down: true, since: Date.now(), error };
+  health[hkey(u)] = { down: true, since: Date.now(), error, pingMs: (h && h.pingMs) ?? null };
   log(`pool ${u.label} (${hkey(u)}) fora do ar: ${error}`);
+  addEvent('pool_down', `${u.label} is down: ${error}`);
 }
-function markUp(u) {
+function markUp(u, pingMs = null) {
   const h = health[hkey(u)];
-  if (!h || !h.down) return;
-  health[hkey(u)] = { down: false, since: Date.now(), error: null };
+  const ms = typeof pingMs === 'number' && pingMs >= 0 ? Math.round(pingMs) : (h && h.pingMs != null ? h.pingMs : null);
+  if (!h || !h.down) {
+    if (h) h.pingMs = ms;
+    else health[hkey(u)] = { down: false, since: Date.now(), error: null, pingMs: ms };
+    return;
+  }
+  health[hkey(u)] = { down: false, since: Date.now(), error: null, pingMs: ms };
   log(`pool ${u.label} (${hkey(u)}) voltou`);
+  addEvent('pool_up', `${u.label} is back`);
 }
 const sessions = new Set();   // sessões ativas (para devolver à principal quando ela voltar)
 
 function probe(u) {
   return new Promise((resolve) => {
+    const t0 = Date.now();
     const c = net.connect(u.port, u.host);
-    const done = (ok) => { c.destroy(); resolve(ok); };
+    const done = (ok) => {
+      const ms = Date.now() - t0;
+      c.destroy();
+      if (ok) markUp(u, ms);
+      resolve(ok);
+    };
     c.setTimeout(CONNECT_TIMEOUT_MS, () => done(false));
     c.on('connect', () => done(true));
     c.on('error', () => done(false));
@@ -179,16 +205,23 @@ function session(down, route) {
     if (i >= ups.length) return close('nenhuma pool respondeu');
     s.upIndex = i;
     const u = ups[i];
+    const connectStart = Date.now();
     const c = net.connect(u.port, u.host);
     up = c;
     c.setTimeout(CONNECT_TIMEOUT_MS, () => { if (!upReady) c.destroy(new Error('tempo esgotado')); });
     c.on('connect', () => {
+      const tcpPing = Date.now() - connectStart;
       c.setTimeout(0);
       c.setKeepAlive(true, 30e3);
       upReady = true;
-      markUp(u);
-      if (i > 0) log(`[${route.label}] usando a reserva ${u.label}`);
-      if (s.worker) s.worker.pool = u.label;
+      markUp(u, tcpPing);
+      s.pingMs = tcpPing;
+      if (i > 0) { log(`[${route.label}] usando a reserva ${u.label}`); addEvent('failover', `port ${route.listen}: using backup ${u.label}`); }
+      if (s.worker) {
+        s.worker.pool = u.label;
+        s.worker.pingMs = tcpPing;
+        s.worker.pingScore = pingScore(tcpPing).score;
+      }
       for (const l of queue) c.write(l);
       queue.length = 0;
     });
@@ -217,7 +250,12 @@ function session(down, route) {
         s.worker.online++;
         s.worker.connectedSince = Date.now();
         s.worker.bestSession = 0;
+        s.worker.ip = cleanIp(s.peer);
+        s.worker.listen = route.listen;
+        s.worker.shareDiff = s.shareDiff;
+        s.worker.extranonce1 = s.en1;
         log(`[${route.label}] ${name} conectou de ${s.peer}`);
+        addEvent('worker_up', `${name} connected (${cleanIp(s.peer)})`, { worker: name });
       } else if (m.method === 'mining.submit' && m.params) {
         const job = s.jobs.get(m.params[1]);
         const r = job && s.en1 ? shareDifficulty(job, s.en1, m.params, s.versionMask) : null;
@@ -238,18 +276,26 @@ function session(down, route) {
         if (s.jobs.size > 32) s.jobs.delete(s.jobs.keys().next().value);
       } else if (m.method === 'mining.set_difficulty' && m.params) {
         s.shareDiff = Number(m.params[0]) || s.shareDiff;
+        if (s.worker) s.worker.shareDiff = s.shareDiff;
       } else if (m.method === 'mining.set_extranonce' && m.params) {
         s.en1 = m.params[0];
+        if (s.worker) s.worker.extranonce1 = s.en1;
       } else if (m.id !== undefined && m.id !== null) {
         if (s.subscribeIds.has(m.id) && Array.isArray(m.result)) {
           s.en1 = m.result[1];
+          if (s.worker) s.worker.extranonce1 = s.en1;
           s.subscribeIds.delete(m.id);
         } else if (s.configureIds.has(m.id) && m.result) {
           if (m.result['version-rolling']) s.versionMask = m.result['version-rolling.mask'] || null;
           s.configureIds.delete(m.id);
         } else if (s.pending.has(m.id)) {
           const p = s.pending.get(m.id); s.pending.delete(m.id);
+          const rtt = Math.round(Date.now() - p.at);
+          s.pingMs = rtt;
+          markUp(ups[s.upIndex], rtt);
           const w = s.worker; if (!w) return;
+          w.pingMs = rtt;
+          w.pingScore = pingScore(rtt).score;
           const ok = m.result === true;
           const entry = { at: p.at, worker: w.name, pool: label(), diff: p.diff, target: p.target, ok };
           if (ok) {
@@ -280,6 +326,7 @@ function session(down, route) {
             w.rejected++;
             entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
             w.lastReject = { at: p.at, error: entry.error };
+            addEvent('reject', `${w.name}: share rejected (${entry.error})`, { worker: w.name });
           }
           recent.unshift(entry);
           if (recent.length > RECENT_MAX) recent.length = RECENT_MAX;
@@ -292,38 +339,105 @@ function session(down, route) {
   function close(why) {
     if (s.closed) return; s.closed = true;
     sessions.delete(s);
-    if (s.worker) { s.worker.online = Math.max(0, s.worker.online - 1); log(`[${label()}] ${s.worker.name} desconectou (${why})`); }
+    if (s.worker) { s.worker.online = Math.max(0, s.worker.online - 1); log(`[${label()}] ${s.worker.name} desconectou (${why})`); addEvent('worker_down', `${s.worker.name} disconnected (${why})`, { worker: s.worker.name }); }
     down.destroy(); if (up) up.destroy();
   }
   s.close = close;
+  s.queued = () => down.writableLength + (up ? up.writableLength : 0);
   sessions.add(s);
   down.on('close', () => close('minerador fechou'));
   down.on('error', (e) => close('minerador: ' + e.code));
   connectUp(0);
 }
 
-for (const r of ROUTES) {
-  net.createServer((sock) => session(sock, r))
-    .on('error', (e) => log(`porta ${r.listen}:`, e.message))
-    .listen(r.listen, '0.0.0.0', () => log(`porta ${r.listen} -> ${r.host}:${r.port} (${r.label})`));
+// Métricas do próprio processo do proxy (RAM, CPU e fila de escrita nos sockets)
+let cpuPrev = { usage: process.cpuUsage(), at: Date.now() };
+function processStats() {
+  const now = Date.now();
+  const u = process.cpuUsage();
+  const dt = (now - cpuPrev.at) * 1000;   // µs
+  const cpuPct = dt > 0 ? Math.round(1000 * ((u.user - cpuPrev.usage.user) + (u.system - cpuPrev.usage.system)) / dt) / 10 : 0;
+  cpuPrev = { usage: u, at: now };
+  const queueBytes = [...sessions].reduce((n, x) => n + (x.queued ? x.queued() : 0), 0);
+  return { uptimeS: Math.round(process.uptime()), rssMB: Math.round(process.memoryUsage().rss / 1048576), cpuPct, sessions: sessions.size, queueBytes };
+}
+function efficiency() {
+  const t = Object.values(workers).reduce((a, w) => ({ ok: a.ok + (w.accepted || 0), bad: a.bad + (w.rejected || 0) }), { ok: 0, bad: 0 });
+  return t.ok + t.bad ? Math.round(10000 * t.ok / (t.ok + t.bad)) / 100 : null;
 }
 
-// ---------------------------------------------------------------- estatísticas via HTTP (só local)
-http.createServer((req, res) => {
-  if (!req.url.startsWith('/stats')) { res.writeHead(404); return res.end(); }
-  const list = Object.values(workers).map((w) => {
-    const { window, ...rest } = w;
-    const hr = hashrate(w);   // poda a janela antes de contar
-    return { ...rest, hashrate: hr, shares1h: w.window.length };
-  });
-  res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-  if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
-  rollWeek();
-  const lastHour = Object.values(workers).reduce((n, w) => n + w.window.length, 0);   // hashrate() já podou a janela de 1 h
-  const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
-  const routes = ROUTES.map((r) => ({ ...r, upstreams: upstreamsOf(r).map((u) => ({ ...u, down: isDown(u), since: (health[hkey(u)] || {}).since || null, error: (health[hkey(u)] || {}).error || null })) }));
-  res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals: { today: today.accepted, lastHour }, week, lastWeek, bestHash, dayBestHash: dayBest, hist }));
-}).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
+function startServers() {
+  const servers = [];
+  for (const r of ROUTES) {
+    const s = net.createServer((sock) => session(sock, r))
+      .on('error', (e) => log(`porta ${r.listen}:`, e.message));
+    s.listen(r.listen, '0.0.0.0', () => log(`porta ${r.listen} -> ${r.host}:${r.port} (${r.label})`));
+    servers.push(s);
+  }
 
-process.on('SIGTERM', () => { saveStats(); process.exit(0); });
-process.on('SIGINT', () => { saveStats(); process.exit(0); });
+  const statsServer = http.createServer((req, res) => {
+    if (!req.url.startsWith('/stats')) { res.writeHead(404); return res.end(); }
+    const list = Object.values(workers).map((w) => {
+      const { window, ...rest } = w;
+      const hr = hashrate(w);   // poda a janela antes de contar
+      return { ...rest, hashrate: hr, shares1h: w.window.length };
+    });
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
+    rollWeek();
+    const lastHour = Object.values(workers).reduce((n, w) => n + w.window.length, 0);   // hashrate() já podou a janela de 1 h
+    const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
+    const routes = ROUTES.map((r) => ({
+      ...r,
+      upstreams: upstreamsOf(r).map((u) => {
+        const h = health[hkey(u)] || {};
+        const ps = pingScore(h.pingMs);
+        return {
+          ...u,
+          down: isDown(u),
+          since: h.since || null,
+          error: h.error || null,
+          pingMs: h.pingMs ?? null,
+          pingScore: ps.score,
+        };
+      }),
+    }));
+    const activePings = Object.values(health).map((h) => h.pingMs).filter((m) => typeof m === 'number' && m >= 0);
+    const avgPing = activePings.length ? Math.round(activePings.reduce((a, b) => a + b, 0) / activePings.length) : null;
+    const pingSummary = pingScore(avgPing);
+    const totals = {
+      today: today.accepted,
+      lastHour,
+      pingMs: avgPing,
+      pingScore: pingSummary.score,
+      efficiency: efficiency(),
+    };
+    res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist }));
+  }).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
+  servers.push(statsServer);
+  return servers;
+}
+
+if (require.main === module) {
+  startServers();
+  process.on('SIGTERM', () => { saveStats(); process.exit(0); });
+  process.on('SIGINT', () => { saveStats(); process.exit(0); });
+}
+
+module.exports = {
+  ROUTES,
+  bucket,
+  noteBestHash,
+  dayKey,
+  rollWeek,
+  worker,
+  hashrate,
+  safeJson,
+  saveStats,
+  session,
+  startServers,
+  addEvent,
+  efficiency,
+  processStats,
+  _state: () => ({ events, workers, recent, today, week, lastWeek, bestHash, dayBestHash, hist, health }),
+};

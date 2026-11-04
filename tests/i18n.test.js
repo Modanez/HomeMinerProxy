@@ -35,6 +35,19 @@ test('locale e moeda são injetados', () => {
   assert.match(localizePage(PAGE, 'en', 'USD'), /<html lang="en">/);
   assert.match(localizePage(PAGE, 'pt', 'BRL', 'ocean'), /<body data-theme="ocean">/);
   assert.match(localizePage(PAGE, 'en', 'USD', 'latte'), /<body data-theme="latte">/);
+  // tema padrão omitido e tema inválido que cai no fallback obsidian
+  assert.match(localizePage(PAGE, 'pt', 'BRL'), /<body data-theme="obsidian">/);
+  assert.match(localizePage(PAGE, 'pt', 'BRL', 'invalido'), /<body data-theme="obsidian">/);
+  // idioma desconhecido cai no locale padrão en-US
+  assert.match(localizePage(PAGE, 'es', 'EUR'), /const LOC = 'en-US', CUR = 'EUR';/);
+});
+
+test('tabela WIDGET exportada nos dois idiomas', () => {
+  const { WIDGET } = require('../src/i18n');
+  assert.ok(WIDGET.pt.big.length > 0);
+  assert.ok(WIDGET.en.big.length > 0);
+  assert.strictEqual(WIDGET.pt.oneIn, '1 em ');
+  assert.strictEqual(WIDGET.en.oneIn, '1 in ');
 });
 
 test('escolha do idioma: ?lang > LANGUAGE do servidor > navegador > inglês', () => {
@@ -46,6 +59,9 @@ test('escolha do idioma: ?lang > LANGUAGE do servidor > navegador > inglês', ()
   assert.strictEqual(pickLang(req('/', 'de-DE,en;q=0.5'), ''), 'en');
   assert.strictEqual(pickLang(req('/', 'fr-FR'), ''), 'en');
   assert.strictEqual(pickLang(req('/?lang=xx'), ''), 'en');
+  // sem headers e sem serverLang
+  assert.strictEqual(pickLang({ url: '/', headers: {} }), 'en');
+  assert.strictEqual(pickLang({ url: '/' }), 'en');
 });
 
 test('botão PT|EN: o cookie vence o LANGUAGE do servidor, mas não o ?lang', () => {

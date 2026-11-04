@@ -481,6 +481,7 @@
                   "  pm.expect(j).to.have.property('workers');",
                   "  pm.expect(j).to.have.property('recent');",
                   "  pm.expect(j).to.have.property('totals');",
+                  "  pm.expect(j.totals).to.have.property('pingScore');",
                   "  pm.expect(j).to.have.property('hist');",
                   "  pm.expect(j).to.have.property('week');",
                   "});"
@@ -496,7 +497,7 @@
               "host": ["{{proxyStatsUrl}}"],
               "path": ["stats"]
             },
-            "description": "Retorna a telemetria em tempo real do proxy Stratum V1: rotas e estado de failover das pools, workers conectados, hashrate na janela de 1h, últimos 100 shares, `bestHash`, `dayBestHash` e o histograma de 40 faixas de dificuldade (`hist`)."
+            "description": "Retorna a telemetria em tempo real do proxy Stratum V1: rotas, latência de ping da pool (pingMs) e score (ótimo/bom/ruim), estado de failover, workers conectados, hashrate na janela de 1h, shares recentes, `bestHash`, `dayBestHash` e o histograma de 40 faixas de dificuldade (`hist`)."
           }
         }
       ]
