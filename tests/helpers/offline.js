@@ -1,4 +1,5 @@
 // Pré-carregado nos testes do painel (node -r): nenhuma chamada HTTPS sai para a internet.
+process.env.RETRY_BASE_MS = '5';
 const https = require('https');
 const { PassThrough } = require('stream');
 https.get = (url, opts, cb) => {

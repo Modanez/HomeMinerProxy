@@ -33,7 +33,7 @@ function normalizePlugs(rawPlugs, legacy = {}) {
     }
   }
   if ((arr == null || (Array.isArray(arr) && !arr.length)) && legacy && legacy.deviceId) {
-    const legId = String(legacy.deviceId || '').replace(/[\s"']/g, '');
+    const legId = String(legacy.deviceId).replace(/[\s"']/g, '');
     if (ID_RE.test(legId)) {
       const legW = String(legacy.worker || '').trim();
       const legWd = Number(legacy.watchdogMin || 0);
@@ -82,9 +82,9 @@ function validConfig(cfg = {}) {
 
 // Assinatura HMAC-SHA256 oficial da Tuya OpenAPI v1.0.
 function signRequest({ clientId, secret, accessToken = '', method = 'GET', pathWithQuery = '/', body = '', timestamp, nonce = '' }) {
-  const contentHash = crypto.createHash('sha256').update(body || '', 'utf8').digest('hex');
+  const contentHash = crypto.createHash('sha256').update(body, 'utf8').digest('hex');
   const stringToSign = [method.toUpperCase(), contentHash, '', pathWithQuery].join('\n');
-  const payload = String(clientId) + String(accessToken || '') + String(timestamp) + String(nonce || '') + stringToSign;
+  const payload = String(clientId) + String(accessToken) + String(timestamp) + String(nonce) + stringToSign;
   return crypto.createHmac('sha256', String(secret)).update(payload, 'utf8').digest('hex').toUpperCase();
 }
 
@@ -172,7 +172,7 @@ function createClient(opts = {}) {
       expireAt = Date.now() + Math.max(60, expSec - 120) * 1000;
       return { ok: true, token };
     }
-    return { ok: false, code: r.code, error: r.error || 'tuyaauth' };
+    return { ok: false, code: r.code, error: r.error };
   }
 
   async function ensureToken(force = false) {
@@ -183,9 +183,9 @@ function createClient(opts = {}) {
       const r = await fetchTokenOn(base);
       if (r.ok) return r;
       lastErr = r;
-      if (r.code !== 1004 && !/suspended/i.test(String(r.error || ''))) break;
+      if (r.code !== 1004 && !/suspended/i.test(String(r.error))) break;
     }
-    return { ok: false, error: (lastErr && lastErr.error) || 'tuyaauth' };
+    return { ok: false, error: lastErr.error };
   }
 
   async function callOnCurrentBase(method, pathWithQuery, bodyObj = null, retried = false) {
@@ -212,7 +212,7 @@ function createClient(opts = {}) {
     const first = await callOnCurrentBase(method, pathWithQuery, bodyObj, false);
     if (first.ok || cfg.customBase) return first;
     // Se o datacenter atual estiver suspenso ou não tiver o dispositivo/projeto, tenta os outros datacenters da Tuya
-    if (/suspended|permission|sign invalid/i.test(String(first.error || '')) || first.code === 1004 || first.code === 1106 || first.code === 28841105) {
+    if (/suspended|permission|sign invalid/i.test(String(first.error)) || first.code === 1004 || first.code === 1106 || first.code === 28841105) {
       const others = ALL_ENDPOINTS.filter((u) => u !== cfg.baseUrl);
       for (const base of others) {
         const tk = await fetchTokenOn(base);
@@ -225,7 +225,7 @@ function createClient(opts = {}) {
   }
 
   async function getStatus(devId = cfg.deviceId) {
-    const targetId = String(devId || cfg.deviceId || '').replace(/[\s"']/g, '');
+    const targetId = String(devId || cfg.deviceId).replace(/[\s"']/g, '');
     if (!ID_RE.test(targetId)) return { ok: false, error: 'tuyaid' };
     const id = encodeURIComponent(targetId);
     const paths = [
@@ -240,7 +240,7 @@ function createClient(opts = {}) {
       if (attempt.ok) { r = attempt; break; }
       if (!r) r = attempt;
     }
-    if (!r || !r.ok) return r || { ok: false, error: 'tuyaauth' };
+    if (!r || !r.ok) return r;
     const status = parseStatus(r.result);
     if (status.switchCode && status.switchCode !== '1') {
       lastSwitchCode = status.switchCode;
@@ -250,9 +250,9 @@ function createClient(opts = {}) {
   }
 
   async function setSwitch(on, devId = cfg.deviceId) {
-    const targetId = String(devId || cfg.deviceId || '').replace(/[\s"']/g, '');
+    const targetId = String(devId || cfg.deviceId).replace(/[\s"']/g, '');
     if (!ID_RE.test(targetId)) return { ok: false, error: 'tuyaid' };
-    const code = switchCodes.get(targetId) || lastSwitchCode || 'switch_1';
+    const code = switchCodes.get(targetId) || lastSwitchCode;
     const id = encodeURIComponent(targetId);
     let r = await signedCall('POST', `/v1.0/iot-03/devices/${id}/commands`, {
       commands: [{ code, value: !!on }],
@@ -283,5 +283,5 @@ async function testPlug(opts = {}) {
   return client.getStatus();
 }
 
-module.exports = { ENDPOINTS, ID_RE, SECRET_RE, PLUG_NAME_RE, normalizePlugs, validConfig, signRequest, parseStatus, createClient, testPlug };
+module.exports = { ENDPOINTS, ID_RE, SECRET_RE, PLUG_NAME_RE, normalizePlugs, validConfig, signRequest, parseStatus, createClient, testPlug, _test: { rawRequest } };
 

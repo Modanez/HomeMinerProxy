@@ -13,6 +13,8 @@ test('sorte 1 = exatamente o esperado (mediana)', () => {
 test('sem trabalho ou sem share não há medida', () => {
   assert.strictEqual(luckOf(0, 10), null);
   assert.strictEqual(luckOf(10, 0), null);
+  assert.strictEqual(luckOf(-5, 10), null);
+  assert.strictEqual(luckOf(10, -5), null);
 });
 
 test('simulação: o percentil do melhor share é uniforme (a fórmula está calibrada)', () => {
@@ -100,4 +102,128 @@ test('conquistas: desbloqueia marcos, detecta troféu vovô (underdog) e preserv
   const r2 = evaluateAchievements({ best: 10, totalShares: 5 }, r1.map, now);
   assert.deepStrictEqual(r2.newlyUnlocked, []);
   assert.strictEqual(r2.unlockedCount, r1.unlockedCount);
+});
+
+test('cobertura completa de weeklyStandings e desempates', () => {
+  const mon = new Date(2026, 10, 2, 12, 0, 0).getTime();
+  assert.strictEqual(weekKey(), weekKey(Date.now()));
+  assert.strictEqual(weekKey(mon), '2026-11-02');
+
+  // Dois workers sem factor (work = 0), exercitando b.best - a.best (linha 64)
+  const recs = [
+    null,
+    { worker: '' },
+    { worker: '—', value: 100, at: new Date(mon).toISOString() },
+    { worker: 'w1', value: 0, at: new Date(mon).toISOString() },
+    { worker: 'w1', value: 50, at: 'data-invalida' },
+    { worker: 'w1', value: 50 },
+    { worker: 'w1', value: 10, at: new Date(mon).toISOString() },
+    { worker: 'w1', value: 5, at: new Date(mon).toISOString() }, // menor que cur.best
+    { worker: 'w2', value: 20, at: new Date(mon).toISOString() },
+  ];
+  const emptyWeek = {
+    key: '2026-11-02',
+    workers: {
+      invalido: null,
+      semShares: { shares: 0, best: 0 },
+    },
+  };
+  const ch = weeklyStandings(emptyWeek, recs, mon);
+  assert.strictEqual(ch.standings[0].name, 'w2');
+  assert.strictEqual(ch.standings[1].name, 'w1');
+
+  // Empate de factor desempatando por best e empate total
+  const weekTied = {
+    key: '2026-11-02',
+    workers: {
+      a: { shares: 10, work: 100, best: 200 },
+      b: { shares: 10, work: 100, best: 200 },
+      c: { shares: 10, work: 100, best: 150 },
+    },
+  };
+  const chTied = weeklyStandings(weekTied, [], mon);
+  assert.strictEqual(chTied.standings.length, 3);
+
+  // Sem weekObj e sem records
+  const chEmpty = weeklyStandings(null, null, mon);
+  assert.deepStrictEqual(chEmpty.standings, []);
+  assert.strictEqual(chEmpty.leader, null);
+  assert.strictEqual(chEmpty.topDiff, null);
+
+  // Worker sem factor ordenado contra worker com factor (exercita b.factor != null)
+  // e worker com shares mas sem best
+  const weekMixed = {
+    key: '2026-11-02',
+    workers: {
+      soShares: { shares: 5, work: 0, best: 0 },
+      semFactor: { shares: 0, work: 0, best: 50 },
+      comFactor: { shares: 10, work: 10, best: 100 },
+    },
+  };
+  const chMixed = weeklyStandings(weekMixed, [], mon);
+  assert.strictEqual(chMixed.standings[0].name, 'comFactor');
+  assert.strictEqual(chMixed.standings[1].name, 'semFactor');
+});
+
+test('cobertura de todas as conquistas e edge cases de evaluateAchievements', () => {
+  const now = Date.now();
+  // Conquistas de alta dificuldade e shares
+  const res = evaluateAchievements({
+    best: 2e9,
+    bestWorker: '—', // deve virar null e pegar workers[0]
+    totalShares: 2e5,
+    workers: [{ name: 'fallbackWorker', hashRate: 1000 }],
+    luckWorkers: [{ name: 'superLucky', factor: 12 }],
+    proxyWorkers: [
+      null,
+      { online: 0, connectedSince: now - 10 * 86400e3 },
+      { online: 1, connectedSince: now - 1 * 86400e3 },
+      { online: 1, connectedSince: now - 8 * 86400e3, name: 'minerHero' },
+    ],
+  }, {
+    conquistaInexistente: { unlockedAt: '2026-01-01' },
+    diff_1k: null,
+    diff_1m: 'nao-objeto',
+    shares_1k: { worker: 'salvo' }, // sem unlockedAt, deve usar now
+  }, now);
+
+  const ids = res.newlyUnlocked.map((a) => a.id);
+  assert.ok(ids.includes('first_share'));
+  assert.ok(ids.includes('diff_1b'));
+  assert.ok(ids.includes('shares_100k'));
+  assert.ok(ids.includes('luck_10x'));
+  assert.ok(ids.includes('week_nonstop'));
+
+  // Contexto onde nada é atingido e branches negativos de checks
+  const resEmpty = evaluateAchievements({
+    best: 0,
+    totalShares: 0,
+    workers: [{ name: 'w1' }, { name: 'w2', hashRate: 'invalido' }],
+    luckWorkers: [{ name: 'w1', factor: 1 }],
+    championship: { leader: { name: 'w1' }, standings: [{ name: 'w1' }] },
+  }, {}, now);
+  assert.strictEqual(resEmpty.newlyUnlocked.length, 0);
+
+  // Championship com leader não underdog (líder tem hashrate alto)
+  const resNotUnderdog = evaluateAchievements({
+    workers: [{ name: 'bitaxe', hashRate: 1e12 }, { name: 'devkit', hashRate: 100 }],
+    championship: { leader: { name: 'bitaxe' }, standings: [{}, {}] },
+  });
+  assert.strictEqual(resNotUnderdog.newlyUnlocked.length, 0);
+
+  // evaluateAchievements com contexto nulo ou propriedades não-array e worker sem nome
+  const emptyRes = evaluateAchievements();
+  assert.strictEqual(emptyRes.unlockedCount, 0);
+  const nullSavedRes = evaluateAchievements({}, null);
+  assert.strictEqual(nullSavedRes.unlockedCount, 0);
+
+  const nonArrayRes = evaluateAchievements({
+    best: 10,
+    totalShares: 1,
+    workers: [{}], // worker sem name
+    proxyWorkers: 'string',
+    luckWorkers: null,
+  });
+  assert.ok(nonArrayRes.map.first_share);
+  assert.strictEqual(nonArrayRes.map.first_share.worker, null);
 });

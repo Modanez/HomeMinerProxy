@@ -74,6 +74,89 @@ test('parseStatus converte DPs padrão Tuya (switch_1, cur_power em dW, cur_volt
   assert.strictEqual(multi.list[1].watchdogMin, 15);
   assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'curto' }]).error, 'tuyaid');
   assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'eb1111111111111111', watchdogMin: 2 }]).error, 'watchdog');
+  assert.strictEqual(tuya.normalizePlugs('{invalido').error, 'tuyaplugs');
+  assert.strictEqual(tuya.normalizePlugs('[{"deviceId":"dev_12345"}]').list.length, 1);
+  assert.strictEqual(tuya.normalizePlugs(Array(35).fill({ deviceId: 'dev_12345' })).error, 'tuyaplugs');
+  assert.strictEqual(tuya.normalizePlugs([null]).error, 'tuyaplugs');
+  assert.strictEqual(tuya.normalizePlugs([['array']]).error, 'tuyaplugs');
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: '' }]).list.length, 0);
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'dev_12345', worker: 'invalido?!' }]).error, 'name');
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'dev_12345', name: 'a'.repeat(60) }]).error, 'name');
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'dev_12345', watchdogMin: 'invalido' }]).error, 'watchdog');
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'dev_12345', watchdogMin: 2000 }]).error, 'watchdog');
+  assert.strictEqual(tuya.normalizePlugs(null).list.length, 0);
+  assert.strictEqual(tuya.normalizePlugs('', { deviceId: 'curto' }).list.length, 0);
+
+  // parseStatus com objeto direto, switch_led, switch e valores vazios
+  const directObj = tuya.parseStatus({ switch_led: true, switch: false, cur_power: 'nao-numero' });
+  assert.strictEqual(directObj.on, false);
+  assert.strictEqual(directObj.watts, null);
+
+  const directObj2 = tuya.parseStatus({ switch_led: true });
+  assert.strictEqual(directObj2.switchCode, 'switch_led');
+  assert.strictEqual(directObj2.on, true);
+
+  const emptyStatus = tuya.parseStatus(null);
+  assert.strictEqual(emptyStatus.on, null);
+  assert.strictEqual(emptyStatus.watts, null);
+
+  // legacy com worker '*' e watchdog fora da faixa
+  const legStar = tuya.normalizePlugs('', { deviceId: 'eb49d08081c5ba5e80ackt', worker: '*', watchdogMin: 1 });
+  assert.strictEqual(legStar.list[0].name, 'Tomada 1');
+  assert.strictEqual(legStar.list[0].watchdogMin, 0);
+
+  // item com worker '*' gerando nome 'Tomada 1'
+  const starItem = tuya.normalizePlugs([{ deviceId: 'eb49d08081c5ba5e80ackt', worker: '*' }]);
+  assert.strictEqual(starItem.list[0].name, 'Tomada 1');
+
+  // item sem name mas com worker válido 'bitaxe' gera rawName = worker
+  const wNameItem = tuya.normalizePlugs([{ deviceId: 'eb49d08081c5ba5e80ackt', worker: 'bitaxe' }]);
+  assert.strictEqual(wNameItem.list[0].name, 'bitaxe');
+
+  // legacy com apenas deviceId (sem worker e sem watchdogMin)
+  const bareLeg = tuya.normalizePlugs('', { deviceId: 'eb49d08081c5ba5e80ackt' });
+  assert.strictEqual(bareLeg.list[0].name, 'Tomada 1');
+  assert.strictEqual(bareLeg.list[0].watchdogMin, 0);
+});
+
+test('validConfig, testPlug vazio e powerCycle com falha', async () => {
+  // allowNoDevice
+  const noDev = tuya.validConfig({ clientId: 'client_12345', secret: 'secret_12345', allowNoDevice: true });
+  assert.ok(noDev);
+  assert.strictEqual(noDev.deviceId, '');
+
+  // deviceId inválido com allowNoDevice
+  assert.strictEqual(tuya.validConfig({ clientId: 'client_12345', secret: 'secret_12345', deviceId: 'curto', allowNoDevice: true }), null);
+  // secret inválido
+  assert.strictEqual(tuya.validConfig({ clientId: 'client_12345', secret: 'curto' }), null);
+  // deviceId omitido sem allowNoDevice
+  assert.strictEqual(tuya.validConfig({ clientId: 'client_12345', secret: 'secret_12345' }), null);
+  // region vazia usa 'us'
+  const defReg = tuya.validConfig({ clientId: 'client_12345', secret: 'secret_12345', deviceId: 'dev_12345', region: '' });
+  assert.strictEqual(defReg.region, 'us');
+  const spaceReg = tuya.validConfig({ clientId: 'client_12345', secret: 'secret_12345', deviceId: 'dev_12345', region: '   ' });
+  assert.strictEqual(spaceReg.region, 'us');
+
+  // getStatus e setSwitch sem devId e sem cfg.deviceId (allowNoDevice: true)
+  const noDevClient = tuya.createClient({ clientId: 'client_12345', secret: 'secret_12345', allowNoDevice: true });
+  assert.strictEqual((await noDevClient.getStatus()).error, 'tuyaid');
+  assert.strictEqual((await noDevClient.setSwitch(true)).error, 'tuyaid');
+
+  // signRequest sem nonce
+  const sigNoNonce = tuya.signRequest({ clientId: 'c', secret: 's', timestamp: 123 });
+  assert.ok(sigNoNonce);
+
+  // testPlug sem client válido
+  const noClient = await tuya.testPlug();
+  assert.strictEqual(noClient.ok, false);
+  assert.strictEqual(noClient.error, 'tuyamissing');
+
+  // getStatus e setSwitch com devId inválido
+  const client = tuya.createClient({ clientId: 'client_12345', secret: 'secret_12345', deviceId: 'dev_12345' });
+  const badDevGet = await client.getStatus('curto');
+  assert.strictEqual(badDevGet.error, 'tuyaid');
+  const badDevSet = await client.setSwitch(true, 'curto');
+  assert.strictEqual(badDevSet.error, 'tuyaid');
 });
 
 test('createClient e testPlug conversam com servidor Tuya OpenAPI v1.0 (token, renovação 1010, leitura e comandos)', async (t) => {
@@ -161,5 +244,211 @@ test('createClient e testPlug conversam com servidor Tuya OpenAPI v1.0 (token, r
   assert.strictEqual(cycleRes.ok, true);
   assert.strictEqual(switchOn, true);
   assert.strictEqual(commandsSent.length, 3); // false, false, true
+});
+
+test('fallback de comandos v1.0/devices e falha no powerCycle', async (t) => {
+  let postCount = 0;
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/v1.0/token')) {
+      return res.end(JSON.stringify({ success: true, result: { access_token: 'tok_test', expire_time: 7200 } }));
+    }
+    if (req.method === 'POST') {
+      postCount++;
+      // Primeiro endpoint (/iot-03) falha; segundo (/devices) tem sucesso
+      if (req.url.includes('/iot-03/')) {
+        return res.end(JSON.stringify({ success: false, code: 1106, msg: 'permission deny' }));
+      }
+      return res.end(JSON.stringify({ success: true, result: true }));
+    }
+    res.end(JSON.stringify({ success: true, result: [{ code: '1', value: true }] }));
+  });
+
+  await new Promise((res) => server.listen(0, '127.0.0.1', res));
+  const apiBase = `http://127.0.0.1:${server.address().port}`;
+  t.after(() => server.close());
+
+  const client = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase });
+  const sw = await client.setSwitch(true);
+  assert.strictEqual(sw.ok, true);
+  assert.strictEqual(postCount, 2); // Tentou iot-03 e fez fallback para devices
+
+  // Resposta não-JSON
+  const htmlServer = http.createServer((req, res) => {
+    res.writeHead(502, { 'Content-Type': 'text/html' });
+    res.end('<html>Bad Gateway</html>');
+  });
+  await new Promise((res) => htmlServer.listen(0, '127.0.0.1', res));
+  t.after(() => htmlServer.close());
+
+  const clientHtml = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase: `http://127.0.0.1:${htmlServer.address().port}` });
+  const badHtmlRes = await clientHtml.getStatus();
+  assert.strictEqual(badHtmlRes.ok, false);
+
+  // Servidor que rejeita ambos endpoints de comando (exercita : r no setSwitch)
+  let cmdCalls = 0;
+  const failCmdServer = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/v1.0/token')) {
+      return res.end(JSON.stringify({ success: true, result: { access_token: 'tok_test', expire_time: 7200 } }));
+    }
+    if (req.method === 'POST') {
+      cmdCalls++;
+      // simula primeiro comando (desligar) sucedendo, segundo (ligar) falhando
+      if (cmdCalls > 1) {
+        return res.end(JSON.stringify({ success: false, description: 'ambos falharam' }));
+      }
+      return res.end(JSON.stringify({ success: true, result: true }));
+    }
+    res.end(JSON.stringify({ success: true, result: [] }));
+  });
+  await new Promise((res) => failCmdServer.listen(0, '127.0.0.1', res));
+  t.after(() => failCmdServer.close());
+
+  const clientFailOn = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase: `http://127.0.0.1:${failCmdServer.address().port}` });
+  // powerCycle onde religar falha (exercita : on)
+  const cycleFailOn = await clientFailOn.powerCycle(10);
+  assert.strictEqual(cycleFailOn.ok, false);
+  assert.strictEqual(cycleFailOn.error, 'ambos falharam');
+
+  // URL malformada e timeout/erro de rede
+  const badUrlClient = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase: 'http://[::1' });
+  assert.strictEqual((await badUrlClient.getStatus()).ok, false);
+
+  // Erro ECONNREFUSED em porta fechada
+  const deadClient = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase: 'http://127.0.0.1:1' });
+  assert.strictEqual((await deadClient.getStatus()).ok, false);
+
+  // rawRequest direto: timeout e resposta sem mensagem de erro
+  const slowServer = http.createServer((req, res) => {
+    if (req.url === '/slow') {
+      setTimeout(() => res.end('{}'), 100);
+      return;
+    }
+    // Resposta com success: false sem msg nem description
+    res.end(JSON.stringify({ success: false }));
+  });
+  await new Promise((res) => slowServer.listen(0, '127.0.0.1', res));
+  t.after(() => slowServer.close());
+
+  const slowBase = `http://127.0.0.1:${slowServer.address().port}`;
+  const toRes = await tuya._test.rawRequest(slowBase, 'GET', '/slow', {}, '', 15);
+  assert.strictEqual(toRes.ok, false);
+  assert.match(toRes.error, /timeout/);
+
+  const noMsgRes = await tuya._test.rawRequest(slowBase, 'GET', '/nomsg', {});
+  assert.strictEqual(noMsgRes.ok, false);
+  assert.strictEqual(noMsgRes.error, 'HTTP 200');
+
+  // powerCycle com falha no setSwitch
+  const failCycle = await client.powerCycle(10, 'curto');
+  assert.strictEqual(failCycle.ok, false);
+  assert.strictEqual(failCycle.error, 'tuyaid');
+});
+
+test('probing automático dos 6 data centers da Tuya em caso de datacenter suspenso', async (t) => {
+  const https = require('https');
+  const { PassThrough } = require('stream');
+  const origRequest = https.request;
+
+  t.after(() => { https.request = origRequest; });
+
+  https.request = (url, opts, cb) => {
+    const callback = typeof opts === 'function' ? opts : cb;
+    const req = new PassThrough();
+    const hostname = url.hostname || (typeof url === 'string' ? new URL(url).hostname : '');
+    const pathname = url.pathname || (typeof url === 'string' ? new URL(url).pathname : '');
+
+    setImmediate(() => {
+      const res = new PassThrough();
+      res.statusCode = 200;
+      callback(res);
+
+      if (hostname === 'openapi.tuyaus.com') {
+        // No us, token funciona mas dispositivo retorna code 1004 sem mensagem especial
+        if (pathname.includes('/token')) {
+          res.end(JSON.stringify({ success: true, result: { access_token: 'tok_us' } })); // sem expire_time (cai em 7200)
+        } else {
+          res.end(JSON.stringify({ success: false, code: 1004, msg: 'outro_erro' }));
+        }
+      } else if (hostname === 'openapi-ueaz.tuyaus.com') {
+        // Primeiro da lista others falha no token (exercita continue)
+        res.end(JSON.stringify({ success: false, code: 9999 }));
+      } else if (hostname === 'openapi.tuyaeu.com') {
+        // Terceiro datacenter responde com sucesso
+        if (pathname.includes('/token')) {
+          res.end(JSON.stringify({ success: true, result: { access_token: 'tok_eu', expire_time: 7200 } }));
+        } else {
+          res.end(JSON.stringify({ success: true, result: [{ code: 'switch_1', value: true }] }));
+        }
+      } else {
+        res.end(JSON.stringify({ success: false, code: 1004, msg: 'outro' }));
+      }
+    });
+
+    return req;
+  };
+
+  const client = tuya.createClient({
+    clientId: 'client_valid_123',
+    secret: 'secret_valid_123',
+    deviceId: 'dev_valid_456',
+    region: 'us', // sem apiBase para usar probing de ALL_ENDPOINTS
+  });
+
+  const st = await client.getStatus();
+  assert.strictEqual(st.ok, true);
+  assert.strictEqual(st.status.on, true);
+
+  // Probing onde todos os outros falham (exercitando linha 224: return first)
+  https.request = (url, opts, cb) => {
+    const callback = typeof opts === 'function' ? opts : cb;
+    const req = new PassThrough();
+    const pathname = url.pathname || (typeof url === 'string' ? new URL(url).pathname : '');
+
+    setImmediate(() => {
+      const res = new PassThrough();
+      res.statusCode = 200;
+      callback(res);
+      if (pathname.includes('/token')) {
+        res.end(JSON.stringify({ success: true, result: { access_token: 'tok_fail', expire_time: 7200 } }));
+      } else {
+        res.end(JSON.stringify({ success: false, code: 1106, msg: 'permission deny' }));
+      }
+    });
+    return req;
+  };
+
+  const clientAllFail = tuya.createClient({
+    clientId: 'client_valid_123',
+    secret: 'secret_valid_123',
+    deviceId: 'dev_valid_456',
+    region: 'us',
+  });
+  const stFail = await clientAllFail.getStatus();
+  assert.strictEqual(stFail.ok, false);
+
+  // Probing com códigos 1106 e 28841105
+  for (const c of [1106, 28841105]) {
+    https.request = (url, opts, cb) => {
+      const callback = typeof opts === 'function' ? opts : cb;
+      const req = new PassThrough();
+      const pathname = url.pathname || (typeof url === 'string' ? new URL(url).pathname : '');
+      setImmediate(() => {
+        const res = new PassThrough();
+        res.statusCode = 200;
+        callback(res);
+        if (pathname.includes('/token')) {
+          res.end(JSON.stringify({ success: true, result: { access_token: 'tok_test', expire_time: 7200 } }));
+        } else {
+          res.end(JSON.stringify({ success: false, code: c }));
+        }
+      });
+      return req;
+    };
+    const cCli = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', region: 'us' });
+    const r = await cCli.getStatus();
+    assert.strictEqual(r.ok, false);
+  }
 });
 

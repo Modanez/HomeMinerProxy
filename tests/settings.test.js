@@ -312,3 +312,110 @@ test('carteira escondida: a API do painel não mostra saldo nem transações', a
   assert.ok('fiat' in snap.wallet);   // a cotação continua (prêmio, rede)
   assert.strictEqual(JSON.parse((await req(port, 'GET', '/api/config')).body).values.SHOW_WALLET, false);
 });
+
+test('testCube, testTelegram, validateBackupData e rotas desconhecidas em settings.js', async (t) => {
+  // 1. testCube
+  assert.strictEqual(await st.testCube(''), false);
+  assert.strictEqual(await st.testCube('127.0.0.1:99999'), false); // porta/host inválido
+
+  const cubeServer = http.createServer((_, res) => res.end('OK'));
+  await new Promise((res) => cubeServer.listen(0, '127.0.0.1', res));
+  const cubePort = cubeServer.address().port;
+  t.after(() => cubeServer.close());
+
+  // com porta padrão 80 fechada em localhost
+  assert.strictEqual(await st.testCube('127.0.0.1', 50), false);
+
+  // mock de http.get para testCube com resposta de sucesso
+  const { PassThrough } = require('stream');
+  const origHttpGet = http.get;
+  http.get = (opts, cb) => {
+    const res = new PassThrough();
+    res.statusCode = 200;
+    setImmediate(() => { cb(res); res.end('OK'); });
+    return { on: () => {}, destroy: () => {} };
+  };
+  assert.strictEqual(await st.testCube('cubo.local'), true);
+  http.get = origHttpGet;
+
+  // resetPinFails
+  st.resetPinFails();
+
+  // page com tema customizado
+  assert.match(st.page('pt', true, 'ocean'), /data-theme="ocean"/);
+  assert.match(st.page('en', true, 'latte'), /data-theme="latte"/);
+
+  // 2. testTelegram
+  assert.deepStrictEqual(await st.testTelegram('invalido', '123'), { ok: false, error: 'missing' });
+  assert.deepStrictEqual(await st.testTelegram(TOKEN, ''), { ok: false, error: 'missing' });
+
+  let tgStatus = 200, tgBody = { ok: true };
+  const tgServer = http.createServer((_, res) => {
+    res.writeHead(tgStatus, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify(tgBody));
+  });
+  await new Promise((res) => tgServer.listen(0, '127.0.0.1', res));
+  const tgBase = `http://127.0.0.1:${tgServer.address().port}`;
+  t.after(() => tgServer.close());
+
+  // sucesso
+  assert.deepStrictEqual(await st.testTelegram(TOKEN, '42', 'msg', tgBase), { ok: true });
+
+  // erro do telegram
+  tgBody = { ok: false, description: 'Chat not found' };
+  assert.deepStrictEqual(await st.testTelegram(TOKEN, '42', 'msg', tgBase), { ok: false, error: 'Chat not found' });
+
+  // resposta não-JSON
+  tgBody = null;
+  tgStatus = 502;
+  const nonJsonServer = http.createServer((_, res) => { res.writeHead(502); res.end('Bad Gateway'); });
+  await new Promise((res) => nonJsonServer.listen(0, '127.0.0.1', res));
+  t.after(() => nonJsonServer.close());
+  const nonJsonRes = await st.testTelegram(TOKEN, '42', 'msg', `http://127.0.0.1:${nonJsonServer.address().port}`);
+  assert.strictEqual(nonJsonRes.ok, false);
+  assert.strictEqual(nonJsonRes.error, 'HTTP 502');
+
+  // 3. validateBackupData com achievements, proxyStats, telegram, cubo
+  const bkpOk = st.restoreBackup(tmp(), {
+    version: 1,
+    data: {
+      achievements: { first_share: { unlockedAt: '2026-11-04', worker: 'bitaxe' } },
+      proxyStats: { workers: {}, recent: [], hist: new Array(40).fill(0) },
+      telegram: { offset: 100, lastDaily: '2026-11-04' },
+      cubo: { recordT: 1234, partyUntil: 0, lastAt: 5678 },
+    },
+  });
+  assert.strictEqual(bkpOk.ok, true);
+
+  // Backup inválido com campo malformado
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { achievements: 'nao-objeto' } }), { error: 'backup' });
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { achievements: { 'chave!invalida': {} } } }), { error: 'backup' });
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { proxyStats: 'nao-objeto' } }), { error: 'backup' });
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { proxyStats: { hist: [1, 2] } } }), { error: 'backup' });
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { telegram: 'nao-objeto' } }), { error: 'backup' });
+  assert.deepStrictEqual(st.restoreBackup(tmp(), { data: { cubo: 'nao-objeto' } }), { error: 'backup' });
+
+  // 4. clean com tipo de campo desconhecido e tuyaplugs inválido
+  assert.deepStrictEqual(st.clean({ key: 'TEST', type: 'tipo_inexistente' }, 'val'), { error: 'option' });
+  st.current({ ...process.env, TUYA_PLUGS: '{invalido' });
+  st.current({ ...process.env, TUYA_PLUGS: '[{"deviceId":"dev_12345678"}]' });
+
+  // 5. handle com rota inexistente (com SETTINGS_PIN no env)
+  const origPin = process.env.SETTINGS_PIN;
+  process.env.SETTINGS_PIN = '123456';
+  t.after(() => { process.env.SETTINGS_PIN = origPin; });
+
+  const mockReq = {
+    method: 'POST',
+    url: '/api/config/rota_inexistente',
+    headers: { 'content-type': 'application/json' },
+    on: (ev, cb) => {
+      if (ev === 'data') cb(Buffer.from(JSON.stringify({ pin: '123456' })));
+      if (ev === 'end') cb();
+    },
+  };
+  let resStatus = 0;
+  const mockRes = { writeHead: (s) => { resStatus = s; }, end: () => {} };
+  st.handle(mockReq, mockRes, { dataDir: tmp() });
+  assert.strictEqual(resStatus, 404);
+});

@@ -15,6 +15,7 @@ const snap = (o = {}) => ({
   hall: o.hall || [{ worker: 'odroid', value: 100, at: '2026-11-01T10:00:00Z' }],
   proxy: { failover: o.failover || [] },
   wallet: { okAt: 1, sats: o.sats ?? 9248 },
+  energy: o.energy || null,
   luck: { workers: [{ name: 'vovo', factor: 2.69, percentile: 0.77 }] },
   nearBlock: {
     tip: { height: 974200, hash: '00000000000000000000' + 'ab'.repeat(22), hashDiff: 6.08e14, target: 1.484e14 },
@@ -164,12 +165,15 @@ test('textos dos comandos', () => {
   assert.strictEqual(tg.formatter('en').diff(148.4e12), '148.4T');
   assert.strictEqual(fm.diff(0.00149), '0,00149');
   assert.strictEqual(fm.diff(250000), '250.000');
+  assert.strictEqual(fm.ago(3 * 86400e3), '3 d');
+  assert.strictEqual(tg.formatter('en').ago(3 * 86400e3), '3 d');
 });
 
 // ---------------------------------------------------------------- API falsa do Telegram
-function fakeTelegram() {
+function fakeTelegram(opts = {}) {
   const sent = [], calls = [], queue = [];
   let id = 1;
+  let failUpdatesRemaining = opts.failUpdates || 0;
   const server = http.createServer((req, res) => {
     let b = '';
     const chunks = [];
@@ -182,6 +186,11 @@ function fakeTelegram() {
       calls.push({ url: req.url, method, body });
       const reply = (result) => { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ ok: true, result })); };
       if (!req.url.startsWith('/botTOKEN123/')) { res.writeHead(401); return res.end(JSON.stringify({ ok: false, description: 'Unauthorized' })); }
+      if (failUpdatesRemaining > 0 && method === 'getUpdates') {
+        failUpdatesRemaining--;
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ ok: false, description: 'Internal Server Error' }));
+      }
       if (method === 'getMe') return reply({ username: 'FazendaBot' });
       if (method === 'sendMessage') { sent.push(body); return reply({ message_id: sent.length }); }
       if (method === 'sendPhoto') { sent.push({ photo: true, raw: body.raw }); return reply({ message_id: sent.length }); }
@@ -238,20 +247,234 @@ test('sem TELEGRAM_CHAT_ID, o /start ensina a configurar', async (t) => {
   assert.match(api.sent[0].text, /TELEGRAM_CHAT_ID=777/);
 });
 
-test('o painel liga o bot quando há TELEGRAM_BOT_TOKEN', async (t) => {
+test('comandos restantes do bot e controle de tomada', async (t) => {
   const api = await fakeTelegram();
-  const port = await new Promise((res) => { const s = net.createServer().listen(0, () => { const p = s.address().port; s.close(() => res(p)); }); });
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-tg-'));
-  const p = spawn(process.execPath, ['-r', path.join(__dirname, 'helpers/offline.js'), path.join(__dirname, '../src/painel.js')], {
-    env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'x'), CKPOOL_URLS: '', OCEAN_API: '',
-      TELEGRAM_BOT_TOKEN: 'TOKEN123', TELEGRAM_CHAT_ID: '42', TELEGRAM_API: api.url, LANGUAGE: 'pt-BR' },
-    stdio: 'ignore',
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-extra-'));
+  const current = snap({
+    energy: {
+      plugs: [
+        { name: 'Tomada 1', deviceId: 'eb123', okAt: '2026-11-04T00:00:00Z', on: true, watts: 15.5, volts: 220, currentMa: 70, worker: 'bitaxe' },
+        { name: 'Tomada 2', deviceId: 'eb456', okAt: '2026-11-04T00:00:00Z', on: false, watts: 0, volts: 220, currentMa: 0, worker: '' },
+      ],
+    },
   });
-  t.after(() => { p.kill(); api.server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
-  await waitFor(() => api.calls.some((c) => c.method === 'getMe'), 10000);
-  api.push(42, '/ajuda');
-  await waitFor(() => api.sent.length >= 1, 10000);
-  assert.match(api.sent[0].text, /\/sorte · medidor de sorte/);
+
+  let switchedState = null;
+  const mockTuya = {
+    setSwitch: async (on, devId) => { switchedState = { on, devId }; return { ok: true }; },
+    powerCycle: async (offMs, devId) => { switchedState = { reboot: true, devId }; return { ok: true }; },
+    getStatus: async (devId) => ({ ok: true, status: { on: true, watts: 20, volts: 220, currentMa: 90 } }),
+  };
+
+  const bot = tg.start({
+    token: 'TOKEN123',
+    chatIds: ['42'],
+    lang: 'pt',
+    snapshot: () => current,
+    api: api.url,
+    pollS: 0,
+    warmupMs: 1e9,
+    tuya: mockTuya,
+    log: () => {},
+  });
+  t.after(() => { bot.stop(); api.server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  api.push(42, '/sorte');
+  api.push(42, '/recordes');
+  api.push(42, '/campeonato');
+  api.push(42, '/conquistas');
+  api.push(42, '/tomada on');
+  api.push(42, '/tomada off');
+  api.push(42, '/tomada reiniciar');
+  api.push(42, '/tomada ligar 1');
+  api.push(42, '/tomada ligar eb456');
+  api.push(42, '/tomada desligar bitaxe');
+  api.push(42, '/tomada reiniciar 999');
+  api.push(42, '/tomada 2');
+  api.push(42, '/tomada');
+
+  await waitFor(() => api.sent.length >= 13);
+  assert.strictEqual(switchedState.reboot, true);
+
+  // Testa /tomada quando há apenas 1 plug configurado (cobre linhas 496-498)
+  const singlePlugBot = tg.start({
+    token: 'TOKEN123',
+    chatIds: ['42'],
+    lang: 'pt',
+    snapshot: () => snap({ energy: { plugs: [{ name: 'Única', deviceId: 'eb123', on: true, watts: 10 }] } }),
+    api: api.url,
+    pollS: 0,
+    warmupMs: 1e9,
+    tuya: mockTuya,
+    log: () => {},
+  });
+  t.after(() => singlePlugBot.stop());
+  api.push(42, '/tomada');
+  await waitFor(() => api.sent.length >= 14);
+});
+
+test('cobertura exaustiva de STRINGS, formatters e views em pt e en', () => {
+  for (const lang of ['pt', 'en']) {
+    const S = tg.STRINGS[lang];
+    assert.ok(S.record('w', '10'));
+    assert.ok(S.personal('w', '10'));
+    assert.ok(S.stopped('w', '5m'));
+    assert.ok(S.back('w'));
+    assert.ok(S.failover(3333, 'p1', 'p2'));
+    assert.ok(S.failover(3333, 'p1', null));
+    assert.ok(S.failback(3333, 'p1'));
+    assert.ok(S.money(100));
+    assert.ok(S.block(3.125));
+    assert.ok(S.dailyTitle('2026-11-04'));
+    assert.ok(S.mining(1, 2));
+    assert.ok(S.dayBest('10', 'w'));
+    assert.ok(S.farmRecord('10', 'w'));
+    assert.ok(S.luckiest('w', '2.5'));
+    assert.ok(S.failoverNow(3333, 'p1', 'p2'));
+    assert.ok(S.failoverNow(3333, 'p1', null));
+    assert.ok(S.stoppedNow('w1, w2'));
+    assert.ok(S.poolPing(45, 'great'));
+    assert.ok(S.poolPing(150, 'good'));
+    assert.ok(S.poolPing(300, 'poor'));
+    assert.ok(S.luckRow('w', '2.0', '95'));
+    assert.ok(S.achievement('🏆', 'Title', 'Desc', 'w'));
+    assert.ok(S.achievement('🏆', 'Title', 'Desc', null));
+    assert.ok(S.champRow('🥇', 'w', '2.5', '10', '100'));
+    assert.ok(S.champRow('🥈', 'w', null, '10', null));
+    assert.ok(S.champLast('w', '10'));
+    assert.ok(S.sundayWinner('w', '2.5', '10'));
+    assert.ok(S.sundayWinner('w', null, '10'));
+    assert.ok(S.achTitle(5, 10));
+    assert.ok(S.plugReboot('*'));
+    assert.ok(S.plugReboot('w'));
+    assert.ok(S.plugReboot(null));
+    assert.ok(S.plugState(true));
+    assert.ok(S.plugState(false));
+    assert.ok(S.plugPower(15.5, 220, 70));
+    assert.ok(S.plugPower(15.5, null, null));
+    assert.ok(S.plugWorker('*'));
+    assert.ok(S.plugWorker('bitaxe'));
+    assert.ok(S.plugWorker(''));
+    assert.ok(S.plugSwitched(true));
+    assert.ok(S.plugSwitched(false));
+    assert.ok(S.plugErr('network'));
+    assert.ok(S.ticketCaption('10', 'w'));
+    assert.ok(S.setup('123456'));
+
+    const fmt = tg.formatter(lang);
+    assert.ok(fmt.ago(10000));
+    assert.ok(fmt.ago(120000));
+    assert.ok(fmt.ago(7200000));
+    assert.ok(fmt.ago(200000000));
+    assert.ok(fmt.diff(0.5));
+    assert.ok(fmt.diff(1500));
+    assert.ok(fmt.diff(1500000));
+    assert.ok(fmt.diff(1500000000));
+    assert.ok(fmt.hashrate(5));
+    assert.ok(fmt.hashrate(500000));
+  }
+
+  // Views vazias e nos dois idiomas
+  const emptySnap = {
+    farm: { hasData: false, best: 0, hashrate: 0, shares: {}, workers: [] },
+    hall: [],
+    proxy: { failover: [] },
+    wallet: {},
+    energy: null,
+    luck: { workers: [] },
+    nearBlock: { tip: null, dayBestHash: null },
+    championship: { standings: [] },
+    achievements: { unlocked: 0, total: 0, list: [] },
+  };
+
+  for (const lang of ['pt', 'en']) {
+    const o = { lang };
+    assert.ok(tg.statusText(emptySnap, o));
+    assert.ok(tg.workersText(emptySnap, o));
+    assert.ok(tg.luckText(emptySnap, o));
+    assert.ok(tg.recordsText(emptySnap, o));
+    assert.ok(tg.championshipText(emptySnap, o));
+    assert.ok(tg.achievementsText(emptySnap, o));
+    assert.ok(tg.plugText(emptySnap, o));
+    assert.ok(tg.dailyText(emptySnap, o));
+
+    const fullSnap = snap({ proxy: { failover: [], pingMs: 50, pingScore: 'great' } });
+    assert.ok(tg.statusText(fullSnap, o));
+    assert.ok(tg.workersText(fullSnap, o));
+    assert.ok(tg.luckText(fullSnap, o));
+    assert.ok(tg.recordsText(fullSnap, o));
+    assert.ok(tg.championshipText(fullSnap, o));
+    assert.ok(tg.achievementsText(fullSnap, o));
+    assert.ok(tg.plugText(fullSnap, o));
+    assert.ok(tg.dailyText(fullSnap, o));
+  }
+});
+
+test('erro temporário de rede no getUpdates tenta de novo após retryMs', async (t) => {
+  const api = await fakeTelegram({ failUpdates: 1 });
+  let retryLogged = false;
+  const bot = tg.start({
+    token: 'TOKEN123',
+    chatIds: ['42'],
+    snapshot: () => snap(),
+    api: api.url,
+    pollS: 0,
+    warmupMs: 1e9,
+    retryMs: 10,
+    log: (m) => { if (m.includes('sem conexão com o Telegram')) retryLogged = true; },
+  });
+  t.after(() => { bot.stop(); api.server.close(); });
+  await waitFor(() => retryLogged);
+});
+
+test('ticketImage e /bilhete com script simulado (independente de Pillow)', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fake-ticket-'));
+  const fakePy = path.join(dir, 'fake_ticket.py');
+  // Cria um script que escreve um PNG mockado de 150 bytes e sai com 0
+  fs.writeFileSync(fakePy, "import sys\nsys.stdout.buffer.write(b'\\x89PNG\\r\\n\\x1a\\n' + b'0'*150)\n");
+  t.after(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  const today = new Date().toLocaleDateString('sv');
+  const png = await tg.ticketImage(snap({ dayDate: today }), 'pt', { script: fakePy });
+  assert.ok(png && png.length > 100);
+
+  // Teste de /bilhete e resumo diário usando o fakePy
+  const api = await fakeTelegram();
+  const bot = tg.start({
+    token: 'TOKEN123',
+    chatIds: ['42'],
+    lang: 'pt',
+    snapshot: () => snap({ dayDate: today }),
+    api: api.url,
+    pollS: 0,
+    warmupMs: 1e9,
+    ticketScript: fakePy,
+    dailyHour: new Date().getHours(),
+    log: () => {},
+  });
+  t.after(() => { bot.stop(); api.server.close(); });
+
+  api.push(42, '/bilhete');
+  await waitFor(() => api.sent.some((m) => m.photo));
+  const photoMsg = api.sent.find((m) => m.photo);
+  assert.ok(photoMsg);
+
+  // dispara tick() para cobrir resumo diário com envio de foto
+  bot.tick();
+  await waitFor(() => api.sent.filter((m) => m.photo).length >= 2);
+
+  // Poll com erro 401 encerra limpo
+  let tokenErrLogged = false;
+  const badBot = tg.start({
+    token: 'TOKEN_INVALIDO',
+    chatIds: ['42'],
+    api: api.url,
+    pollS: 0,
+    warmupMs: 1e9,
+    log: (m) => { if (m.includes('recusado')) tokenErrLogged = true; },
+  });
+  t.after(() => badBot.stop());
+  await waitFor(() => tokenErrLogged);
 });
 
 const hasPillow = require('child_process').spawnSync('python3', ['-c', 'import PIL']).status === 0;

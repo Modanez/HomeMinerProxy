@@ -65,12 +65,16 @@ test('parseBroker e cleanTopic validam URLs, hosts e prefixos', () => {
   assert.strictEqual(mq.parseBroker('http://192.168.0.10:1883'), null);
   assert.strictEqual(mq.parseBroker('mqtt://999.999.999.999'), null);
   assert.strictEqual(mq.parseBroker('mqtt://host/caminho'), null);
+  assert.strictEqual(mq.parseBroker('mqtt://host:99999'), null);
+  assert.strictEqual(mq.parseBroker('mqtt://host:0'), null);
+  assert.strictEqual(mq.parseBroker(null), null);
 
   assert.strictEqual(mq.cleanTopic(''), 'homeminerproxy');
   assert.strictEqual(mq.cleanTopic('/fazenda/solo/'), 'fazenda/solo');
   assert.strictEqual(mq.cleanTopic('invalido#wild'), null);
   assert.strictEqual(mq.cleanTopic('invalido+wild'), null);
   assert.strictEqual(mq.cleanTopic('a/b/c/d/e'), null);
+  assert.strictEqual(mq.cleanTopic('a'.repeat(60)), null);
 });
 
 test('codificação MQTT, Auto-Discovery e statePayload', () => {
@@ -151,6 +155,35 @@ test('testBroker e start() conversam com um broker MQTT 3.1.1 real via TCP', asy
   const authRes = await mq.testBroker(`mqtt://127.0.0.1:${port}`, 'usuario', 'errada', 'fazenda');
   assert.deepStrictEqual(authRes, { ok: false, error: 'mqttauth' });
 
+  // testBroker com erro rc=2, protocolo inválido, timeout e erro de conexão
+  connackCode = 2;
+  const rc2Res = await mq.testBroker(`mqtt://127.0.0.1:${port}`);
+  assert.deepStrictEqual(rc2Res, { ok: false, error: 'CONNACK 2' });
+
+  const deadRes = await mq.testBroker('mqtt://127.0.0.1:1');
+  assert.strictEqual(deadRes.ok, false);
+
+  const badBroker = net.createServer((sock) => {
+    sock.write(Buffer.from([0x00, 0x00, 0x00, 0x00])); // byte 0 não é 0x20
+  });
+  await new Promise((res) => badBroker.listen(0, '127.0.0.1', res));
+  const badProtoRes = await mq.testBroker(`mqtt://127.0.0.1:${badBroker.address().port}`);
+  assert.deepStrictEqual(badProtoRes, { ok: false, error: 'protocol' });
+  badBroker.close();
+
+  const slowBroker = net.createServer(() => {});
+  await new Promise((res) => slowBroker.listen(0, '127.0.0.1', res));
+  const toRes = await mq.testBroker(`mqtt://127.0.0.1:${slowBroker.address().port}`, '', '', 'fazenda', 20);
+  assert.deepStrictEqual(toRes, { ok: false, error: 'timeout' });
+  slowBroker.close();
+
+  // testBroker com host inválido
+  assert.deepStrictEqual(await mq.testBroker(''), { ok: false, error: 'host' });
+
+  // testBroker com TLS (mqtts://) em porta fechada
+  const tlsRes = await mq.testBroker('mqtts://127.0.0.1:1');
+  assert.strictEqual(tlsRes.ok, false);
+
   // 3. start() contínuo: publica Auto-Discovery, state, workers e eventos de transição
   connackCode = 0;
   received.length = 0;
@@ -161,7 +194,10 @@ test('testBroker e start() conversam com um broker MQTT 3.1.1 real via TCP', asy
       workers: [{ name: 'bitaxe', state: 'ok', hashRate: 1.2e12, bestDifficulty: 1000, pool: 'ckpool solo', viaProxy: true }],
     },
     hall: [{ worker: 'bitaxe', value: 1000 }],
-    energy: { watts: 20, kwhMonth: 14.4, costMonth: 12.96 },
+    energy: {
+      watts: 20, kwhMonth: 14.4, costMonth: 12.96,
+      plugs: [{ name: 'Tomada 1', deviceId: 'eb123', okAt: '2026-11-04T00:00:00Z', on: true, watts: 15.5, volts: 220, currentMa: 70, kwhTotal: 1.2 }],
+    },
     championship: { leader: { name: 'bitaxe', factor: 1.1 } },
     achievements: { unlocked: 1, total: 10, list: [{ id: 'first_share', unlocked: true, title: 'Primeira faísca', desc: '1 share' }] },
     proxy: { failover: [] },
@@ -192,6 +228,7 @@ test('testBroker e start() conversam com um broker MQTT 3.1.1 real via TCP', asy
   };
 
   await waitUntil(() => received.some((p) => p.type === 'PUBLISH' && p.topic === 'homeminerproxy/worker/bitaxe'));
+  await waitUntil(() => received.some((p) => p.type === 'PUBLISH' && p.topic === 'homeminerproxy/plug/Tomada_1'));
   assert.strictEqual(received.filter((p) => p.type === 'PUBLISH' && p.topic.startsWith('homeassistant/')).length, 12);
   const stateMsg = JSON.parse(received.find((p) => p.type === 'PUBLISH' && p.topic === 'homeminerproxy/state').payload);
   assert.strictEqual(stateMsg.best_difficulty, 1000);
@@ -221,4 +258,101 @@ test('testBroker e start() conversam com um broker MQTT 3.1.1 real via TCP', asy
   assert.ok(events.some((e) => e.type === 'farm_record'), 'publicou evento farm_record');
   assert.ok(events.some((e) => e.type === 'achievement_unlocked'), 'publicou evento achievement_unlocked');
   client.stop();
+
+  // 4. start() recusado pelo broker (CONNACK code != 0) e reconexão
+  const rejectBroker = net.createServer((sock) => {
+    sock.on('data', () => {
+      sock.write(Buffer.from([0x20, 0x02, 0x00, 0x05])); // código 5: não autorizado
+      sock.destroy();
+    });
+  });
+  await new Promise((res) => rejectBroker.listen(0, '127.0.0.1', res));
+  t.after(() => rejectBroker.close());
+
+  let logMsg = '';
+  const rejectClient = mq.start({
+    url: `mqtt://127.0.0.1:${rejectBroker.address().port}`,
+    log: (m) => { logMsg += m; },
+    reconnectMs: 50,
+  });
+  t.after(() => rejectClient.stop());
+  await waitUntil(() => logMsg.includes('recusou'));
+  rejectClient.stop();
+
+  // 5. Casos de borda: start inválido, connectPacket e discovery em inglês
+  assert.strictEqual(mq.start({ url: '' }), null);
+
+  const pktWillRetain = mq.connectPacket({ willTopic: 't', willPayload: 'p', willRetain: true, user: 'u', pass: '' });
+  assert.ok(pktWillRetain.length > 0);
+
+  const enDiscov = mq.discoveryConfigs('homeminerproxy', 'en', 'USD');
+  assert.strictEqual(enDiscov.length, 12);
+  const esDiscov = mq.discoveryConfigs('homeminerproxy', 'es', 'EUR');
+  assert.strictEqual(esDiscov.length, 12);
+
+  // start com timeout de socket
+  const hungBroker = net.createServer(() => {});
+  await new Promise((res) => hungBroker.listen(0, '127.0.0.1', res));
+  const hungClient = mq.start({
+    url: `mqtt://127.0.0.1:${hungBroker.address().port}`,
+    topic: '###invalido',
+    timeoutMs: 15,
+    pingMs: 15,
+  });
+  t.after(() => { hungClient.stop(); hungBroker.close(); });
+  await new Promise((r) => setTimeout(r, 40));
+  hungClient.stop();
+
+  // statePayload vazio
+  const emptyState = mq.statePayload(null);
+  assert.strictEqual(emptyState.hashrate, 0);
+  assert.strictEqual(emptyState.workers_active, 0);
+
+  // pingPacket e disconnectPacket
+  assert.deepStrictEqual(mq.pingPacket(), Buffer.from([0xc0, 0x00]));
+  assert.deepStrictEqual(mq.disconnectPacket(), Buffer.from([0xe0, 0x00]));
+
+  // publishPacket com Buffer
+  const bufPkt = mq.publishPacket('topic', Buffer.from('payload'));
+  assert.ok(bufPkt.length > 0);
+
+  // encodeStr com null/vazio
+  assert.ok(mq.encodeStr(null).length >= 2);
+
+  // testBroker com tópico inválido que cai no fallback 'homeminerproxy'
+  const defTopicRes = await mq.testBroker(`mqtt://127.0.0.1:${port}`, '', '', '###invalido');
+  assert.strictEqual(defTopicRes.ok, true);
+
+  // statePayload com plug desligado e plug sem watts/volts
+  const offPlugsState = mq.statePayload({
+    energy: { plugs: [{ okAt: '2026-11-04', on: false, watts: null, volts: null }] },
+  });
+  assert.strictEqual(offPlugsState.plug_on, 'OFF');
+  assert.strictEqual(offPlugsState.plug_watts, null);
+  assert.strictEqual(offPlugsState.plug_volts, null);
+
+  // start() com snapshot lançando erro e com worker/plug sem nome
+  let throwOnce = true;
+  const snapThrowClient = mq.start({
+    url: `mqtt://127.0.0.1:${port}`,
+    snapshot: () => {
+      if (throwOnce) { throwOnce = false; throw new Error('erro no snapshot'); }
+      return {
+        farm: {
+          hasData: true,
+          workers: [{ name: '', state: 'ok' }, { name: 'w1', state: 'ok' }],
+        },
+        energy: {
+          plugs: [{ deviceId: 'eb123', name: '', okAt: '2026-11-04', on: false }],
+        },
+      };
+    },
+    everyMs: 60000,
+  });
+  t.after(() => snapThrowClient.stop());
+  await new Promise((r) => setTimeout(r, 60));
+  snapThrowClient.tick();
+  await waitUntil(() => received.some((p) => p.type === 'PUBLISH' && p.topic.includes('eb123')));
+  snapThrowClient.publish('manual/buffer', Buffer.from('test'));
+  snapThrowClient.stop();
 });

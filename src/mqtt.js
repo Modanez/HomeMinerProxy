@@ -323,7 +323,7 @@ function start(opts = {}) {
   function connect() {
     if (stopped) return;
     ready = false;
-    sock = (b.tls ? tls : net).connect({ host: b.host, port: b.port, timeout: 10000 }, () => {
+    sock = (b.tls ? tls : net).connect({ host: b.host, port: b.port, timeout: opts.timeoutMs || 10000 }, () => {
       sock.write(connectPacket({ user: b.user, pass: b.pass, willTopic: `${prefix}/availability`, willPayload: 'offline', willRetain: true }));
     });
     let buf = Buffer.alloc(0);
@@ -355,7 +355,7 @@ function start(opts = {}) {
 
   connect();
   const tTick = setInterval(tick, opts.everyMs || 30000);
-  const tPing = setInterval(() => send(pingPacket()), 25000);
+  const tPing = setInterval(() => send(pingPacket()), opts.pingMs || 25000);
   for (const t of [tTick, tPing]) { if (t.unref) t.unref(); timers.push(t); }
 
   return {
@@ -374,4 +374,4 @@ function start(opts = {}) {
   };
 }
 
-module.exports = { parseBroker, cleanTopic, encodeVarInt, encodeStr, connectPacket, publishPacket, discoveryConfigs, statePayload, testBroker, start };
+module.exports = { parseBroker, cleanTopic, encodeVarInt, encodeStr, connectPacket, publishPacket, pingPacket, disconnectPacket, discoveryConfigs, statePayload, testBroker, start };
