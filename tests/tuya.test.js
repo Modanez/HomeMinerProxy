@@ -51,11 +51,15 @@ test('parseStatus converte DPs padrão Tuya (switch_1, cur_power em dW, cur_volt
   assert.strictEqual(s1.kwhTotal, 1.25);
   assert.strictEqual(s1.switchCode, 'switch_1');
 
-  // DPs numéricos legados (1, 18, 19, 20, 17)
+  // DPs numéricos legados (1, 18, 19, 20, 17) e shadow v2.0 (properties)
   const s2 = tuya.parseStatus({ status: [{ code: '1', value: false }, { code: '19', value: 0 }, { code: '20', value: 1270 }] });
   assert.strictEqual(s2.on, false);
   assert.strictEqual(s2.watts, 0);
   assert.strictEqual(s2.volts, 127);
+
+  const s3 = tuya.parseStatus({ properties: [{ code: 'switch_1', value: true }, { code: 'cur_power', value: 650 }] });
+  assert.strictEqual(s3.on, true);
+  assert.strictEqual(s3.watts, 65);
 });
 
 test('createClient e testPlug conversam com servidor Tuya OpenAPI v1.0 (token, renovação 1010, leitura e comandos)', async (t) => {

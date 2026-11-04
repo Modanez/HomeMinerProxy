@@ -18,9 +18,11 @@ Mineradores solo caseiros costumam ligar seus ASICs (como o Bitaxe) ou ventilado
 
 Implementamos um cliente nativo **Tuya OpenAPI v1.0** sem dependências externas em [`src/tuya.js`](../../src/tuya.js) usando apenas os módulos nativos `https` e `crypto` do Node.js:
 
-1. **Assinatura HMAC-SHA256 (`signRequest`)**:
+1. **Assinatura HMAC-SHA256 (`signRequest`) e Descoberta Automática entre os 6 Data Centers**:
    - Implementa a assinatura oficial da Tuya OpenAPI v1.0 (`client_id + access_token + t + nonce + stringToSign`) com cache de token e renovação transparente quando o token expira (`code: 1010`).
-2. **Normalização dos DPs de Energia (`parseStatus`)**:
+   - Suporta todos os 6 Data Centers regionais da Tuya (`us`, `us-east`, `eu`, `eu-west`, `cn`, `in`) e testa automaticamente os demais endpoints caso a região escolhida retorne `sign invalid` (`1004`), `permission deny` (`1106`) ou `"data center is suspended"` (comum no plano Trial gratuito da Tuya, que permite apenas `1 / 1` Data Center ativo).
+2. **Normalização dos DPs de Energia (`parseStatus`) e Fallback de Rotas**:
+   - Consulta `/v1.0/iot-03/devices/{id}/status` com fallback automático para `/v1.0/devices/{id}/status`, `/v1.0/devices/{id}` e `/v2.0/cloud/thing/{id}/shadow/properties`.
    - Converte tanto os nomes padrão de tomadas Tuya (`switch_1`, `cur_power` em `0,1 W`, `cur_voltage` em `0,1 V`, `cur_current` em `mA`, `add_ele` em `0,001 kWh`) quanto os códigos numéricos legados (`1`, `19`, `20`, `18`, `17`).
 3. **Mascaramento de Segredo em `/config`**:
    - `TUYA_SECRET` é tratado como campo secreto em [`src/settings.js`](../../src/settings.js) (mascarado para os 4 últimos caracteres em `GET /api/config` e salvo com permissão `0600` em `settings.json`).

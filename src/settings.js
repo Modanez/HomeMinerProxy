@@ -31,7 +31,7 @@ const FIELDS = [
   { key: 'MQTT_USER', group: 'mqtt', type: 'mqttuser' },
   { key: 'MQTT_PASS', group: 'mqtt', type: 'secret' },
   { key: 'MQTT_TOPIC', group: 'mqtt', type: 'mqtttopic' },
-  { key: 'TUYA_REGION', group: 'tuya', type: 'select', options: ['', 'us', 'eu', 'cn', 'in'] },
+  { key: 'TUYA_REGION', group: 'tuya', type: 'select', options: ['', 'us', 'us-east', 'eu', 'eu-west', 'cn', 'in'] },
   { key: 'TUYA_CLIENT_ID', group: 'tuya', type: 'tuyaid' },
   { key: 'TUYA_SECRET', group: 'tuya', type: 'secret' },
   { key: 'TUYA_DEVICE_ID', group: 'tuya', type: 'tuyaid' },

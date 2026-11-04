@@ -18,9 +18,11 @@ Home solo miners frequently plug their ASIC miners (such as Bitaxe) or cooling f
 
 We implemented a native, zero-dependency **Tuya OpenAPI v1.0** client in [`src/tuya.js`](../../src/tuya.js) using Node's built-in `https` and `crypto` modules:
 
-1. **HMAC-SHA256 Request Signing (`signRequest`)**:
+1. **HMAC-SHA256 Request Signing (`signRequest`) & Automatic Multi-Datacenter Discovery**:
    - Implements the official Tuya OpenAPI v1.0 signature (`client_id + access_token + t + nonce + stringToSign`) with automatic token caching and transparent renewal on token expiration (`code: 1010`).
-2. **Standard DP Normalization (`parseStatus`)**:
+   - Supports all 6 Tuya regional Data Centers (`us`, `us-east`, `eu`, `eu-west`, `cn`, `in`) and automatically probes remaining regional endpoints if the configured region returns `sign invalid` (`1004`), `permission deny` (`1106`), or `"data center is suspended"` (common on Tuya Free Trial accounts limited to `1 / 1` active Data Center).
+2. **Standard DP Normalization (`parseStatus`) & Multi-Path Status Fallback**:
+   - Queries `/v1.0/iot-03/devices/{id}/status` with automatic fallback to `/v1.0/devices/{id}/status`, `/v1.0/devices/{id}`, and `/v2.0/cloud/thing/{id}/shadow/properties`.
    - Parses both standard Tuya Socket/Plug data points (`switch_1`, `cur_power` in `0.1 W`, `cur_voltage` in `0.1 V`, `cur_current` in `mA`, `add_ele` in `0.001 kWh`) and legacy numeric DPs (`1`, `19`, `20`, `18`, `17`).
 3. **Secret Masking in `/config`**:
    - `TUYA_SECRET` is treated as a secret field in [`src/settings.js`](../../src/settings.js) (masked to its last 4 characters on `GET /api/config`, stored with `0600` file permissions in `settings.json`).

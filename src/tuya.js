@@ -7,23 +7,26 @@ const https = require('https');
 const crypto = require('crypto');
 
 const ENDPOINTS = {
-  us: 'https://openapi.tuyaus.com',   // Américas (inclui Brasil)
-  eu: 'https://openapi.tuyaeu.com',   // Europa
-  cn: 'https://openapi.tuyacn.com',   // China
-  in: 'https://openapi.tuyain.com',   // Índia
+  us: 'https://openapi.tuyaus.com',        // Western America (padrão Brasil / Américas)
+  'us-east': 'https://openapi-ueaz.tuyaus.com', // Eastern America
+  eu: 'https://openapi.tuyaeu.com',        // Central Europe
+  'eu-west': 'https://openapi-weaz.tuyaeu.com', // Western Europe
+  cn: 'https://openapi.tuyacn.com',        // China
+  in: 'https://openapi.tuyain.com',        // Índia
 };
+const ALL_ENDPOINTS = Object.values(ENDPOINTS);
 
 const ID_RE = /^[a-zA-Z0-9_-]{8,64}$/;
 const SECRET_RE = /^[a-zA-Z0-9_-]{8,128}$/;
 
 function validConfig(cfg = {}) {
-  const clientId = String(cfg.clientId || '').trim();
-  const secret = String(cfg.secret || '').trim();
-  const deviceId = String(cfg.deviceId || '').trim();
+  const clientId = String(cfg.clientId || '').replace(/[\s"']/g, '');
+  const secret = String(cfg.secret || '').replace(/[\s"']/g, '');
+  const deviceId = String(cfg.deviceId || '').replace(/[\s"']/g, '');
   const region = String(cfg.region || 'us').trim() || 'us';
   if (!ID_RE.test(clientId) || !SECRET_RE.test(secret) || !ID_RE.test(deviceId)) return null;
   if (!ENDPOINTS[region] && !cfg.apiBase) return null;
-  return { clientId, secret, deviceId, region, baseUrl: cfg.apiBase || ENDPOINTS[region] };
+  return { clientId, secret, deviceId, region, baseUrl: cfg.apiBase || ENDPOINTS[region], customBase: !!cfg.apiBase };
 }
 
 // Assinatura HMAC-SHA256 oficial da Tuya OpenAPI v1.0.
@@ -36,7 +39,9 @@ function signRequest({ clientId, secret, accessToken = '', method = 'GET', pathW
 
 // Converte a lista de DPs da Tuya (ex.: switch_1, cur_power, cur_voltage, cur_current) em objeto padronizado.
 function parseStatus(raw) {
-  const list = Array.isArray(raw) ? raw : (raw && Array.isArray(raw.status) ? raw.status : null);
+  const list = Array.isArray(raw)
+    ? raw
+    : (raw && Array.isArray(raw.status) ? raw.status : (raw && Array.isArray(raw.properties) ? raw.properties : null));
   const map = {};
   if (list) {
     for (const item of list) {
@@ -97,25 +102,38 @@ function createClient(opts = {}) {
   if (!cfg) return null;
   let token = null, expireAt = 0, lastSwitchCode = 'switch_1';
 
-  async function ensureToken(force = false) {
-    if (!force && token && Date.now() < expireAt) return { ok: true, token };
+  async function fetchTokenOn(base) {
+    const pathWithQuery = '/v1.0/token?grant_type=1';
     const timestamp = String(Date.now());
     const nonce = crypto.randomBytes(8).toString('hex');
-    const pathWithQuery = '/v1.0/token?grant_type=1';
     const sign = signRequest({ clientId: cfg.clientId, secret: cfg.secret, method: 'GET', pathWithQuery, timestamp, nonce });
-    const r = await rawRequest(cfg.baseUrl, 'GET', pathWithQuery, {
+    const r = await rawRequest(base, 'GET', pathWithQuery, {
       client_id: cfg.clientId, sign, t: timestamp, sign_method: 'HMAC-SHA256', nonce,
     });
-    if (!r.ok || !r.result || !r.result.access_token) {
-      return { ok: false, error: r.error || 'tuyaauth' };
+    if (r.ok && r.result && r.result.access_token) {
+      cfg.baseUrl = base;
+      token = r.result.access_token;
+      const expSec = Number(r.result.expire_time) || 7200;
+      expireAt = Date.now() + Math.max(60, expSec - 120) * 1000;
+      return { ok: true, token };
     }
-    token = r.result.access_token;
-    const expSec = Number(r.result.expire_time) || 7200;
-    expireAt = Date.now() + Math.max(60, expSec - 120) * 1000;
-    return { ok: true, token };
+    return { ok: false, code: r.code, error: r.error || 'tuyaauth' };
   }
 
-  async function signedCall(method, pathWithQuery, bodyObj = null, retried = false) {
+  async function ensureToken(force = false) {
+    if (!force && token && Date.now() < expireAt) return { ok: true, token };
+    const candidates = cfg.customBase ? [cfg.baseUrl] : [cfg.baseUrl, ...ALL_ENDPOINTS.filter((u) => u !== cfg.baseUrl)];
+    let lastErr = null;
+    for (const base of candidates) {
+      const r = await fetchTokenOn(base);
+      if (r.ok) return r;
+      lastErr = r;
+      if (r.code !== 1004 && !/suspended/i.test(String(r.error || ''))) break;
+    }
+    return { ok: false, error: (lastErr && lastErr.error) || 'tuyaauth' };
+  }
+
+  async function callOnCurrentBase(method, pathWithQuery, bodyObj = null, retried = false) {
     const tk = await ensureToken(retried);
     if (!tk.ok) return tk;
     const body = bodyObj ? JSON.stringify(bodyObj) : '';
@@ -130,14 +148,42 @@ function createClient(opts = {}) {
     }, body);
     if (!r.ok && r.code === 1010 && !retried) {
       token = null;
-      return signedCall(method, pathWithQuery, bodyObj, true);
+      return callOnCurrentBase(method, pathWithQuery, bodyObj, true);
     }
     return r;
   }
 
+  async function signedCall(method, pathWithQuery, bodyObj = null) {
+    const first = await callOnCurrentBase(method, pathWithQuery, bodyObj, false);
+    if (first.ok || cfg.customBase) return first;
+    // Se o datacenter atual estiver suspenso ou não tiver o dispositivo/projeto, tenta os outros datacenters da Tuya
+    if (/suspended|permission|sign invalid/i.test(String(first.error || '')) || first.code === 1004 || first.code === 1106 || first.code === 28841105) {
+      const others = ALL_ENDPOINTS.filter((u) => u !== cfg.baseUrl);
+      for (const base of others) {
+        const tk = await fetchTokenOn(base);
+        if (!tk.ok) continue;
+        const r = await callOnCurrentBase(method, pathWithQuery, bodyObj, false);
+        if (r.ok) return r;
+      }
+    }
+    return first;
+  }
+
   async function getStatus() {
-    const r = await signedCall('GET', `/v1.0/iot-03/devices/${encodeURIComponent(cfg.deviceId)}/status`);
-    if (!r.ok) return r;
+    const id = encodeURIComponent(cfg.deviceId);
+    const paths = [
+      `/v1.0/iot-03/devices/${id}/status`,
+      `/v1.0/devices/${id}/status`,
+      `/v1.0/devices/${id}`,
+      `/v2.0/cloud/thing/${id}/shadow/properties`,
+    ];
+    let r = null;
+    for (const p of paths) {
+      const attempt = await signedCall('GET', p);
+      if (attempt.ok) { r = attempt; break; }
+      if (!r) r = attempt;
+    }
+    if (!r || !r.ok) return r || { ok: false, error: 'tuyaauth' };
     const status = parseStatus(r.result);
     if (status.switchCode && status.switchCode !== '1') lastSwitchCode = status.switchCode;
     return { ok: true, status: { on: status.on, watts: status.watts, volts: status.volts, currentMa: status.currentMa, kwhTotal: status.kwhTotal, updatedAt: new Date().toISOString() } };
