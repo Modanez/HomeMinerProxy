@@ -5,3 +5,8 @@ docs
 extras
 *.env
 *.md
+.venv
+.coverage
+htmlcov
+coverage
+requirements-dev.txt

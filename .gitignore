@@ -8,6 +8,14 @@ records.json
 history.json
 diffhist.json
 cubo-state.json
+achievements.json
+settings.json
+# ambiente de testes e relatórios de cobertura
+.venv/
+.coverage
+.coverage.*
+htmlcov/
+coverage/
 # configuração local (o modelo é config/mineracao.env.example)
 *.env
 !config/*.env.example
