@@ -185,6 +185,10 @@ test('página nos dois idiomas, sem PIN só leitura, script válido', () => {
   const pt = st.page('pt', true), en = st.page('en', true);
   assert.match(pt, /Configurações[\s\S]*Consumo por worker[\s\S]*new_worker_watts[\s\S]*new_worker_hr[\s\S]*Backup e restauração[\s\S]*Salvar e reiniciar/);
   assert.match(en, /Settings[\s\S]*Power per worker[\s\S]*new_worker_watts[\s\S]*new_worker_hr[\s\S]*Backup and restore[\s\S]*Save and restart/);
+  for (const tab of ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'backup']) {
+    assert.match(pt, new RegExp(`data-tab="${tab}"`));
+    assert.match(pt, new RegExp(`data-pane="${tab}"`));
+  }
   assert.doesNotMatch(st.page('pt', false), /id="save"/);
   assert.match(st.page('pt', false), /SETTINGS_PIN/);
   for (const html of [pt, en]) {

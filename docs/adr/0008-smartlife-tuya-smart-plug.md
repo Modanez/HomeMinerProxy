@@ -31,3 +31,4 @@ We implemented a native, zero-dependency **Tuya OpenAPI v1.0** client in [`src/t
 
 - **Positive:** Works out-of-the-box with any SmartLife / Tuya energy-monitoring plug using a free Tuya IoT Platform account, with zero npm dependencies, full `/config` test button support, and seamless transition from monitoring a fan today to measuring/rebooting a Bitaxe tomorrow.
 - **Negative / Trade-offs:** Relies on Tuya Cloud OpenAPI (requires internet connectivity to `openapi.tuyaus.com` / `tuyaeu.com`, which the dashboard already uses for Bitcoin network/price APIs).
+

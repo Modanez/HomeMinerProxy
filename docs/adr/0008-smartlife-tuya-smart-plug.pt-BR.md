@@ -31,3 +31,4 @@ Implementamos um cliente nativo **Tuya OpenAPI v1.0** sem dependências externas
 
 - **Positivas:** Funciona direto com qualquer tomada SmartLife / Tuya com medidor de energia usando uma conta gratuita na Tuya IoT Platform, sem nenhuma dependência npm, com botão "Testar tomada" em `/config` e transição imediata entre apenas monitorar um ventilador hoje ou medir/reiniciar o Bitaxe quando ele chegar.
 - **Negativas / Trade-offs:** Depende da Tuya Cloud OpenAPI (exige acesso HTTPS de saída para `openapi.tuyaus.com` / `tuyaeu.com`, o que o painel já utiliza para consultar a rede Bitcoin e a cotação).
+

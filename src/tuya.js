@@ -168,3 +168,4 @@ async function testPlug(opts = {}) {
 }
 
 module.exports = { ENDPOINTS, ID_RE, SECRET_RE, validConfig, signRequest, parseStatus, createClient, testPlug };
+

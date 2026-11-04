@@ -424,6 +424,7 @@ const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
     groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomada Inteligente SmartLife / Tuya', backup: 'Backup e restauração' },
+    tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', backup: '💾 Backup' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
@@ -468,6 +469,7 @@ const T = {
   en: {
     title: 'Settings', back: '← Back to the dashboard',
     groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'SmartLife / Tuya Smart Plug', backup: 'Backup and restore' },
+    tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', backup: '💾 Backup' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
@@ -548,10 +550,14 @@ function page(lang, hasPin) {
       : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>`
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>` : '';
-    return `<div class="f" data-key="${f.key}"><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
+    const half = ['LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TUYA_REGION', 'TUYA_WORKER', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    return `<div class="f${half}" data-key="${f.key}"><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };
-  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => `<fieldset><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
-  const backupGroup = `<fieldset><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
+  const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'backup'];
+  const tabBar = `<nav class="tabs" id="tabs">` + tabOrder.map((g, i) =>
+    `<button type="button" class="tab${i === 0 ? ' active' : ''}" data-tab="${g}"><span>${S.tabs[g]}</span><i class="tdot"></i></button>`).join('') + `</nav>`;
+  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => `<fieldset class="tab-pane${g === 'farm' ? ' active' : ''}" data-pane="${g}"><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const backupGroup = `<fieldset class="tab-pane" data-pane="backup"><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
     `<div class="bbar"><button type="button" class="ghost" data-backup="export">${htmlEsc(S.backupDown)}</button>` +
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
     `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div></fieldset>`;
@@ -567,12 +573,29 @@ function page(lang, hasPin) {
 <style>
   :root { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --ok:#3ecf8e; --warn:#e5534b; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:16px; max-width:760px; margin:0 auto; }
-  h1 { font-size:22px; margin:6px 0 14px; } h1 a { color:var(--dim); font-size:13px; font-weight:400; text-decoration:none; display:block; margin-bottom:8px; }
-  fieldset { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px 6px; margin-bottom:14px; }
-  legend { color:var(--gold); font-size:12px; letter-spacing:.08em; text-transform:uppercase; padding:0 6px; }
-  .f { margin-bottom:14px; } .f > label { display:block; font-size:14px; margin-bottom:5px; font-weight:600; }
+  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:18px 16px 32px; max-width:840px; margin:0 auto; }
+  .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 0 14px; flex-wrap:wrap; }
+  h1 { font-size:22px; font-weight:700; display:flex; align-items:center; gap:8px; }
+  .back { color:var(--dim); font-size:13px; font-weight:500; text-decoration:none; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); transition:border-color .15s, color .15s; }
+  .back:hover { color:var(--gold); border-color:var(--gold); }
+  .tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; scrollbar-width:thin; }
+  .tab { background:var(--card); color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:9px 13px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; transition:all .15s; }
+  .tab:hover { color:var(--txt); border-color:#384256; }
+  .tab.active { color:var(--gold); border-color:var(--gold); background:rgba(242,169,0,.09); }
+  .tdot { width:7px; height:7px; border-radius:50%; display:none; }
+  .tab.on .tdot { display:inline-block; background:var(--ok); box-shadow:0 0 6px rgba(62,207,142,.6); }
+  .tab.err { border-color:var(--warn); color:var(--warn); }
+  .tab.err .tdot { display:inline-block; background:var(--warn); box-shadow:0 0 6px rgba(229,83,75,.8); }
+  fieldset { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 18px 10px; margin-bottom:14px; }
+  fieldset.tab-pane { display:none; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px 16px; }
+  fieldset.tab-pane.active { display:grid; }
+  legend { color:var(--gold); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:0 6px; }
+  .f { grid-column:1 / -1; margin-bottom:2px; }
+  .f.half { grid-column:span 1; }
+  @media (max-width:580px) { .f.half { grid-column:1 / -1; } }
+  .f > label { display:block; font-size:14px; margin-bottom:5px; font-weight:600; }
   input:not([type=checkbox]), select { width:100%; max-width:100%; background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:9px 10px; font-size:15px; font-family:inherit; }
+  input:not([type=checkbox]):focus, select:focus { outline:none; border-color:var(--gold); }
   input[name=BTC_ADDRESS], input[type=password] { font-family:ui-monospace, Menlo, monospace; font-size:13px; }
   .f.bad input, .f.bad select { border-color:var(--warn); }
   .hint { color:var(--dim); font-size:12px; margin-top:5px; line-height:1.4; } .ferr { color:var(--warn); font-size:12px; margin-top:3px; }
@@ -590,21 +613,23 @@ function page(lang, hasPin) {
   .addw .addw-hr { width:125px; padding:7px 8px; font-size:14px; text-align:right; }
   .addw .addw-u { width:78px; padding:7px 4px; font-size:13px; }
   .addw button { margin:0; white-space:nowrap; }
-  .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
+  .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
   button { background:var(--gold); color:#111; border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
   button:disabled { opacity:.5; cursor:default; }
+  .pin-card { position:sticky; bottom:10px; z-index:10; box-shadow:0 8px 28px rgba(0,0,0,.55); padding-bottom:14px; }
   .bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; } .bar .f { flex:1; min-width:160px; margin:0; }
-  #msg { margin-top:12px; font-size:14px; min-height:20px; } #msg.ok { color:var(--ok); } #msg.bad { color:var(--warn); }
+  #msg { margin-top:10px; font-size:14px; min-height:20px; } #msg.ok { color:var(--ok); } #msg.bad { color:var(--warn); }
   [hidden] { display:none !important; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
 </style></head><body>
-<h1><a href="/">${S.back}</a>⚙️ ${S.title}</h1>
+<div class="top"><h1>⚙️ ${S.title}</h1><a class="back" href="/">${S.back}</a></div>
 <form id="form" autocomplete="off">
+${tabBar}
 ${fieldGroups}
 ${backupGroup}
-<fieldset><legend>${S.pin}</legend>
+<fieldset class="pin-card"><legend>${S.pin}</legend>
 ${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
 <div id="msg"></div>
 </fieldset>
@@ -615,7 +640,34 @@ const UNITS = [['', 'H/s', 1], ['k', 'kH/s', 1e3], ['M', 'MH/s', 1e6], ['G', 'GH
 const form = document.getElementById('form'), msg = document.getElementById('msg');
 const say = (t, ok) => { msg.textContent = t; msg.className = ok ? 'ok' : 'bad'; };
 const el = (n) => form.elements[n];
-let workers = [], stateValues = { ALARM_IGNORE: [], WATTS: {}, EXPECTED: {} };
+let workers = [], stateValues = { ALARM_IGNORE: [], WATTS: {}, EXPECTED: {} }, secretSet = {};
+
+function selectTab(id) {
+  if (!form.querySelector('.tab-pane[data-pane="' + id + '"]')) return;
+  for (const b of form.querySelectorAll('.tab[data-tab]')) b.classList.toggle('active', b.dataset.tab === id);
+  for (const p of form.querySelectorAll('.tab-pane[data-pane]')) p.classList.toggle('active', p.dataset.pane === id);
+  if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', '#' + id);
+}
+for (const b of form.querySelectorAll('.tab[data-tab]')) {
+  b.addEventListener('click', () => selectTab(b.dataset.tab));
+}
+if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.slice(1));
+
+function updateTabDots() {
+  const hasVal = (k) => Boolean((el(k) && el(k).value && el(k).value.trim()) || secretSet[k]);
+  const activeMap = {
+    farm: hasVal('BTC_ADDRESS'),
+    miners: workers.length > 0,
+    cube: hasVal('CUBE_IP'),
+    telegram: hasVal('TELEGRAM_CHAT_ID') || hasVal('TELEGRAM_BOT_TOKEN'),
+    mqtt: hasVal('MQTT_URL'),
+    tuya: hasVal('TUYA_DEVICE_ID') && hasVal('TUYA_CLIENT_ID'),
+  };
+  for (const b of form.querySelectorAll('.tab[data-tab]')) {
+    b.classList.toggle('on', !!activeMap[b.dataset.tab]);
+  }
+}
+form.addEventListener('input', updateTabDots);
 
 function splitHr(n) {
   if (n === undefined || n === null || n === '') return ['', 'M'];
@@ -725,10 +777,11 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
     if (k === 'ALARM_IGNORE' || k === 'WATTS' || k === 'EXPECTED') continue;
     const e = el(k); if (!e) continue;
     if (e.type === 'checkbox') e.checked = !!v;
-    else if (e.type === 'password') { document.getElementById(k + '_state').textContent = v.set ? M.tokenSet.replace('%s', v.tail) : ''; document.getElementById(k + '_clearbox').hidden = !v.set; }
+    else if (e.type === 'password') { secretSet[k] = !!(v && v.set); document.getElementById(k + '_state').textContent = v.set ? M.tokenSet.replace('%s', v.tail) : ''; document.getElementById(k + '_clearbox').hidden = !v.set; }
     else if (e.tagName === 'SELECT' && v && ![...e.options].some((o) => o.value === v)) { e.add(new Option(v, v)); e.value = v; }
     else e.value = v;
   }
+  updateTabDots();
 });
 
 const addBtn = document.getElementById('add_worker_btn'), addInp = document.getElementById('new_worker');
@@ -745,6 +798,7 @@ if (addBtn && addInp) {
     if (hrVal !== '') stateValues.EXPECTED[n] = hrVal === '0' ? '0' : hrVal + uVal;
     if (!workers.includes(n)) { workers.push(n); workers.sort((a, b) => a.localeCompare(b)); }
     renderWorkerControls();
+    updateTabDots();
     addInp.value = '';
     if (addWInp) addWInp.value = '';
     if (addHrInp) addHrInp.value = '';
@@ -792,7 +846,21 @@ function values() {
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
 const pin = () => (el('pin') || {}).value || '';
 function showErrors(errs) {
-  for (const f of form.querySelectorAll('.f[data-key]')) { const e = errs[f.dataset.key]; f.classList.toggle('bad', !!e); f.querySelector('.ferr').textContent = e ? M.err[e] || e : ''; }
+  let firstErrPane = null;
+  for (const f of form.querySelectorAll('.f[data-key]')) {
+    const e = errs[f.dataset.key];
+    f.classList.toggle('bad', !!e);
+    f.querySelector('.ferr').textContent = e ? M.err[e] || e : '';
+    if (e && !firstErrPane) {
+      const pane = f.closest('.tab-pane[data-pane]');
+      if (pane) firstErrPane = pane.dataset.pane;
+    }
+  }
+  for (const b of form.querySelectorAll('.tab[data-tab]')) {
+    const pane = form.querySelector('.tab-pane[data-pane="' + b.dataset.tab + '"]');
+    b.classList.toggle('err', !!(pane && pane.querySelector('.f.bad')));
+  }
+  if (firstErrPane) selectTab(firstErrPane);
 }
 async function waitRestartAndGo(message) {
   say(message, true);

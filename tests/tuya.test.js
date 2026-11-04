@@ -144,3 +144,4 @@ test('createClient e testPlug conversam com servidor Tuya OpenAPI v1.0 (token, r
   assert.strictEqual(switchOn, true);
   assert.strictEqual(commandsSent.length, 3); // false, false, true
 });
+
