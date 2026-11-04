@@ -112,6 +112,15 @@ test('proxy repassa, mede e conta os shares', async (t) => {
   assert.strictEqual(s.recent[0].ok, false);
   assert.strictEqual(s.recent[0].error, 'Difficulty too low');
   assert.strictEqual(s.recent[1].target, TARGET);
+  // rejeição com código 23 é "inválido": não conta como stale nem duplicado
+  assert.strictEqual(w.stale, 0);
+  assert.strictEqual(w.duplicate, 0);
+  assert.ok(w.hashrate24h > 0 && w.hashrate15m > 0);
+  assert.ok(!('bins' in w));
+  assert.ok(s.totals.hashrate.h24 > 0 && s.totals.hashrate.m15 > 0);
+  assert.strictEqual(w.ip, '127.0.0.1');
+  assert.strictEqual(s.totals.efficiency, 50);
+  assert.ok(s.events.some((e) => e.type === 'worker_up' && e.worker === 'vovo'));
 });
 
 test('rotas padrão: todas as pools, portas sem repetição', async (t) => {

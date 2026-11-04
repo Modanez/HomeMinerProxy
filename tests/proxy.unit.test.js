@@ -127,3 +127,32 @@ test('eventos são gravados e recarregados do arquivo de estatísticas', () => {
   const out = run("const p=require('./src/proxy');console.log(p._state().events[0].msg);process.exit(0)");
   assert.strictEqual(out.trim(), 'persist-me is back');
 });
+
+test('rejectKind: classifica stale, duplicado e inválido', () => {
+  assert.strictEqual(proxy.rejectKind([21, 'Job not found', null]), 'stale');
+  assert.strictEqual(proxy.rejectKind([22, 'Duplicate share', null]), 'duplicate');
+  assert.strictEqual(proxy.rejectKind([23, 'Low difficulty share', null]), 'invalid');
+  assert.strictEqual(proxy.rejectKind({ code: 21, message: 'x' }), 'stale');
+  assert.strictEqual(proxy.rejectKind({ message: 'stale share' }), 'stale');
+  assert.strictEqual(proxy.rejectKind(null), 'invalid');
+});
+
+test('addBin e hashrateOver: médias de 15 min, 1 h e 24 h', () => {
+  const now = Date.now();
+  const w = { window: [[now - 60e3, 1], [now - 20 * 60e3, 1]], connectedSince: now - 3 * 3600e3, bins: [] };
+  assert.strictEqual(proxy.hashrateOver({ window: [], bins: [] }, 24 * 3600e3), 0);
+  // 15 min: só o share de 1 min atrás; janela mínima de 60 s
+  const r15 = proxy.hashrateOver(w, 15 * 60e3);
+  assert.ok(r15 > 0);
+  assert.ok(proxy.hashrateOver(w, 3600e3) > 0);
+  assert.ok(proxy.hashrateOver(w, 3600e3) < r15 * 2.01);   // 2 shares num span maior
+  // 24 h: baldes de 5 min, soma de balde repetido e descarte de balde com mais de 24 h
+  proxy.addBin(w, now - 2 * 3600e3, 2);
+  proxy.addBin(w, now - 2 * 3600e3 + 1000, 2);
+  assert.strictEqual(w.bins.length, 1);
+  assert.strictEqual(w.bins[0][1], 4);
+  w.bins.unshift([now - 25 * 3600e3, 9]);
+  proxy.addBin(w, now, 1);
+  assert.ok(!w.bins.some(([t]) => t < now - 24 * 3600e3));
+  assert.ok(proxy.hashrateOver(w, 24 * 3600e3) > 0);
+});

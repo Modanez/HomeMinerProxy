@@ -267,7 +267,7 @@ function workersView() {
     const pw = proxy.workers[name];       // último share visto pelo proxy (fica mesmo depois de desconectar)
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
     const pxw = proxied.get(name);
-    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null } : {};
+    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0 } : {};
     return { ...k, name, hashRate, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx };
   }).sort((a, b) => b.hashRate - a.hashRate);
 }
@@ -789,6 +789,7 @@ function snapshot(internal = false) {
       best,
       difficulty: pool.difficulty,
       hashrate: farmHashrate(view),
+      hashrateAvg: proxyUp() && proxy.totals ? proxy.totals.hashrate || null : null,
       workers: view,
       accounting: client.accounting || {},
       shares: proxyUp() && proxy.totals
@@ -1082,7 +1083,7 @@ const PAGE = `<!doctype html>
   <h2 class="sect">Fazenda</h2>
   <div class="grid">
     <div class="card"><div class="label">Recorde (Best Difficulty)</div><div class="big gold" id="best">–</div><div class="sub" id="dist">–</div></div>
-    <div class="card"><div class="label">Hashrate da fazenda</div><div class="big" id="hash">–</div><div class="sub" id="workers">–</div></div>
+    <div class="card"><div class="label">Hashrate da fazenda</div><div class="big" id="hash">–</div><div class="sub" id="hashavg"></div><div class="sub" id="workers">–</div></div>
     <div class="card"><div class="label">Chance de bloco por ano</div><div class="big" id="odds">–</div><div class="sub" id="eta">–</div></div>
     <div class="card"><div class="label">Shares hoje</div><div class="big" id="shares">–</div><div class="sub" id="lasth">–</div></div>
   </div>
@@ -1418,6 +1419,8 @@ function renderFarm(j) {
   set('best', nf(f.best, 2));
   set('dist', f.best > 0 ? 'faltam ' + fmtBig(D / f.best) + ' de vezes' : '–');
   set('hash', fmtHash(f.hashrate));
+  const av = f.hashrateAvg;
+  set('hashavg', av ? '15 min ' + fmtHash(av.m15) + ' · 1 h ' + fmtHash(av.h1) + ' · 24 h ' + fmtHash(av.h24) : '');
   const inactive = f.workers.filter((w) => w.inactive).length;
   const visible = f.workers.filter((w) => showInactive || !w.inactive);
   const count = (st) => visible.filter((w) => w.state === st).length;
@@ -1454,8 +1457,9 @@ function renderFarm(j) {
     const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + '</span>' : '';
     const det = [w.ip, w.shareDiff ? 'diff ' + nf(w.shareDiff, 0) : null].filter(Boolean).join(' · ');
     const netInfo = det ? ' <span class="sub" title="extranonce1: ' + esc(w.extranonce1 || '–') + '">' + esc(det) + '</span>' : '';
+    const rej = w.rejected > 0 ? ' <span class="sub" title="recusados pela pool: stale = job vencido, duplicado = share repetido">✗ ' + w.rejected + ' (stale ' + (w.stale || 0) + ' · duplicado ' + (w.duplicate || 0) + ')</span>' : '';
     const trophy = j.championship && j.championship.leader && j.championship.leader.name === w.name ? ' 🏆' : '';
-    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + netInfo + temp +
+    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + netInfo + rej + temp +
       '</td><td' + dim + '>' + hr + '</td><td>' + best +
       '</td><td' + dim + '>' + seen + '</td></tr>';
   }).join('') : '<tr><td colspan="4" class="sub">nenhum worker enviou shares ainda</td></tr>';

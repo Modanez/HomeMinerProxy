@@ -224,6 +224,8 @@ const EN = [
   ["'Eficiência: '", "'Efficiency: '"],
   ["' sessão(ões)'", "' session(s)'"],
   ['<li>nenhum evento ainda</li>', '<li>no events yet</li>'],
+  ['recusados pela pool: stale = job vencido, duplicado = share repetido', 'rejected by the pool: stale = expired job, duplicate = repeated share'],
+  ["' · duplicado '", "' · duplicate '"],
   ['Eventos recentes</summary>', 'Recent events</summary>'],
   ["' no ar · '", "' up · '"],
   ["' · fila '", "' · queue '"],

@@ -119,6 +119,39 @@ function hashrate(w) {
   return work / (Math.min(span, HASHRATE_WINDOW_MS) / 1000);
 }
 
+// Médias de hashrate: 15 min e 1 h saem da janela de shares; 24 h sai de baldes de 5 min (guardados no arquivo)
+const BIN_MS = 5 * 60e3, DAY_MS = 24 * 3600e3;
+function addBin(w, at, target) {
+  const t = Math.floor(at / BIN_MS) * BIN_MS;
+  const bins = w.bins || (w.bins = []);
+  const last = bins[bins.length - 1];
+  if (last && last[0] === t) last[1] += target; else bins.push([t, target]);
+  const cut = Date.now() - DAY_MS;
+  while (bins.length && bins[0][0] < cut) bins.shift();
+}
+function hashrateOver(w, ms) {
+  const now = Date.now();
+  if (ms >= DAY_MS) {
+    const bins = (w.bins || []).filter(([t]) => now - t <= ms);
+    if (!bins.length) return 0;
+    const work = bins.reduce((n, [, d]) => n + d, 0) * 4294967296;
+    return work / (Math.min(Math.max(now - bins[0][0], BIN_MS), ms) / 1000);
+  }
+  const win = (w.window || []).filter(([t]) => now - t <= ms);
+  if (!win.length) return 0;
+  const work = win.reduce((n, [, d]) => n + d, 0) * 4294967296;
+  const span = Math.max(now - Math.min(w.connectedSince || now, win[0][0]), 60e3);
+  return work / (Math.min(span, ms) / 1000);
+}
+// Motivo da rejeição: 21 job não encontrado/stale, 22 duplicado, resto (23 dificuldade baixa, 24 não autorizado...) = inválido
+function rejectKind(err) {
+  const code = Array.isArray(err) ? Number(err[0]) : err && Number(err.code);
+  const text = Array.isArray(err) ? String(err[1] || '') : String((err && err.message) || err || '');
+  if (code === 21 || /stale|job not found/i.test(text)) return 'stale';
+  if (code === 22 || /duplicate/i.test(text)) return 'duplicate';
+  return 'invalid';
+}
+
 const { shareDifficulty, pingScore } = require('./stratum');
 
 // ---------------------------------------------------------------- saúde das pools (failover)
@@ -305,6 +338,7 @@ function session(down, route) {
             w.lastShareAt = p.at;
             w.lastShareDiff = p.diff;
             w.window.push([p.at, p.target]);
+            addBin(w, p.at, p.target);
             if (p.diff > w.bestSession) w.bestSession = p.diff;
             if (p.diff > w.bestEver) w.bestEver = p.diff;
             if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
@@ -324,6 +358,8 @@ function session(down, route) {
             noteBestHash(w.name, p);
           } else {
             w.rejected++;
+            const kind = rejectKind(m.error);
+            if (kind !== 'invalid') w[kind] = (w[kind] || 0) + 1;
             entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
             w.lastReject = { at: p.at, error: entry.error };
             addEvent('reject', `${w.name}: share rejected (${entry.error})`, { worker: w.name });
@@ -380,7 +416,8 @@ function startServers() {
     const list = Object.values(workers).map((w) => {
       const { window, ...rest } = w;
       const hr = hashrate(w);   // poda a janela antes de contar
-      return { ...rest, hashrate: hr, shares1h: w.window.length };
+      const { bins, ...slim } = rest;
+      return { ...slim, hashrate: hr, shares1h: w.window.length, hashrate15m: hashrateOver(w, 15 * 60e3), hashrate24h: hashrateOver(w, DAY_MS), stale: w.stale || 0, duplicate: w.duplicate || 0 };
     });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
@@ -411,6 +448,7 @@ function startServers() {
       pingMs: avgPing,
       pingScore: pingSummary.score,
       efficiency: efficiency(),
+      hashrate: { m15: list.reduce((n, w) => n + w.hashrate15m, 0), h1: list.reduce((n, w) => n + w.hashrate, 0), h24: list.reduce((n, w) => n + w.hashrate24h, 0) },
     };
     res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist }));
   }).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
@@ -432,6 +470,9 @@ module.exports = {
   rollWeek,
   worker,
   hashrate,
+  hashrateOver,
+  rejectKind,
+  addBin,
   safeJson,
   saveStats,
   session,
