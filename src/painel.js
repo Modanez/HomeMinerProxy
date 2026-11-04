@@ -28,6 +28,8 @@ if (!ADDRESS) {
 }
 const LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
 const ROTATE_S = Number(process.env.ROTATE_S || 20);
+// Mostrar saldo e movimentação da carteira no painel (0 esconde; os avisos do Telegram continuam)
+const SHOW_WALLET = process.env.SHOW_WALLET !== '0';
 // Preço do kWh na moeda CURRENCY. POWER_PRICE_KWH (ou o nome antigo TARIFA_KWH); padrão: R$ 0,90 ou US$ 0,15.
 const TARIFA_KWH = Number(process.env.POWER_PRICE_KWH || process.env.TARIFA_KWH || (CURRENCY === 'BRL' ? 0.9 : 0.15));
 const WATTS = Object.assign({}, safeJson(process.env.WATTS));   // consumo por worker, ex.: '{"bitaxe":20,"nerdminer":1}'
@@ -633,7 +635,8 @@ function energy(view) {
 }
 
 // ---------------------------------------------------------------- resposta da API
-function snapshot() {
+// internal = uso do próprio servidor (bot do Telegram): inclui a carteira mesmo quando a tela a esconde
+function snapshot(internal = false) {
   const view = workersView();
   const client = pool.client || {};
   const best = Math.max(Number(client.bestDifficulty || 0), topRecord());
@@ -649,7 +652,7 @@ function snapshot() {
     boot: BOOT,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
-    ocean: OCEAN_API ? { ...ocean } : null,
+    ocean: OCEAN_API ? { ...ocean, ...(SHOW_WALLET || internal ? {} : { unpaidSats: null }) } : null,
     proxy: PROXY_URL ? { okAt: proxy.okAt, error: proxy.error, up: proxyUp(), recent: proxy.recent.slice(0, 10), failover: proxyUp() ? proxy.failover || [] : [] } : null,
     error: pool.error,
     staleWarnMs: STALE_WARN_MS,
@@ -667,7 +670,10 @@ function snapshot() {
       lastShare: proxyUp() ? proxy.recent.find((r) => r.ok) || null : null,
       poolHashrate: Number((client.accounting || {}).hashRateLastHour) || 0,
     },
-    wallet: { ...wallet, fiat: CURRENCY === 'USD' ? wallet.usd : wallet.brl, fiatChange24h: CURRENCY === 'USD' ? wallet.changeUsd24h : wallet.change24h },
+    wallet: SHOW_WALLET || internal
+      ? { ...wallet, hidden: false, fiat: CURRENCY === 'USD' ? wallet.usd : wallet.brl, fiatChange24h: CURRENCY === 'USD' ? wallet.changeUsd24h : wallet.change24h }
+      // escondida: só a cotação (usada no prêmio e na rede), nada de saldo ou transações
+      : { hidden: true, sats: null, fiat: CURRENCY === 'USD' ? wallet.usd : wallet.brl, fiatChange24h: CURRENCY === 'USD' ? wallet.changeUsd24h : wallet.change24h },
     net: { ...net, halving },
     timeMachine: timeMachine(best),
     nearBlock: {
@@ -819,6 +825,7 @@ const PAGE = `<!doctype html>
   .bar i { display:block; height:100%; background:var(--gold); }
   .wallet { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:12px; margin-top:12px; }
   .wallet .big { font-size:30px; overflow-wrap:anywhere; }
+  .card.wallet[hidden] { display:none; }
   .duo { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
   .hexcard { margin-bottom:12px; }
   table.luck td, table.luck th { padding:6px 6px; }
@@ -1306,6 +1313,8 @@ function fitBig() {
 
 function renderWallet(w) {
   if (!w) return;
+  document.querySelector('.card.wallet').hidden = !!w.hidden;
+  if (w.hidden) return set('werr', '');
   set('werr', w.error && w.sats === null ? 'Saldo indisponível: ' + w.error : '');
   if (w.sats === null) return;
   const btc = w.sats / 1e8;
@@ -1948,7 +1957,7 @@ function startTelegram() {
     token,
     chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
     lang: LANGUAGE || 'en',
-    snapshot,
+    snapshot: () => snapshot(true),
     quiet: quietNow,
     ignore: ALARM_IGNORE,
     personal: process.env.TELEGRAM_PERSONAL === '1',

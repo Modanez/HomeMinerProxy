@@ -70,10 +70,12 @@ test('só o que mudou vai para o settings.json, por cima do .env', () => {
   assert.deepStrictEqual(cur.WATTS, { bitaxe: 20, nerdminer: 1 });
   assert.deepStrictEqual(cur.EXPECTED, { bitaxe: 1.2e12 });
   assert.strictEqual(cur.TELEGRAM_DAILY, '21');           // padrão quando não definido
+  assert.strictEqual(cur.SHOW_WALLET, true);              // carteira aparece por padrão
+  assert.strictEqual(st.current({ SHOW_WALLET: '0' }).SHOW_WALLET, false);
   assert.deepStrictEqual(cur.TELEGRAM_BOT_TOKEN, { set: false });
 
   // mandar o formulário inteiro sem mudar nada não grava nada (mesmo se o JSON do .env tinha outra ordem de chaves)
-  const same = { ...cur, WATTS: { bitaxe: '20', nerdminer: '1' }, EXPECTED: { bitaxe: '1.2T' }, TELEGRAM_BOT_TOKEN: '', TELEGRAM_PERSONAL: false };
+  const same = { ...cur, WATTS: { bitaxe: '20', nerdminer: '1' }, EXPECTED: { bitaxe: '1.2T' }, TELEGRAM_BOT_TOKEN: '', TELEGRAM_PERSONAL: false, SHOW_WALLET: true };
   assert.deepStrictEqual(st.merge(dir, same, { ...env }).overlay, {});
 
   let r = st.merge(dir, {
@@ -256,4 +258,20 @@ test('salvar pela tela (incluindo WATTS/EXPECTED) e backup/restore gravam, reini
   p = run();
   const snap2 = await waitFor(async () => JSON.parse((await req(port, 'GET', '/api/mining')).body));
   assert.strictEqual(snap2.farm.best, 77777);
+});
+
+test('carteira escondida: a API do painel não mostra saldo nem transações', async (t) => {
+  const port = await freePort();
+  const dir = tmp();
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ SHOW_WALLET: '0' }));   // salvo pela tela
+  const p = spawn(process.execPath, ['-r', path.join(__dirname, 'helpers/offline.js'), path.join(__dirname, '../src/painel.js')], {
+    env: { ...process.env, BTC_ADDRESS: ADDR, PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'x'), CKPOOL_URLS: '', OCEAN_API: '' }, stdio: 'ignore',
+  });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const snap = await waitFor(async () => JSON.parse((await req(port, 'GET', '/api/mining')).body));
+  assert.strictEqual(snap.wallet.hidden, true);
+  assert.strictEqual(snap.wallet.sats, null);
+  assert.ok(!('txCount' in snap.wallet) && !('pendingSats' in snap.wallet));
+  assert.ok('fiat' in snap.wallet);   // a cotação continua (prêmio, rede)
+  assert.strictEqual(JSON.parse((await req(port, 'GET', '/api/config')).body).values.SHOW_WALLET, false);
 });

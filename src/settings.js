@@ -14,6 +14,7 @@ const FIELDS = [
   { key: 'LANGUAGE', group: 'farm', type: 'select', options: ['', 'pt-BR', 'en'] },
   { key: 'CURRENCY', group: 'farm', type: 'select', options: ['', 'BRL', 'USD'] },
   { key: 'POWER_PRICE_KWH', group: 'farm', type: 'price', alias: 'TARIFA_KWH' },
+  { key: 'SHOW_WALLET', group: 'farm', type: 'bool', unset: '1' },
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
   { key: 'ALARM_IGNORE', group: 'miners', type: 'workers' },
   { key: 'WATTS', group: 'miners', type: 'watts' },
@@ -40,7 +41,10 @@ function readOverlay(dataDir) {
 // Valor como o painel o interpreta (undefined = não definido).
 function effective(f, raw) {
   if (f.type === 'hour') return raw === undefined ? f.unset : (raw === '' || raw === 'off' ? 'off' : String(raw));
-  if (f.type === 'bool') return raw === '1' ? '1' : '0';
+  if (f.type === 'bool') {
+    if (raw === undefined || raw === '') return f.unset || '0';
+    return f.unset === '1' ? (raw === '0' ? '0' : '1') : (raw === '1' ? '1' : '0');
+  }
   if (f.type === 'watts' || f.type === 'expected') {
     if (!raw) return '';
     const r = cleanMap(raw, f.type);
@@ -388,6 +392,7 @@ const T = {
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
+    SHOW_WALLET: ['Mostrar a carteira', 'Saldo, valor e movimentação na tela da fazenda. Desligue se a tela fica à vista de visitas ou se o painel é aberto de fora de casa. A cotação continua aparecendo, e o aviso de dinheiro entrando continua chegando no Telegram.'],
     LOCAL_WORKER: ['Minerador nesta máquina', 'Worker do cpuminer que roda neste servidor (serviço minerd). O painel lê o hashrate do log e mostra a temperatura da CPU.'],
     ALARM_IGNORE: ['Não acender a luz vermelha', 'Workers que podem parar sem alarme (ex.: um notebook que você desliga à noite). Também não geram aviso no Telegram.'],
     WATTS: ['Consumo por worker (W)', 'Em watts, para a estimativa da conta de luz. Vazio usa o padrão (5 W).'],
@@ -419,6 +424,7 @@ const T = {
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
+    SHOW_WALLET: ['Show the wallet', 'Balance, value and activity on the farm screen. Turn it off if the screen is in view of visitors or the dashboard is opened from outside your home. The BTC price still shows, and Telegram still alerts when money arrives.'],
     LOCAL_WORKER: ['Miner on this machine', 'The cpuminer worker running on this server (minerd service). The dashboard reads its hashrate from the log and shows the CPU temperature.'],
     ALARM_IGNORE: ['Don\'t turn the red light on', 'Workers that may stop without an alarm (e.g. a laptop you shut down at night). They also skip Telegram alerts.'],
     WATTS: ['Power per worker (W)', 'In watts, for the power bill estimate. Empty uses the default (5 W).'],

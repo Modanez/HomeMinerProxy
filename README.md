@@ -65,7 +65,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
 
 ## Settings screen
 
-The ⚙️ button at the top of the dashboard (or `http://SERVER-IP:3000/config`) changes the everyday options without editing files: bitcoin address, language, currency, kWh price, the miner running on the server (`LOCAL_WORKER`), workers that don't trigger the red light (`ALARM_IGNORE`), power draw (`WATTS`) and expected hashrate (`EXPECTED`) per worker, the cube IP and the Telegram bot. It has buttons to test the cube, send a Telegram test message, and **download or restore a full backup** (settings, records, history and workers in a single JSON file).
+The ⚙️ button at the top of the dashboard (or `http://SERVER-IP:3000/config`) changes the everyday options without editing files: bitcoin address, language, currency, kWh price, whether to show the wallet balance, the miner running on the server (`LOCAL_WORKER`), workers that don't trigger the red light (`ALARM_IGNORE`), power draw (`WATTS`) and expected hashrate (`EXPECTED`) per worker, the cube IP and the Telegram bot. It has buttons to test the cube, send a Telegram test message, and **download or restore a full backup** (settings, records, history and workers in a single JSON file).
 
 - **PIN:** saving asks for the `SETTINGS_PIN`. `install.sh` creates it, shows it at the end, and keeps it in `/etc/mineracao.env`. With Docker, set `SETTINGS_PIN` in `mineracao.env` yourself.
 - **Where it is saved:** in `settings.json`, next to the records and history. It takes priority over `/etc/mineracao.env`; anything you don't change on the screen still comes from the file.
