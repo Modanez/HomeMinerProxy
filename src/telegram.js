@@ -49,21 +49,23 @@ const STRINGS = {
     sundayWinner: (w, f, d) => `\n🏆 <b>Campeão da semana:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
     achTitle: (u, t) => `🎖️ <b>Conquistas da fazenda</b> (${u}/${t})`,
     plugReboot: (w) => `🔌 <b>Tomada reiniciada automaticamente</b>${w && w !== '*' ? ' (' + w + ')' : ''}: minerador sem shares pelo tempo limite`,
-    plugNone: 'Tomada inteligente não configurada. Configure em Tomada Inteligente (SmartLife / Tuya) na tela /config.',
+    plugNone: 'Tomada inteligente não configurada. Cadastre as tomadas (SmartLife/Tuya ou Sonoff) na aba 🔌 Tomada da tela /config.',
     plugTitle: '🔌 <b>Tomada inteligente</b>',
     plugState: (on) => `Estado: <b>${on === false ? '🔴 desligada' : '🟢 ligada'}</b>`,
     plugPower: (w, v, ma) => `Consumo: <b>${w} W</b>${v != null ? ' · ' + v + ' V' : ''}${ma != null ? ' · ' + ma + ' mA' : ''}`,
     plugWorker: (w) => `Vinculada a: <b>${w === '*' ? 'fazenda inteira' : w || 'só monitorar'}</b>`,
-    plugActions: 'Comandos: <code>/tomada ligar</code> · <code>/tomada desligar</code> · <code>/tomada reiniciar</code>',
+    plugActions: 'Comandos: <code>/tomada ligar devkit</code> · <code>/tomada desligar devkit</code> · <code>/tomada reiniciar devkit</code> (pelo nome do worker ou da tomada; sem nome, vale a primeira)',
     plugSwitched: (on) => on ? '🟢 Tomada <b>ligada</b>.' : '🔴 Tomada <b>desligada</b>.',
     plugRebooted: '🔄 Tomada <b>reiniciada</b> (desligou 8 s e religou).',
     plugErr: (e) => `⚠️ Falha ao falar com a tomada: ${e}`,
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle da tomada SmartLife\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
+    plugNotFound: (q, list) => `Não achei a tomada "${q}". Tomadas: ${list}`,
+    plugErrs: { selfplug: 'essa tomada alimenta o próprio servidor do painel (LOCAL_WORKER). Desligar daqui apagaria o painel sem como religar; use o app da tomada.', sonoffoffline: 'o Sonoff não respondeu. Confira o IP e se o modo LAN/DIY está ligado.', sonofflan: 'o Sonoff recusou o comando: o modo LAN/DIY está desligado.', sonoffid: 'o Sonoff não reconheceu o Device ID informado.', sonoffformat: 'resposta inesperada do Sonoff.', tuyamissing: 'faltam as credenciais da Tuya Cloud em /config.' },
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle das tomadas (SmartLife ou Sonoff)\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
     ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
     noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Tomada inteligente (SmartLife)'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Ligar, desligar e reiniciar tomadas'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -104,21 +106,23 @@ const STRINGS = {
     sundayWinner: (w, f, d) => `\n🏆 <b>Champion of the week:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
     achTitle: (u, t) => `🎖️ <b>Farm achievements</b> (${u}/${t})`,
     plugReboot: (w) => `🔌 <b>Smart plug auto-rebooted</b>${w && w !== '*' ? ' (' + w + ')' : ''}: miner had no shares for the watchdog limit`,
-    plugNone: 'Smart plug not configured. Set it up under Smart Plug (SmartLife / Tuya) in /config.',
+    plugNone: 'No smart plug configured. Add your plugs (SmartLife/Tuya or Sonoff) in the 🔌 Smart Plug tab of /config.',
     plugTitle: '🔌 <b>Smart plug</b>',
     plugState: (on) => `State: <b>${on === false ? '🔴 off' : '🟢 on'}</b>`,
     plugPower: (w, v, ma) => `Power: <b>${w} W</b>${v != null ? ' · ' + v + ' V' : ''}${ma != null ? ' · ' + ma + ' mA' : ''}`,
     plugWorker: (w) => `Linked to: <b>${w === '*' ? 'whole farm' : w || 'monitor only'}</b>`,
-    plugActions: 'Commands: <code>/plug on</code> · <code>/plug off</code> · <code>/plug reboot</code>',
+    plugActions: 'Commands: <code>/plug on devkit</code> · <code>/plug off devkit</code> · <code>/plug reboot devkit</code> (by worker or plug name; without a name, the first plug)',
     plugSwitched: (on) => on ? '🟢 Smart plug turned <b>on</b>.' : '🔴 Smart plug turned <b>off</b>.',
     plugRebooted: '🔄 Smart plug <b>rebooted</b> (off for 8 s, then back on).',
     plugErr: (e) => `⚠️ Smart plug error: ${e}`,
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control\n/ticket · today\'s lottery ticket\n/help · this list',
+    plugNotFound: (q, list) => `No smart plug named "${q}". Plugs: ${list}`,
+    plugErrs: { selfplug: 'this plug powers the dashboard server itself (LOCAL_WORKER). Turning it off from here would take the dashboard down with no way to turn it back on; use the plug\'s app.', sonoffoffline: 'the Sonoff did not answer. Check the IP and that LAN/DIY mode is on.', sonofflan: 'the Sonoff refused the command: LAN/DIY mode is off.', sonoffid: 'the Sonoff did not recognize the Device ID.', sonoffformat: 'unexpected answer from the Sonoff.', tuyamissing: 'Tuya Cloud credentials are missing in /config.' },
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control (SmartLife or Sonoff)\n/ticket · today\'s lottery ticket\n/help · this list',
     ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
     noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Smart plug (SmartLife)'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Turn smart plugs on, off or reboot'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -468,24 +472,29 @@ function start(opts) {
         if (!targetQuery || !cfgPlugs.length) return cfgPlugs[0] || null;
         const idx = Number(targetQuery);
         if (Number.isInteger(idx) && idx >= 1 && idx <= cfgPlugs.length) return cfgPlugs[idx - 1];
-        return cfgPlugs.find((p) => (p.name || '').toLowerCase() === targetQuery || (p.worker || '').toLowerCase() === targetQuery || (p.deviceId || '').toLowerCase() === targetQuery) || cfgPlugs[0];
+        // nome errado não pode cair na primeira tomada: "/tomada desligar devkti" desligaria outra coisa
+        return cfgPlugs.find((p) => (p.name || '').toLowerCase() === targetQuery || (p.worker || '').toLowerCase() === targetQuery || (p.deviceId || '').toLowerCase() === targetQuery || (p.host || '').toLowerCase() === targetQuery) || null;
       };
       const target = pickPlug();
+      if (targetQuery && !target && ['ligar', 'on', 'desligar', 'off', 'reiniciar', 'reboot'].includes(arg)) {
+        return send(id, T.plugNotFound(escHtml(targetQuery), cfgPlugs.map((p) => escHtml(p.worker && p.worker !== '*' ? p.worker : p.name)).join(', ') || '–'));
+      }
+      const plugErrText = (r) => T.plugErr(escHtml(T.plugErrs[(r && r.error) || ''] || (r && r.error) || 'erro'));
       const devId = target && target.deviceId ? target.deviceId : undefined;
       if (arg === 'ligar' || arg === 'on') {
         if (!opts.tuya) return send(id, T.plugNone);
         const r = await opts.tuya.setSwitch(true, devId);
-        return send(id, r && r.ok ? T.plugSwitched(true) : T.plugErr(escHtml((r && r.error) || 'erro')));
+        return send(id, r && r.ok ? T.plugSwitched(true) : plugErrText(r));
       }
       if (arg === 'desligar' || arg === 'off') {
         if (!opts.tuya) return send(id, T.plugNone);
         const r = await opts.tuya.setSwitch(false, devId);
-        return send(id, r && r.ok ? T.plugSwitched(false) : T.plugErr(escHtml((r && r.error) || 'erro')));
+        return send(id, r && r.ok ? T.plugSwitched(false) : plugErrText(r));
       }
       if (arg === 'reiniciar' || arg === 'reboot') {
         if (!opts.tuya) return send(id, T.plugNone);
         const r = await opts.tuya.powerCycle(opts.rebootOffMs || 8000, devId);
-        return send(id, r && r.ok ? T.plugRebooted : T.plugErr(escHtml((r && r.error) || 'erro')));
+        return send(id, r && r.ok ? T.plugRebooted : plugErrText(r));
       }
       let live = null, liveList = null;
       if (opts.tuya && typeof opts.tuya.getStatus === 'function') {

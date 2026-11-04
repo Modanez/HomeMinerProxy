@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Sonoff plugs on the local network:** the plug list on `/config` now takes Sonoff plugs in LAN/DIY mode (by IP, no cloud or credentials) next to SmartLife/Tuya. They get the same dashboard buttons, Telegram `/plug on|off|reboot <worker>` and watchdog. The plug of the server itself (`LOCAL_WORKER`) can no longer be turned off or rebooted remotely, and a plug name the bot does not know is refused instead of falling back to the first plug.
 - **Daily ticket on Telegram:** the 21:00 summary now comes with today's lottery-ticket image, and `/ticket` sends it any time. Rendered on the server by `ticket.py` (Pillow); without Pillow the summary stays text only.
 - **Hide the wallet:** new "Show the wallet" option on the settings screen (`SHOW_WALLET=0`). Hides balance, value and activity from the dashboard and its API, for screens in view of visitors or dashboards opened from outside. The BTC price still shows and Telegram still alerts when money arrives.
 - **Weekly championship & farm achievements:** weekly leaderboard ranked by relative luck (so slow ESP32/CPU miners can beat an ASIC) with a `🏆` badge on the leader, Sunday winner announcement in Telegram, `/championship` (`/campeonato`) and `/achievements` (`/conquistas`) commands, and 10 persistent farm achievements (`achievements.json`) with real-time Telegram alerts.
@@ -12,6 +13,7 @@
 - **Architecture & API docs:** C4 Model diagrams (`docs/c4`), Architecture Decision Records (`docs/adr`) and Postman v2.1 collections + environment (`docs/postman`), all in English and Brazilian Portuguese.
 
 ### Português
+- **Tomadas Sonoff pela rede local:** a lista de tomadas em `/config` agora aceita Sonoff no modo LAN/DIY (pelo IP, sem nuvem nem credenciais) junto com as SmartLife/Tuya. Elas ganham os mesmos botões no painel, o `/tomada ligar|desligar|reiniciar <worker>` no Telegram e o watchdog. A tomada do próprio servidor (`LOCAL_WORKER`) não pode mais ser desligada ou reiniciada de longe, e um nome de tomada que o bot não conhece é recusado em vez de cair na primeira tomada.
 - **Bilhete do dia no Telegram:** o resumo das 21h agora vem com a imagem do bilhete de loteria do dia, e o `/bilhete` manda a qualquer hora. Gerado no servidor pelo `ticket.py` (Pillow); sem Pillow, o resumo continua só em texto.
 - **Esconder a carteira:** nova opção "Mostrar a carteira" na tela de configurações (`SHOW_WALLET=0`). Tira saldo, valor e movimentação do painel e da API dele, para telas à vista de visitas ou painéis abertos de fora de casa. A cotação continua aparecendo, e o Telegram continua avisando quando entra dinheiro.
 - **Campeonato semanal e conquistas da fazenda:** ranking da semana ordenado por sorte relativa (permitindo que o vovô devkit/ESP32 vença um ASIC), troféu `🏆` no líder, anúncio do campeão no resumo de domingo, comandos `/campeonato` e `/conquistas` no Telegram e 10 conquistas persistentes (`achievements.json`) com aviso em tempo real no bot.

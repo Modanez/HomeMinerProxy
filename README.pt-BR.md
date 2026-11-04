@@ -277,6 +277,18 @@ Se o seu minerador (ou um ventilador enquanto o Bitaxe não chega) estiver ligad
    - **Worker específico (ex.: `bitaxe`) ou Fazenda inteira (`*`)**: substitui a estimativa fixa de `WATTS` pelo consumo real medido ao vivo pela tomada.
 5. Controle pelo Telegram (`/tomada`, `/tomada ligar`, `/tomada desligar`, `/tomada reiniciar`) ou defina `TUYA_WATCHDOG_MIN` (ex.: `30`) para reiniciar a tomada sozinho se o minerador ficar 30 minutos sem enviar shares.
 
+### Tomadas Sonoff (rede local)
+
+As tomadas Sonoff são controladas **direto pela rede de casa**, pelo modo LAN / DIY delas: sem nuvem, sem conta de desenvolvedor e sem credenciais.
+
+1. Ligue o **modo DIY / LAN** do seu Sonoff, seguindo o guia da Sonoff para o seu modelo (procure por "DIY mode" em sonoff.tech). Modelos sem modo DIY ainda não são suportados.
+2. Reserve um IP fixo para a tomada no roteador (reserva de DHCP).
+3. Em `/config` → 🔌 **Tomada**, escolha **Sonoff (rede local)**, digite o IP, escolha o minerador ligado nela e clique em **Adicionar tomada**, depois em **Testar tomada**.
+
+Tomadas Sonoff e SmartLife/Tuya convivem na mesma lista. As duas ganham os botões **Ligar / Desligar / Reiniciar** na tela Histórico (protegidos pelo PIN), os comandos do Telegram com o nome do worker (`/tomada reiniciar devkit`) e o watchdog. A maioria dos Sonoff não informa o consumo no modo DIY, então a conta de luz continua usando a estimativa do `WATTS` para eles.
+
+**Segurança:** a tomada ligada ao `LOCAL_WORKER` (o servidor que roda o painel) só pode ser ligada pelo painel ou pelo Telegram, nunca desligada ou reiniciada: isso apagaria o painel sem como religar. Um nome de tomada que o bot não conhece é recusado, em vez de cair em outra tomada.
+
 ## Home Assistant / MQTT (opcional)
 
 Defina `MQTT_URL` (ex.: `mqtt://homeassistant.local:1883` ou `mqtts://host:8883`), `MQTT_USER`, `MQTT_PASS` e `MQTT_TOPIC` (padrão: `homeminerproxy`) em `/etc/mineracao.env` ou direto pela tela de configurações (`/config`).

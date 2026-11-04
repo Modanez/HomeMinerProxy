@@ -42,6 +42,8 @@ const WATTS_DEFAULT = Number(process.env.WATTS_DEFAULT || 5);
 const TUYA_WORKER = (process.env.TUYA_WORKER || '').trim();
 const TUYA_WATCHDOG_MIN = Number(process.env.TUYA_WATCHDOG_MIN || 0);
 let TUYA_PLUGS = [];
+let tuyaCloud = null;
+let sonoffLan = null;
 let tuyaClient = null;
 let tuyaPlugsState = new Map();
 function initTuya() {
@@ -50,16 +52,37 @@ function initTuya() {
     worker: TUYA_WORKER,
     watchdogMin: TUYA_WATCHDOG_MIN,
   }).list;
-  tuyaClient = TUYA_PLUGS.length ? require('./tuya').createClient({
+  const cloudPlugs = TUYA_PLUGS.filter((p) => p.type !== 'sonoff');
+  tuyaCloud = cloudPlugs.length ? require('./tuya').createClient({
     clientId: process.env.TUYA_CLIENT_ID,
     secret: process.env.TUYA_SECRET,
-    deviceId: TUYA_PLUGS[0].deviceId,
+    deviceId: cloudPlugs[0].deviceId,
     region: process.env.TUYA_REGION || 'us',
     apiBase: process.env.TUYA_API,
     allowNoDevice: true,
   }) : null;
+  sonoffLan = TUYA_PLUGS.some((p) => p.type === 'sonoff') ? require('./sonoff').createClient({ plugs: TUYA_PLUGS }) : null;
+  // Cliente único das tomadas: cada deviceId vai para a Tuya Cloud ou para o Sonoff na rede de casa
+  tuyaClient = tuyaCloud || sonoffLan ? {
+    getStatus: (id) => backendOf(id).getStatus(id),
+    setSwitch: (on, id) => (plugGuard(id, on ? 'on' : 'off') || backendOf(id).setSwitch(on, id)),
+    powerCycle: (ms, id) => (plugGuard(id, 'reboot') || backendOf(id).powerCycle(ms, id)),
+  } : null;
   tuyaPlugsState = new Map(TUYA_PLUGS.map((p) => [p.deviceId, { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 }]));
   return { plugs: TUYA_PLUGS, client: tuyaClient, state: tuyaPlugsState };
+}
+const plugOf = (id) => TUYA_PLUGS.find((p) => p.deviceId === id) || TUYA_PLUGS[0];
+const backendOf = (id) => {
+  const p = plugOf(id);
+  const b = p && p.type === 'sonoff' ? sonoffLan : tuyaCloud;
+  return b || { getStatus: async () => ({ ok: false, error: 'tuyamissing' }), setSwitch: async () => ({ ok: false, error: 'tuyamissing' }), powerCycle: async () => ({ ok: false, error: 'tuyamissing' }) };
+};
+// A tomada que alimenta o próprio servidor (LOCAL_WORKER) não pode ser desligada daqui:
+// o painel apagaria junto e ninguém ligaria de volta.
+function plugGuard(id, action) {
+  const p = plugOf(id), self = (process.env.LOCAL_WORKER || '').trim();
+  if (action !== 'on' && p && self && p.worker === self) return Promise.resolve({ ok: false, error: 'selfplug' });
+  return null;
 }
 initTuya();
 
@@ -1865,6 +1888,7 @@ function renderHistory(j) {
 }
 
 let savedPin = '', pendingPlug = null;
+const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaauth: 'A Tuya recusou o comando' };
 function askPlugAction(deviceId, action) {
   pendingPlug = { deviceId, action };
   set('enPinMsg', '');
@@ -1880,7 +1904,8 @@ async function execPlugAction(pinVal) {
     if (!r.ok) {
       savedPin = '';
       $('enPin').classList.add('on');
-      set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (r.error || 'erro'));
+      set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (PLUG_ERR[r.error] || r.error || 'erro'));
+      if (PLUG_ERR[r.error]) savedPin = pinVal;   // o PIN estava certo; o problema foi a tomada
       return;
     }
     savedPin = pinVal;

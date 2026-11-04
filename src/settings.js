@@ -10,6 +10,7 @@ const https = require('https');
 const crypto = require('crypto');
 const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
 const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, normalizePlugs, testPlug } = require('./tuya');
+const { testSonoff } = require('./sonoff');
 
 const THEMES = ['obsidian', 'ocean', 'latte'];
 function normTheme(v) {
@@ -451,7 +452,7 @@ function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
 const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
-    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomada Inteligente SmartLife / Tuya', backup: 'Backup e restauração' },
+    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', backup: 'Backup e restauração' },
     tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', backup: '💾 Backup' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     THEME: ['Tema visual (Material Design)', 'Escolha um dos 3 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
@@ -481,13 +482,14 @@ const T = {
     TUYA_REGION: ['Região Tuya Cloud', 'Américas (us) atende o Brasil. Só mude se sua conta no iot.tuya.com foi criada em outro datacenter (eu, cn, in).'],
     TUYA_CLIENT_ID: ['Access ID (Client ID)', 'Do seu projeto Cloud em iot.tuya.com (vinculado ao app SmartLife por QR Code). Vazio desliga.'],
     TUYA_SECRET: ['Access Secret (Client Secret)', 'Chave secreta do projeto em iot.tuya.com.'],
-    TUYA_PLUGS: ['Tomadas e dispositivos SmartLife', 'Cadastre quantas tomadas ou dispositivos quiser da sua conta SmartLife. Em cada um: Nome, Device ID (ID Virtual no app SmartLife), qual minerador está ligado nele (ou "Só monitorar") e o watchdog opcional em minutos (mín. 5).'],
+    TUYA_PLUGS: ['Tomadas', 'Cadastre quantas tomadas quiser. SmartLife/Tuya: pelo Device ID (ID Virtual no app), usando as credenciais da Tuya Cloud acima. Sonoff: pelo IP, com o modo LAN/DIY ligado (sem nuvem e sem credenciais). Em cada uma: qual minerador está ligado nela (ou "Só monitorar") e o watchdog opcional em minutos (mín. 5). A tomada do minerador local (o próprio servidor) não pode ser desligada por aqui.'],
     TUYA_DEVICE_ID: ['Device ID da tomada', 'No app SmartLife: toque na tomada → ícone ✏️ no canto superior → Informações do Dispositivo → ID Virtual.'],
     TUYA_WORKER: ['Aparelho ligado na tomada', 'Se escolher um worker (ex.: bitaxe), os Watts reais da tomada entram no consumo dele. Em "Só monitorar", mostra a leitura no painel sem somar na conta dos mineradores.'],
     TUYA_WATCHDOG_MIN: ['Reiniciar tomada se parar (min)', 'Se o worker da tomada ficar parado por esses minutos (mín. 5), desliga a tomada por 8s e religa sozinho. Vazio desliga.'],
     auto: 'Automático', none: 'Nenhum', yes: 'Sim', tuyaNone: 'Só monitorar (não somar nos mineradores)', tuyaAll: 'Fazenda inteira (*)',
     addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWattsPlaceholder: 'W (ex.: 20)', addHrPlaceholder: 'Hashrate (ex.: 1.2)', addWorkerBtn: '+ Adicionar worker',
-    addPlugNamePlaceholder: 'Apelido (ex.: Bitaxe, Ventilador)', addPlugIdPlaceholder: 'Device ID (ID Virtual no app)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Adicionar tomada',
+    addPlugNamePlaceholder: 'Apelido (ex.: Bitaxe, Ventilador)', addPlugIdPlaceholder: 'Device ID (ID Virtual no app)', addPlugHostPlaceholder: 'IP do Sonoff (ex.: 192.168.0.50)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Adicionar tomada',
+    plugTypes: { tuya: 'SmartLife / Tuya (nuvem)', sonoff: 'Sonoff (rede local)' },
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
@@ -500,11 +502,11 @@ const T = {
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
     mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
     tuyaOk: (s) => `Tomada respondeu: ${s}`, tuyaFail: (e) => `Falha na tomada: ${e}`,
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', sonoffoffline: 'O Sonoff não respondeu nesse IP (confira o IP e se o modo LAN/DIY está ligado)', sonofflan: 'O Sonoff recusou: o modo LAN/DIY está desligado', sonoffid: 'O Sonoff não reconheceu esse Device ID', sonoffformat: 'Resposta inesperada do Sonoff', selfplug: 'Essa tomada alimenta o próprio servidor', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
-    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'SmartLife / Tuya Smart Plug', backup: 'Backup and restore' },
+    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', backup: 'Backup and restore' },
     tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', backup: '💾 Backup' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     THEME: ['Visual theme (Material Design)', 'Choose one of the 3 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
@@ -534,13 +536,14 @@ const T = {
     TUYA_REGION: ['Tuya Cloud region', 'Americas (us) covers the US and Brazil. Change only if your iot.tuya.com project is in another region (eu, cn, in).'],
     TUYA_CLIENT_ID: ['Access ID (Client ID)', 'From your Cloud project at iot.tuya.com (linked to the SmartLife app via QR code). Empty turns it off.'],
     TUYA_SECRET: ['Access Secret (Client Secret)', 'Secret key from your iot.tuya.com project.'],
-    TUYA_PLUGS: ['SmartLife plugs & devices', 'Add as many smart plugs or devices from your SmartLife account as you want. For each one: Name, Device ID (Virtual ID in the SmartLife app), linked miner (or "Monitor only") and optional watchdog minutes (min 5).'],
+    TUYA_PLUGS: ['Plugs', 'Add as many plugs as you want. SmartLife/Tuya: by Device ID (Virtual ID in the app), using the Tuya Cloud credentials above. Sonoff: by IP, with LAN/DIY mode on (no cloud, no credentials). For each one: linked miner (or "Monitor only") and optional watchdog minutes (min 5). The plug of the local miner (the server itself) cannot be turned off from here.'],
     TUYA_DEVICE_ID: ['Plug Device ID', 'In the SmartLife app: tap the plug → ✏️ icon at top right → Device Information → Virtual ID.'],
     TUYA_WORKER: ['Device plugged in', 'If set to a worker (e.g. bitaxe), the plug\'s live Watts are used for that worker. "Monitor only" shows the reading on the dashboard without adding it to the miners\' power bill.'],
     TUYA_WATCHDOG_MIN: ['Auto-reboot plug when stopped (min)', 'If the linked worker is stopped for this many minutes (min 5), turns the plug off for 8s and back on. Empty disables.'],
     auto: 'Automatic', none: 'None', yes: 'Yes', tuyaNone: 'Monitor only (do not add to miners)', tuyaAll: 'Whole farm (*)',
     addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWattsPlaceholder: 'W (e.g. 20)', addHrPlaceholder: 'Hashrate (e.g. 1.2)', addWorkerBtn: '+ Add worker',
-    addPlugNamePlaceholder: 'Label (e.g. Bitaxe, Fan)', addPlugIdPlaceholder: 'Device ID (Virtual ID in app)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Add plug',
+    addPlugNamePlaceholder: 'Label (e.g. Bitaxe, Fan)', addPlugIdPlaceholder: 'Device ID (Virtual ID in app)', addPlugHostPlaceholder: 'Sonoff IP (e.g. 192.168.0.50)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Add plug',
+    plugTypes: { tuya: 'SmartLife / Tuya (cloud)', sonoff: 'Sonoff (local network)' },
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
@@ -553,7 +556,7 @@ const T = {
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
     mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
     tuyaOk: (s) => `Plug answered: ${s}`, tuyaFail: (e) => `Plug failed: ${e}`,
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', sonoffoffline: 'The Sonoff did not answer at that IP (check the IP and that LAN/DIY mode is on)', sonofflan: 'The Sonoff refused: LAN/DIY mode is off', sonoffid: 'The Sonoff did not recognize that Device ID', sonoffformat: 'Unexpected answer from the Sonoff', selfplug: 'This plug powers the server itself', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -591,7 +594,8 @@ function page(lang, hasPin, theme) {
         `<button type="button" class="ghost" id="add_worker_btn">${htmlEsc(S.addWorkerBtn)}</button></div>`;
     } else if (f.type === 'tuyaplugs') {
       input = `<div class="plist" id="plug_list"></div>` +
-        `<div class="addw addp"><input type="text" id="new_plug_name" placeholder="${htmlEsc(S.addPlugNamePlaceholder)}" autocomplete="off" spellcheck="false">` +
+        `<div class="addw addp"><select id="new_plug_type"><option value="tuya">${htmlEsc(S.plugTypes.tuya)}</option><option value="sonoff">${htmlEsc(S.plugTypes.sonoff)}</option></select>` +
+        `<input type="text" id="new_plug_name" placeholder="${htmlEsc(S.addPlugNamePlaceholder)}" autocomplete="off" spellcheck="false">` +
         `<input type="text" id="new_plug_id" placeholder="${htmlEsc(S.addPlugIdPlaceholder)}" autocomplete="off" spellcheck="false">` +
         `<select id="new_plug_worker" data-workers="2"><option value="">${htmlEsc(S.tuyaNone)}</option><option value="*">${htmlEsc(S.tuyaAll)}</option></select>` +
         `<input type="text" id="new_plug_wd" class="addw-w" inputmode="numeric" maxlength="4" placeholder="${htmlEsc(S.addPlugWdPlaceholder)}" autocomplete="off">` +
@@ -626,6 +630,7 @@ function page(lang, hasPin, theme) {
     tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'),
     tuyaOk: S.tuyaOk('%s'), tuyaFail: S.tuyaFail('%s'), tokenSet: S.tokenSet('%s'),
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
+    plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
   };
   return `<!doctype html>
@@ -687,15 +692,23 @@ function page(lang, hasPin, theme) {
   .addw .addw-u { width:78px; padding:7px 4px; font-size:13px; }
   .addw button { margin:0; white-space:nowrap; }
   .plist { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
-  .prow { display:grid; grid-template-columns:minmax(110px,1fr) minmax(150px,1.4fr) minmax(150px,1.2fr) 74px auto auto; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  .prow { display:grid; grid-template-columns:58px minmax(90px,0.9fr) minmax(200px,1.8fr) minmax(130px,1.1fr) 74px auto auto; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
   .prow input, .prow select { padding:6px 8px; font-size:13px; }
   .prow .p-id { font-family:ui-monospace, Menlo, monospace; font-size:12px; }
   .prow .p-wd { text-align:right; }
   .prow button { margin:0; padding:6px 9px; font-size:12px; }
+  .prow .p-type { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:3px 5px; text-align:center; }
+  .addp #new_plug_type { flex:1; min-width:150px; padding:7px 8px; font-size:13px; }
   .addp #new_plug_name { flex:1; min-width:130px; padding:7px 9px; font-size:14px; }
   .addp #new_plug_id { flex:1.4; min-width:170px; padding:7px 9px; font-size:13px; font-family:ui-monospace, Menlo, monospace; }
   .addp #new_plug_worker { flex:1.1; min-width:150px; padding:7px 8px; font-size:13px; }
-  @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
+  @media (max-width:640px) {
+    /* celular: tipo + apelido / Device ID ou IP inteiro / worker + watchdog / testar + remover */
+    .prow { grid-template-columns:64px 1fr 1fr 48px; grid-template-areas:"type name name name" "id id id id" "worker worker wd wd" "test test test del"; }
+    .prow > :nth-child(1) { grid-area:type; } .prow > :nth-child(2) { grid-area:name; } .prow > :nth-child(3) { grid-area:id; }
+    .prow > :nth-child(4) { grid-area:worker; } .prow > :nth-child(5) { grid-area:wd; } .prow > :nth-child(6) { grid-area:test; } .prow > :nth-child(7) { grid-area:del; }
+    .prow .p-type { align-self:stretch; display:flex; align-items:center; justify-content:center; }
+  }
   .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
   button { background:var(--gold); color:var(--on-gold); border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
@@ -758,7 +771,7 @@ function updateTabDots() {
     cube: hasVal('CUBE_IP'),
     telegram: hasVal('TELEGRAM_CHAT_ID') || hasVal('TELEGRAM_BOT_TOKEN'),
     mqtt: hasVal('MQTT_URL'),
-    tuya: hasPlugs && hasVal('TUYA_CLIENT_ID'),
+    tuya: hasPlugs && (hasVal('TUYA_CLIENT_ID') || (stateValues.TUYA_PLUGS || []).every((p) => p.type === 'sonoff')),
   };
   for (const b of form.querySelectorAll('.tab[data-tab]')) {
     b.classList.toggle('on', !!activeMap[b.dataset.tab]);
@@ -863,12 +876,15 @@ function renderWorkerControls() {
   renderPlugs();
 }
 
-async function testPlugById(devId, btn) {
+async function testPlugById(devId, btn, plug) {
   if (btn) btn.disabled = true;
   try {
     const v = values();
     v.TUYA_DEVICE_ID = devId;
-    const r = await post('/api/config/test', { pin: pin(), what: 'tuya', values: v });
+    const sonoff = plug && plug.type === 'sonoff';
+    const r = await post('/api/config/test', sonoff
+      ? { pin: pin(), what: 'sonoff', values: { host: plug.host, deviceId: plug.deviceId } }
+      : { pin: pin(), what: 'tuya', values: v });
     showErrors(r.errors || {});
     if (r.error) say(M.err[r.error] || r.error, false);
     else if (r.ok && r.status) {
@@ -896,11 +912,20 @@ function renderPlugs() {
     nInp.value = p.name || '';
     nInp.placeholder = 'Tomada ' + (idx + 1);
     nInp.addEventListener('input', () => { p.name = nInp.value; });
+    const typeTag = document.createElement('span');
+    typeTag.className = 'p-type';
+    typeTag.textContent = p.type === 'sonoff' ? 'Sonoff' : 'Tuya';
     const idInp = document.createElement('input');
     idInp.type = 'text';
     idInp.className = 'p-id';
-    idInp.value = p.deviceId || '';
-    idInp.addEventListener('input', () => { p.deviceId = idInp.value.trim(); });
+    if (p.type === 'sonoff') {
+      idInp.value = p.host || '';
+      idInp.placeholder = M.phHost;
+      idInp.addEventListener('input', () => { p.host = idInp.value.trim(); });
+    } else {
+      idInp.value = p.deviceId || '';
+      idInp.addEventListener('input', () => { p.deviceId = idInp.value.trim(); });
+    }
     const wSel = document.createElement('select');
     wSel.add(new Option(M.tuyaNone, ''));
     wSel.add(new Option(M.tuyaAll, '*'));
@@ -920,7 +945,7 @@ function renderPlugs() {
     tBtn.type = 'button';
     tBtn.className = 'ghost';
     tBtn.textContent = M.testTuya;
-    tBtn.addEventListener('click', () => testPlugById(idInp.value.trim(), tBtn));
+    tBtn.addEventListener('click', () => testPlugById(p.type === 'sonoff' ? p.deviceId : idInp.value.trim(), tBtn, p));
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'ghost';
@@ -930,7 +955,7 @@ function renderPlugs() {
       renderPlugs();
       updateTabDots();
     });
-    row.append(nInp, idInp, wSel, wdInp, tBtn, delBtn);
+    row.append(typeTag, nInp, idInp, wSel, wdInp, tBtn, delBtn);
     box.appendChild(row);
   });
 }
@@ -957,19 +982,28 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
 });
 
 const addPlugBtn = document.getElementById('add_plug_btn'), newPlugName = document.getElementById('new_plug_name');
+const newPlugType = document.getElementById('new_plug_type');
 const newPlugId = document.getElementById('new_plug_id'), newPlugWorker = document.getElementById('new_plug_worker'), newPlugWd = document.getElementById('new_plug_wd');
 if (addPlugBtn && newPlugId) {
+  const syncType = () => { newPlugId.placeholder = newPlugType && newPlugType.value === 'sonoff' ? M.phHost : M.phId; };
+  if (newPlugType) { newPlugType.addEventListener('change', syncType); syncType(); }
   const addP = () => {
     const devId = newPlugId.value.trim();
     if (!devId) return;
-    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(devId)) { say(M.err.tuyaid, false); return; }
+    const sonoff = newPlugType && newPlugType.value === 'sonoff';
+    if (sonoff ? !/^[a-zA-Z0-9.\-]{1,253}(:\d{2,5})?$/.test(devId) : !/^[a-zA-Z0-9_-]{8,64}$/.test(devId)) { say(sonoff ? M.err.host : M.err.tuyaid, false); return; }
     const w = newPlugWorker ? newPlugWorker.value : '';
     const n = (newPlugName ? newPlugName.value.trim() : '') || (w && w !== '*' ? w : 'Tomada ' + ((stateValues.TUYA_PLUGS || []).length + 1));
     const wdRaw = newPlugWd ? newPlugWd.value.trim() : '';
     const wd = wdRaw ? Number(wdRaw) : 0;
     if (wdRaw && (!Number.isInteger(wd) || wd < 5 || wd > 1440)) { say(M.err.watchdog, false); return; }
-    stateValues.TUYA_PLUGS = (stateValues.TUYA_PLUGS || []).filter((x) => x.deviceId !== devId);
-    stateValues.TUYA_PLUGS.push({ name: n, deviceId: devId, worker: w, watchdogMin: wd });
+    if (sonoff) {
+      stateValues.TUYA_PLUGS = (stateValues.TUYA_PLUGS || []).filter((x) => x.host !== devId);
+      stateValues.TUYA_PLUGS.push({ name: n, type: 'sonoff', host: devId, worker: w, watchdogMin: wd });
+    } else {
+      stateValues.TUYA_PLUGS = (stateValues.TUYA_PLUGS || []).filter((x) => x.deviceId !== devId);
+      stateValues.TUYA_PLUGS.push({ name: n, deviceId: devId, worker: w, watchdogMin: wd });
+    }
     if (newPlugName) newPlugName.value = '';
     newPlugId.value = '';
     if (newPlugWorker) newPlugWorker.value = '';
@@ -1037,13 +1071,13 @@ function values() {
       continue;
     }
     if (k === 'TUYA_PLUGS') {
-      const plugs = (stateValues.TUYA_PLUGS || []).map((p) => Object.assign({}, p)).filter((p) => p.deviceId);
+      const plugs = (stateValues.TUYA_PLUGS || []).map((p) => Object.assign({}, p)).filter((p) => p.deviceId || p.host);
       const pendingId = newPlugId && newPlugId.value.trim();
-      if (pendingId && !plugs.some((p) => p.deviceId === pendingId)) {
+      if (pendingId && !plugs.some((p) => p.deviceId === pendingId || p.host === pendingId)) {
         const w = newPlugWorker ? newPlugWorker.value : '';
         const n = (newPlugName ? newPlugName.value.trim() : '') || (w && w !== '*' ? w : 'Tomada ' + (plugs.length + 1));
         const wd = newPlugWd && newPlugWd.value.trim() ? Number(newPlugWd.value.trim()) : 0;
-        plugs.push({ name: n, deviceId: pendingId, worker: w, watchdogMin: wd });
+        plugs.push(newPlugType && newPlugType.value === 'sonoff' ? { name: n, type: 'sonoff', host: pendingId, worker: w, watchdogMin: wd } : { name: n, deviceId: pendingId, worker: w, watchdogMin: wd });
       }
       out.TUYA_PLUGS = plugs;
       const first = plugs[0] || {};
@@ -1204,6 +1238,10 @@ function handle(req, res, ctx) {
         const pass = form.MQTT_PASS_clear ? '' : (String(form.MQTT_PASS || '').trim() || process.env.MQTT_PASS || '');
         const r = await testBroker(u.value, user, pass, tp.value || process.env.MQTT_TOPIC || 'homeminerproxy');
         return json(200, { ok: r.ok, detail: r.error === 'auth' ? 'mqttauth' : r.error });
+      }
+      if (j.what === 'sonoff') {
+        const r = await testSonoff(String(form.host || '').trim(), String(form.deviceId || '').trim());
+        return json(200, { ok: r.ok, status: r.status, detail: r.error });
       }
       if (j.what === 'tuya') {
         const clientId = String(form.TUYA_CLIENT_ID == null ? (process.env.TUYA_CLIENT_ID || '') : form.TUYA_CLIENT_ID).trim();

@@ -294,7 +294,9 @@ test('comandos restantes do bot e controle de tomada', async (t) => {
   api.push(42, '/tomada');
 
   await waitFor(() => api.sent.length >= 13);
-  assert.strictEqual(switchedState.reboot, true);
+  // "/tomada reiniciar 999" não existe: não reinicia a primeira tomada, só avisa; o último comando executado foi o "desligar bitaxe"
+  assert.deepStrictEqual(switchedState, { on: false, devId: 'eb123' });
+  assert.ok(api.sent.some((m) => /Não achei a tomada "999"/.test(m.text || '')));
 
   // Testa /tomada quando há apenas 1 plug configurado (cobre linhas 496-498)
   const singlePlugBot = tg.start({
@@ -515,4 +517,34 @@ test('/bilhete e resumo diário mandam a foto do bilhete', { skip: !hasPillow &&
   assert.ok(api.sent[2].photo);
   assert.match(api.sent[2].raw, /Resumo do dia/);
   assert.match(api.sent[2].raw, /name="parse_mode"\r\n\r\nHTML/);
+});
+
+test('/tomada: nome errado não cai em outra tomada, e o erro da tomada do servidor é explicado', async (t) => {
+  const api = await fakeTelegram();
+  const calls = [];
+  const fakePlugs = {
+    setSwitch: async (on, id) => { calls.push([on, id]); return id === 'sonoff_odroid' ? { ok: false, error: 'selfplug' } : { ok: true, on }; },
+    powerCycle: async (ms, id) => { calls.push(['cycle', id]); return { ok: true }; },
+    getStatus: async () => ({ ok: true, status: { on: true } }),
+  };
+  const plugs = [
+    { name: 'devkit', type: 'sonoff', host: '192.168.0.50', deviceId: 'sonoff_devkit', worker: 'devkit' },
+    { name: 'odroid', type: 'sonoff', host: '192.168.0.51', deviceId: 'sonoff_odroid', worker: 'odroid' },
+  ];
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'pt', snapshot: () => snap(), api: api.url, pollS: 0, warmupMs: 1e9, tuya: fakePlugs, plugs, log: () => {} });
+  t.after(() => { bot.stop(); api.server.close(); });
+
+  api.push(42, '/tomada desligar devkti');
+  await waitFor(() => api.sent.length >= 1);
+  assert.match(api.sent[0].text, /Não achei a tomada "devkti"\. Tomadas: devkit, odroid/);
+  assert.deepStrictEqual(calls, []);   // nada foi desligado
+
+  api.push(42, '/tomada desligar odroid');
+  await waitFor(() => api.sent.length >= 2);
+  assert.match(api.sent[1].text, /alimenta o próprio servidor/);
+
+  api.push(42, '/tomada desligar DevKit');
+  await waitFor(() => api.sent.length >= 3);
+  assert.match(api.sent[2].text, /Tomada <b>desligada<\/b>/);
+  assert.deepStrictEqual(calls.at(-1), [false, 'sonoff_devkit']);
 });
