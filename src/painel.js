@@ -18,6 +18,7 @@ const BOOT = Date.now().toString(36);   // muda a cada reinício: a página reca
 const PORT = Number(process.env.PORT || 3000);
 // Idioma padrão do painel e do widget: pt-BR ou en. Vazio = idioma do navegador. ?lang=pt|en força na URL.
 const LANGUAGE = normLang(process.env.LANGUAGE);
+const THEME = settings.normTheme(process.env.THEME);
 // Moeda dos valores em dinheiro (cotação, prêmio, conta de luz): BRL ou USD. O preço do kWh é nessa moeda.
 const CURRENCY = /^(BRL|USD)$/i.test(process.env.CURRENCY || '') ? process.env.CURRENCY.toUpperCase() : (LANGUAGE === 'pt' ? 'BRL' : 'USD');
 function normLang(v) { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; }
@@ -801,6 +802,7 @@ function snapshot(internal = false) {
     history,
     health: health(),
     energy: energy(view),
+    theme: THEME,
   };
 }
 
@@ -811,9 +813,11 @@ const PAGE = `<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fazenda de Mineração</title>
 <style>
-  :root { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --ok:#3ecf8e; --warn:#e5534b; }
+  :root, body[data-theme="obsidian"] { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --on-gold:#14161c; --gold-soft:rgba(242,169,0,.06); --gold-border:rgba(242,169,0,.45); --ok:#3ecf8e; --warn:#e5534b; --backdrop:rgba(14,17,23,.88); --tip-bg:#0b0e14; --shadow:none; --radius:12px; }
+  body[data-theme="ocean"] { --bg:#0b111e; --card:#131c31; --line:#223254; --txt:#e2e8f0; --dim:#8ea0c2; --gold:#38bdf8; --on-gold:#081221; --gold-soft:rgba(56,189,248,.08); --gold-border:rgba(56,189,248,.45); --ok:#34d399; --warn:#fb7185; --backdrop:rgba(11,17,30,.88); --tip-bg:#080d18; --shadow:0 4px 18px rgba(0,0,0,.28); --radius:16px; }
+  body[data-theme="latte"] { --bg:#f5f3ee; --card:#ffffff; --line:#e2ded5; --txt:#1c1b18; --dim:#666159; --gold:#d97706; --on-gold:#ffffff; --gold-soft:rgba(217,119,6,.08); --gold-border:rgba(217,119,6,.42); --ok:#16a34a; --warn:#dc2626; --backdrop:rgba(28,27,24,.72); --tip-bg:#ffffff; --shadow:0 2px 10px rgba(28,27,24,.06); --radius:16px; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:16px; min-height:100vh; }
+  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:16px; min-height:100vh; transition:background .2s, color .2s; }
   body.kiosk { cursor:none; overflow:hidden; user-select:none; }
   header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
   h1 { font-size:22px; } h1 span { color:var(--gold); }
@@ -823,7 +827,7 @@ const PAGE = `<!doctype html>
   body.kiosk .gear { display:none; }
   .narr { flex:1; min-width:0; text-align:center; color:var(--gold); font-size:14px; font-style:italic; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:opacity .6s; }
   .narr.fade { opacity:0; }
-  .party { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(14,17,23,.88); }
+  .party { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:var(--backdrop); }
   .party.on { display:flex; }
   .party canvas { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
   .party-box { position:relative; text-align:center; padding:28px 40px; border:1px solid var(--gold); border-radius:18px; background:var(--card); max-width:90vw; }
@@ -857,7 +861,7 @@ const PAGE = `<!doctype html>
   body.kiosk .p3 .chart-card { display:flex; flex-direction:column; }
   body.kiosk .p3 .chart { flex:1; height:auto; min-height:90px; }
   .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:12px; margin-bottom:12px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 16px; min-width:0; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:14px 16px; min-width:0; }
   .label { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; }
   .big { font-size:38px; font-weight:700; margin-top:4px; font-variant-numeric:tabular-nums; }
   .grid .big { white-space:nowrap; overflow:hidden; }   /* o fitBig() reduz a fonte quando o número não cabe */
@@ -876,12 +880,12 @@ const PAGE = `<!doctype html>
   body.kiosk .toggle { display:none; }
   .ticket-btn { margin-left:10px; font-size:12px; letter-spacing:0; text-transform:none; color:var(--gold); text-decoration:none; border:1px solid var(--gold); border-radius:6px; padding:2px 8px; }
   body.kiosk .ticket-btn { display:none; }
-  .ticket { position:fixed; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:rgba(14,17,23,.92); padding:16px; }
+  .ticket { position:fixed; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--backdrop); padding:16px; }
   .ticket.on { display:flex; }
   .ticket img { max-width:min(92vw, 540px); max-height:78vh; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
   .ticket .btns { display:flex; gap:10px; }
   .ticket button { font:inherit; font-size:14px; padding:8px 16px; border-radius:8px; border:1px solid var(--gold); background:var(--card); color:var(--txt); cursor:pointer; }
-  .ticket button.main { background:var(--gold); color:#14161c; font-weight:700; }
+  .ticket button.main { background:var(--gold); color:var(--on-gold); font-weight:700; }
   .pool { font-size:11px; color:var(--dim); margin-left:6px; white-space:nowrap; }
   .last { display:block; font-size:11px; color:var(--dim); white-space:nowrap; }
   .last.fresh { color:var(--gold); }
@@ -912,7 +916,7 @@ const PAGE = `<!doctype html>
   .champ-duo { margin-top:12px; }
   .ach-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:8px; }
   .ach { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; opacity:.45; }
-  .ach.on { opacity:1; border-color:rgba(242,169,0,.45); background:rgba(242,169,0,.06); }
+  .ach.on { opacity:1; border-color:var(--gold-border); background:var(--gold-soft); }
   .ach-i { font-size:18px; line-height:1.2; }
   .ach-t { font-size:13px; font-weight:600; color:var(--txt); }
   .ach.on .ach-t { color:var(--gold); }
@@ -956,7 +960,7 @@ const PAGE = `<!doctype html>
   .en-pin.on { display:flex; }
   .en-pin input { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:4px 8px; width:100px; font-size:12px; font-family:ui-monospace, monospace; }
   .en-pin span { font-size:12px; color:var(--warn); }
-  .tooltip { position:fixed; pointer-events:none; background:#0b0e14; border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
+  .tooltip { position:fixed; pointer-events:none; background:var(--tip-bg); box-shadow:var(--shadow); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
   .tooltip b { color:var(--txt); } .tooltip span { color:var(--dim); }
 
   @media (max-width: 640px) {
@@ -1009,7 +1013,7 @@ const PAGE = `<!doctype html>
   }
 </style>
 </head>
-<body>
+<body data-theme="obsidian">
 <header>
   <h1>⛏️ Fazenda de <span>Mineração</span></h1>
   <div class="narr" id="narr"></div>
@@ -1978,6 +1982,7 @@ async function load() {
     const j = await r.json();
     if (bootSeen && j.boot && j.boot !== bootSeen) return location.reload();   // painel reiniciou (configuração nova)
     bootSeen = j.boot;
+    if (j.theme) document.body.dataset.theme = j.theme;
     lastData = j;
     lastOcean = j.ocean;
     if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; schedule(); }
@@ -2112,7 +2117,7 @@ http.createServer((req, res) => {
     return res.end(JSON.stringify(snapshot()));
   }
   const lang = pickLang(req, LANGUAGE);
-  const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY));
+  const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY, THEME));
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Language': LOCALES[lang] });
   res.end(html);
 }).listen(PORT, '0.0.0.0', () => {

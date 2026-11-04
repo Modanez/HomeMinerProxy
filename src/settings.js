@@ -11,8 +11,15 @@ const crypto = require('crypto');
 const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
 const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, normalizePlugs, testPlug } = require('./tuya');
 
+const THEMES = ['obsidian', 'ocean', 'latte'];
+function normTheme(v) {
+  const s = String(v || '').trim().toLowerCase();
+  return THEMES.includes(s) ? s : 'obsidian';
+}
+
 const FIELDS = [
   { key: 'BTC_ADDRESS', group: 'farm', type: 'address', required: true },
+  { key: 'THEME', group: 'farm', type: 'theme', options: ['', 'obsidian', 'ocean', 'latte'] },
   { key: 'LANGUAGE', group: 'farm', type: 'select', options: ['', 'pt-BR', 'en'] },
   { key: 'CURRENCY', group: 'farm', type: 'select', options: ['', 'BRL', 'USD'] },
   { key: 'POWER_PRICE_KWH', group: 'farm', type: 'price', alias: 'TARIFA_KWH' },
@@ -151,6 +158,7 @@ function clean(field, raw) {
       if (/^bc1/i.test(v) || /^tb1/i.test(v)) v = v.toLowerCase();
       return ADDRESS_RE.test(v) ? { value: v } : { error: 'address' };
     case 'select':
+    case 'theme':
       return field.options.includes(v) ? { value: v } : { error: 'option' };
     case 'price': {
       if (v === '') return { value: '' };
@@ -446,6 +454,12 @@ const T = {
     groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomada Inteligente SmartLife / Tuya', backup: 'Backup e restauração' },
     tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', backup: '💾 Backup' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
+    THEME: ['Tema visual (Material Design)', 'Escolha um dos 3 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
+    themes: [
+      { id: 'obsidian', name: '🌑 Obsidian', sub: 'Material Dark · Grafite e Ouro Bitcoin (padrão)', colors: ['#0e1117', '#171c26', '#f2a900', '#3ecf8e'] },
+      { id: 'ocean', name: '🌊 Material Ocean', sub: 'Material You Escuro · Azul Profundo e Ciano Elétrico', colors: ['#0b111e', '#131c31', '#38bdf8', '#34d399'] },
+      { id: 'latte', name: '☀️ Material Solar', sub: 'Material 3 Claro · Alabastro e Âmbar', colors: ['#f5f3ee', '#ffffff', '#d97706', '#16a34a'] },
+    ],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
@@ -493,6 +507,12 @@ const T = {
     groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'SmartLife / Tuya Smart Plug', backup: 'Backup and restore' },
     tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', backup: '💾 Backup' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
+    THEME: ['Visual theme (Material Design)', 'Choose one of the 3 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
+    themes: [
+      { id: 'obsidian', name: '🌑 Obsidian', sub: 'Material Dark · Graphite & Bitcoin Gold (default)', colors: ['#0e1117', '#171c26', '#f2a900', '#3ecf8e'] },
+      { id: 'ocean', name: '🌊 Material Ocean', sub: 'Material You Dark · Deep Blue & Electric Cyan', colors: ['#0b111e', '#131c31', '#38bdf8', '#34d399'] },
+      { id: 'latte', name: '☀️ Material Solar', sub: 'Material 3 Light · Alabaster & Amber', colors: ['#f5f3ee', '#ffffff', '#d97706', '#16a34a'] },
+    ],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
@@ -539,12 +559,20 @@ const T = {
 
 const htmlEsc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-function page(lang, hasPin) {
+function page(lang, hasPin, theme) {
   const S = T[lang] || T.en;
+  const activeTheme = normTheme(theme || process.env.THEME);
   const field = (f) => {
     const [label, help] = S[f.key];
     let input;
-    if (f.type === 'select') {
+    if (f.type === 'theme') {
+      input = `<select name="${f.key}" hidden>` + f.options.map((o) => `<option value="${o}">${o || 'obsidian'}</option>`).join('') + '</select>' +
+        `<div class="tcards" id="theme_cards">` + S.themes.map((t) => {
+          const dots = t.colors.map((c) => `<i style="background:${c}"></i>`).join('');
+          return `<button type="button" class="tcard${t.id === activeTheme ? ' active' : ''}" data-theme-opt="${t.id}">` +
+            `<span class="tswatch">${dots}</span><span class="tname">${htmlEsc(t.name)}</span><span class="tsub">${htmlEsc(t.sub)}</span></button>`;
+        }).join('') + `</div>`;
+    } else if (f.type === 'select') {
       input = `<select name="${f.key}">` + f.options.map((o) => `<option value="${o}">${o === '' ? S.auto : o}</option>`).join('') + '</select>';
     } else if (f.type === 'worker') {
       input = `<select name="${f.key}" data-workers="1"><option value="">${S.none}</option></select>`;
@@ -604,22 +632,34 @@ function page(lang, hasPin) {
 <html lang="${lang === 'pt' ? 'pt-br' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${S.title}</title>
 <style>
-  :root { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --ok:#3ecf8e; --warn:#e5534b; }
+  :root, body[data-theme="obsidian"] { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --on-gold:#14161c; --gold-soft:rgba(242,169,0,.09); --ok:#3ecf8e; --warn:#e5534b; --shadow:none; --radius:12px; }
+  body[data-theme="ocean"] { --bg:#0b111e; --card:#131c31; --line:#223254; --txt:#e2e8f0; --dim:#8ea0c2; --gold:#38bdf8; --on-gold:#081221; --gold-soft:rgba(56,189,248,.11); --ok:#34d399; --warn:#fb7185; --shadow:0 4px 18px rgba(0,0,0,.28); --radius:16px; }
+  body[data-theme="latte"] { --bg:#f5f3ee; --card:#ffffff; --line:#e2ded5; --txt:#1c1b18; --dim:#666159; --gold:#d97706; --on-gold:#ffffff; --gold-soft:rgba(217,119,6,.10); --ok:#16a34a; --warn:#dc2626; --shadow:0 2px 10px rgba(28,27,24,.06); --radius:16px; }
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:18px 16px 32px; max-width:840px; margin:0 auto; }
+  body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:18px 16px 32px; max-width:840px; margin:0 auto; transition:background .2s, color .2s; }
   .top { display:flex; align-items:center; justify-content:space-between; gap:12px; margin:2px 0 14px; flex-wrap:wrap; }
   h1 { font-size:22px; font-weight:700; display:flex; align-items:center; gap:8px; }
   .back { color:var(--dim); font-size:13px; font-weight:500; text-decoration:none; padding:6px 12px; border:1px solid var(--line); border-radius:8px; background:var(--card); transition:border-color .15s, color .15s; }
   .back:hover { color:var(--gold); border-color:var(--gold); }
   .tabs { display:flex; gap:6px; overflow-x:auto; padding-bottom:4px; margin-bottom:14px; scrollbar-width:thin; }
   .tab { background:var(--card); color:var(--dim); border:1px solid var(--line); border-radius:10px; padding:9px 13px; font-size:13px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:7px; white-space:nowrap; transition:all .15s; }
-  .tab:hover { color:var(--txt); border-color:#384256; }
-  .tab.active { color:var(--gold); border-color:var(--gold); background:rgba(242,169,0,.09); }
+  .tab:hover { color:var(--txt); border-color:var(--gold); }
+  .tab.active { color:var(--gold); border-color:var(--gold); background:var(--gold-soft); }
   .tdot { width:7px; height:7px; border-radius:50%; display:none; }
   .tab.on .tdot { display:inline-block; background:var(--ok); box-shadow:0 0 6px rgba(62,207,142,.6); }
   .tab.err { border-color:var(--warn); color:var(--warn); }
   .tab.err .tdot { display:inline-block; background:var(--warn); box-shadow:0 0 6px rgba(229,83,75,.8); }
-  fieldset { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:18px 18px 10px; margin-bottom:14px; }
+  fieldset { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 18px 10px; margin-bottom:14px; transition:background .2s, border-color .2s; }
+  .tcards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-top:4px; }
+  @media (max-width:640px) { .tcards { grid-template-columns:1fr; } }
+  .tcard { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:left; display:flex; flex-direction:column; gap:5px; cursor:pointer; transition:all .15s; font-weight:500; }
+  .tcard:hover { border-color:var(--gold); }
+  .tcard.active { border-color:var(--gold); background:var(--gold-soft); box-shadow:0 0 0 1px var(--gold); }
+  .tswatch { display:inline-flex; gap:6px; margin-bottom:2px; }
+  .tswatch i { width:16px; height:16px; border-radius:50%; border:1px solid rgba(128,128,128,.35); display:inline-block; }
+  .tname { font-size:14px; font-weight:700; color:var(--txt); }
+  .tcard.active .tname { color:var(--gold); }
+  .tsub { font-size:11px; color:var(--dim); line-height:1.35; }
   fieldset.tab-pane { display:none; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:14px 16px; }
   fieldset.tab-pane.active { display:grid; }
   legend { color:var(--gold); font-size:12px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; padding:0 6px; }
@@ -657,16 +697,16 @@ function page(lang, hasPin) {
   .addp #new_plug_worker { flex:1.1; min-width:150px; padding:7px 8px; font-size:13px; }
   @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
   .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
-  button { background:var(--gold); color:#111; border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
+  button { background:var(--gold); color:var(--on-gold); border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
   button:disabled { opacity:.5; cursor:default; }
-  .pin-card { position:sticky; bottom:10px; z-index:10; box-shadow:0 8px 28px rgba(0,0,0,.55); padding-bottom:14px; }
+  .pin-card { position:sticky; bottom:10px; z-index:10; box-shadow:0 8px 28px rgba(0,0,0,.35); padding-bottom:14px; }
   .bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; } .bar .f { flex:1; min-width:160px; margin:0; }
   #msg { margin-top:10px; font-size:14px; min-height:20px; } #msg.ok { color:var(--ok); } #msg.bad { color:var(--warn); }
   [hidden] { display:none !important; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
-</style></head><body>
+</style></head><body data-theme="${activeTheme}">
 <div class="top"><h1>⚙️ ${S.title}</h1><a class="back" href="/">${S.back}</a></div>
 <form id="form" autocomplete="off">
 ${tabBar}
@@ -695,6 +735,19 @@ for (const b of form.querySelectorAll('.tab[data-tab]')) {
   b.addEventListener('click', () => selectTab(b.dataset.tab));
 }
 if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.slice(1));
+
+function setThemeUI(val) {
+  const th = ['obsidian', 'ocean', 'latte'].includes(val) ? val : 'obsidian';
+  const sel = el('THEME');
+  if (sel) sel.value = val || '';
+  if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = th;
+  for (const c of form.querySelectorAll('.tcard[data-theme-opt]')) {
+    c.classList.toggle('active', c.dataset.themeOpt === th);
+  }
+}
+for (const c of form.querySelectorAll('.tcard[data-theme-opt]')) {
+  c.addEventListener('click', () => setThemeUI(c.dataset.themeOpt));
+}
 
 function updateTabDots() {
   const hasVal = (k) => Boolean((el(k) && el(k).value && el(k).value.trim()) || secretSet[k]);
@@ -899,6 +952,7 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
     else if (e.tagName === 'SELECT' && v && ![...e.options].some((o) => o.value === v)) { e.add(new Option(v, v)); e.value = v; }
     else e.value = v;
   }
+  setThemeUI(c.values && c.values.THEME);
   updateTabDots();
 });
 
@@ -1186,4 +1240,4 @@ function handle(req, res, ctx) {
   return true;
 }
 
-module.exports = { FIELDS, BACKUP_FILES, applyOverlay, readOverlay, parseHr, clean, current, merge, save, exportBackup, restoreBackup, checkPin, resetPinFails, testCube, testTelegram, page, handle };
+module.exports = { THEMES, normTheme, FIELDS, BACKUP_FILES, applyOverlay, readOverlay, parseHr, clean, current, merge, save, exportBackup, restoreBackup, checkPin, resetPinFails, testCube, testTelegram, page, handle };

@@ -218,9 +218,12 @@ const EN = [
   ["'bilhete-' + new Date()", "'ticket-' + new Date()"],
 ];
 
-// Gera a página no idioma e na moeda pedidos (o resultado é guardado em cache por quem chama)
-function localizePage(page, lang, currency) {
-  let out = page.replace("const LOC = '__LOC__', CUR = '__CUR__';", `const LOC = '${LOCALES[lang] || LOCALES.en}', CUR = '${currency}';`);
+// Gera a página no idioma, moeda e tema pedidos (o resultado é guardado em cache por quem chama)
+function localizePage(page, lang, currency, theme = 'obsidian') {
+  const th = ['obsidian', 'ocean', 'latte'].includes(theme) ? theme : 'obsidian';
+  let out = page
+    .replace('<body data-theme="obsidian">', `<body data-theme="${th}">`)
+    .replace("const LOC = '__LOC__', CUR = '__CUR__';", `const LOC = '${LOCALES[lang] || LOCALES.en}', CUR = '${currency}';`);
   if (lang === 'en') for (const [pt, en] of EN) out = out.split(pt).join(en);
   return out;
 }

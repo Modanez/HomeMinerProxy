@@ -22,7 +22,7 @@ O **HomeMinerProxy** precisa persistir:
    - Salvar, testar ou exportar/restaurar backups na tela `/config` exige o `SETTINGS_PIN`, verificado em tempo constante via `crypto.timingSafeEqual` sobre hashes SHA-256 (`checkPin`).
    - Após 5 tentativas erradas em 15 minutos, novas tentativas são bloqueadas (`HTTP 429`).
    - Segredos (`TELEGRAM_BOT_TOKEN`, `MQTT_PASS`, `TUYA_SECRET`) nunca voltam em texto aberto no `GET /api/config` (apenas `{ set: true, tail: "4últimos" }`).
-   - A interface `/config` organiza as categorias em abas (`Fazenda`, `Mineradores`, `Telegram`, `Tomada`, `MQTT / HA`, `Cubo`, `Backup`) com indicadores luminosos de seção ativa/configurada, mudança automática para a aba com erro de validação e barra inferior fixa de `PIN` + salvar.
+   - A interface `/config` organiza as categorias em abas (`Fazenda`, `Mineradores`, `Telegram`, `Tomada`, `MQTT / HA`, `Cubo`, `Backup`) com indicadores luminosos de seção ativa/configurada, mudança automática para a aba com erro de validação, barra inferior fixa de `PIN` + salvar e seletor visual de **3 temas Material Design** (`THEME`: `obsidian`, `ocean`, `latte`) com pré-visualização instantânea.
 4. **Backup e Restauração em Arquivo Único (`/api/config/backup` e `/api/config/restore`)**:
    - `exportBackup` reúne `settings.json`, `workers.json`, `records.json`, `history.json`, `proxy-stats.json`, `telegram.json` e `cubo-state.json` num único JSON versionado (`version: 1`).
    - `restoreBackup` valida cada seção contra um esquema estrito e grava apenas numa lista fechada de arquivos permitidos (`BACKUP_FILES`) de forma atômica (`.tmp` + `fs.renameSync`), reiniciando o painel em seguida para recarregar o estado restaurado.

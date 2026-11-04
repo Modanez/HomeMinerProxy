@@ -33,6 +33,8 @@ test('locale e moeda são injetados', () => {
   assert.match(localizePage(PAGE, 'pt', 'BRL'), /const LOC = 'pt-BR', CUR = 'BRL';/);
   assert.match(localizePage(PAGE, 'en', 'USD'), /const LOC = 'en-US', CUR = 'USD';/);
   assert.match(localizePage(PAGE, 'en', 'USD'), /<html lang="en">/);
+  assert.match(localizePage(PAGE, 'pt', 'BRL', 'ocean'), /<body data-theme="ocean">/);
+  assert.match(localizePage(PAGE, 'en', 'USD', 'latte'), /<body data-theme="latte">/);
 });
 
 test('escolha do idioma: ?lang > LANGUAGE do servidor > navegador > inglês', () => {

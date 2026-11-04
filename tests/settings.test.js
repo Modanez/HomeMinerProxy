@@ -24,6 +24,13 @@ test('validação dos campos', () => {
   assert.ok(st.clean(field('POWER_PRICE_KWH'), '-1').error);
   assert.deepStrictEqual(st.clean(field('LANGUAGE'), 'pt-BR'), { value: 'pt-BR' });
   assert.ok(st.clean(field('LANGUAGE'), 'fr').error);
+  assert.deepStrictEqual(st.clean(field('THEME'), 'ocean'), { value: 'ocean' });
+  assert.deepStrictEqual(st.clean(field('THEME'), 'latte'), { value: 'latte' });
+  assert.deepStrictEqual(st.clean(field('THEME'), 'obsidian'), { value: 'obsidian' });
+  assert.ok(st.clean(field('THEME'), 'neon').error);
+  assert.strictEqual(st.normTheme('ocean'), 'ocean');
+  assert.strictEqual(st.normTheme('latte'), 'latte');
+  assert.strictEqual(st.normTheme('invalido'), 'obsidian');
   assert.deepStrictEqual(st.clean(field('ALARM_IGNORE'), ['macbook', 'macbook', ' tablet ']), { value: 'macbook,tablet' });
   assert.ok(st.clean(field('ALARM_IGNORE'), ['a b']).error);
   // WATTS e EXPECTED por worker
