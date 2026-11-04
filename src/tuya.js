@@ -52,6 +52,17 @@ function normalizePlugs(rawPlugs, legacy = {}) {
   for (let i = 0; i < arr.length; i++) {
     const item = arr[i];
     if (!item || typeof item !== 'object' || Array.isArray(item)) return { error: 'tuyaplugs', list: [] };
+    // Sonoff (modo DIY/LAN): identificado pelo IP; o deviceId real é opcional (senão vira sonoff_IP)
+    const type = item.type === 'sonoff' ? 'sonoff' : 'tuya';
+    let host = '';
+    if (type === 'sonoff') {
+      const sonoff = require('./sonoff');
+      host = String(item.host || '').trim();
+      if (!host) continue;
+      if (!sonoff.validHost(host)) return { error: 'host', list: [] };
+      const given = String(item.deviceId || '').replace(/[\s"']/g, '');
+      item.deviceId = given && ID_RE.test(given) && !given.startsWith(sonoff.SYNTH_PREFIX) ? given : sonoff.syntheticId(host);
+    }
     const deviceId = String(item.deviceId || '').replace(/[\s"']/g, '');
     if (!deviceId) continue;
     if (!ID_RE.test(deviceId)) return { error: 'tuyaid', list: [] };
@@ -63,7 +74,7 @@ function normalizePlugs(rawPlugs, legacy = {}) {
     if (!PLUG_NAME_RE.test(rawName)) return { error: 'name', list: [] };
     const wdRaw = item.watchdogMin === '' || item.watchdogMin == null ? 0 : Number(item.watchdogMin);
     if (!Number.isInteger(wdRaw) || (wdRaw !== 0 && (wdRaw < 5 || wdRaw > 1440))) return { error: 'watchdog', list: [] };
-    list.push({ name: rawName, deviceId, worker, watchdogMin: wdRaw });
+    list.push(type === 'sonoff' ? { name: rawName, type, host, deviceId, worker, watchdogMin: wdRaw } : { name: rawName, deviceId, worker, watchdogMin: wdRaw });
   }
   return { list };
 }

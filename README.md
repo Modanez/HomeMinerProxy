@@ -277,6 +277,18 @@ If your miner (or a fan while you wait for your Bitaxe) is plugged into a **Smar
    - **Specific worker (e.g. `bitaxe`) or Whole farm (`*`)**: replaces the static `WATTS` estimate with the real live measurement from the smart plug.
 5. Control it from Telegram (`/plug`, `/plug on`, `/plug off`, `/plug reboot`) or set `TUYA_WATCHDOG_MIN` (e.g. `30`) to automatically power-cycle the plug if the miner goes 30 minutes without shares.
 
+### Sonoff plugs (local network)
+
+Sonoff plugs are controlled **directly on your home network**, through their LAN / DIY mode: no cloud, no developer account, no credentials.
+
+1. Turn on the **DIY / LAN mode** of your Sonoff, following Sonoff's guide for your model (look for "DIY mode" on sonoff.tech). Models without DIY mode are not supported yet.
+2. Give the plug a fixed IP in your router (DHCP reservation).
+3. On `/config` → 🔌 **Smart Plug**, pick **Sonoff (local network)**, type the IP, choose the linked miner and click **Add plug**, then **Test plug**.
+
+Sonoff and SmartLife/Tuya plugs can live side by side in the same list. Both get the **Turn on / Turn off / Reboot** buttons on the History screen (PIN protected), the Telegram commands with the worker name (`/plug reboot devkit`) and the watchdog. Most Sonoff plugs do not report power in DIY mode, so the bill keeps using the `WATTS` estimate for them.
+
+**Safety:** the plug linked to `LOCAL_WORKER` (the server running the dashboard) can only be turned on from the dashboard or Telegram, never off or rebooted: it would take the dashboard down with no way to turn it back on. A plug name the bot does not know is refused instead of falling back to another plug.
+
 ## Home Assistant / MQTT (optional)
 
 Set `MQTT_URL` (e.g. `mqtt://homeassistant.local:1883` or `mqtts://host:8883`), `MQTT_USER`, `MQTT_PASS`, and `MQTT_TOPIC` (default: `homeminerproxy`) in `/etc/mineracao.env` or on the Settings screen (`/config`).

@@ -24,6 +24,8 @@ const EN = [
   ['<h1>⛏️ Fazenda de <span>Mineração</span></h1>', '<h1>⛏️ Mining <span>Farm</span></h1>'],
   ['<div class="upd" id="upd">carregando…</div>', '<div class="upd" id="upd">loading…</div>'],
   ['title="Configurações"', 'title="Settings"'],
+  ["const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaauth: 'A Tuya recusou o comando' };",
+    "const PLUG_ERR = { selfplug: 'This plug powers the server itself: turn it off in the plug app', sonoffoffline: 'The Sonoff did not answer (check the IP and LAN/DIY mode)', sonofflan: 'The Sonoff LAN/DIY mode is off', tuyamissing: 'Tuya credentials are missing in /config', tuyaauth: 'Tuya rejected the command' };"],
   ['<a class="langsw" id="langsw" href="#" title="Switch to English"><b>PT</b> | EN</a>', '<a class="langsw" id="langsw" href="#" title="Mudar para português">PT | <b>EN</b></a>'],
   ['<h2 class="sect">Fazenda</h2>', '<h2 class="sect">Farm</h2>'],
   ['<div class="label">Recorde (Best Difficulty)</div>', '<div class="label">Record (best difficulty)</div>'],
@@ -137,7 +139,7 @@ const EN = [
   ["const pState = p.on === false ? 'desligada' : 'ligada';", "const pState = p.on === false ? 'off' : 'on';"],
   ["b1.textContent = p.on === false ? 'Ligar' : 'Desligar';", "b1.textContent = p.on === false ? 'Turn on' : 'Turn off';"],
   ["b2.textContent = 'Reiniciar';", "b2.textContent = 'Reboot';"],
-  ["set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (r.error || 'erro'));", "set('enPinMsg', r.error === 'wrong' ? 'Wrong PIN' : (r.error || 'error'));"],
+  ["set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (PLUG_ERR[r.error] || r.error || 'erro'));", "set('enPinMsg', r.error === 'wrong' ? 'Wrong PIN' : (PLUG_ERR[r.error] || r.error || 'error'));"],
   ["} catch (_) { set('enPinMsg', 'erro'); }", "} catch (_) { set('enPinMsg', 'error'); }"],
   ["'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄'", "'for a 1 in ' + fmtBig(od.perYear) + ' chance per year 😄'"],
 

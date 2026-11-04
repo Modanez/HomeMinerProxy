@@ -293,3 +293,33 @@ test('/bilhete e resumo diário mandam a foto do bilhete', { skip: !hasPillow &&
   assert.match(api.sent[2].raw, /Resumo do dia/);
   assert.match(api.sent[2].raw, /name="parse_mode"\r\n\r\nHTML/);
 });
+
+test('/tomada: nome errado não cai em outra tomada, e o erro da tomada do servidor é explicado', async (t) => {
+  const api = await fakeTelegram();
+  const calls = [];
+  const fakePlugs = {
+    setSwitch: async (on, id) => { calls.push([on, id]); return id === 'sonoff_odroid' ? { ok: false, error: 'selfplug' } : { ok: true, on }; },
+    powerCycle: async (ms, id) => { calls.push(['cycle', id]); return { ok: true }; },
+    getStatus: async () => ({ ok: true, status: { on: true } }),
+  };
+  const plugs = [
+    { name: 'devkit', type: 'sonoff', host: '192.168.0.50', deviceId: 'sonoff_devkit', worker: 'devkit' },
+    { name: 'odroid', type: 'sonoff', host: '192.168.0.51', deviceId: 'sonoff_odroid', worker: 'odroid' },
+  ];
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'pt', snapshot: () => snap(), api: api.url, pollS: 0, warmupMs: 1e9, tuya: fakePlugs, plugs, log: () => {} });
+  t.after(() => { bot.stop(); api.server.close(); });
+
+  api.push(42, '/tomada desligar devkti');
+  await waitFor(() => api.sent.length >= 1);
+  assert.match(api.sent[0].text, /Não achei a tomada "devkti"\. Tomadas: devkit, odroid/);
+  assert.deepStrictEqual(calls, []);   // nada foi desligado
+
+  api.push(42, '/tomada desligar odroid');
+  await waitFor(() => api.sent.length >= 2);
+  assert.match(api.sent[1].text, /alimenta o próprio servidor/);
+
+  api.push(42, '/tomada desligar DevKit');
+  await waitFor(() => api.sent.length >= 3);
+  assert.match(api.sent[2].text, /Tomada <b>desligada<\/b>/);
+  assert.deepStrictEqual(calls.at(-1), [false, 'sonoff_devkit']);
+});
