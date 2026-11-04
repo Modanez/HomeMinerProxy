@@ -452,3 +452,31 @@ test('probing automático dos 6 data centers da Tuya em caso de datacenter suspe
   }
 });
 
+
+test('inspect: traz online, status bruto, funções e o código de comando usado', async (t) => {
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/v1.0/token')) return res.end(JSON.stringify({ success: true, result: { access_token: 'tok', expire_time: 7200 } }));
+    if (req.url === '/v1.0/devices/dev_valid_456') {
+      return res.end(JSON.stringify({ success: true, result: { online: false, category: 'cz', product_name: 'Smart Plug', status: [{ code: 'switch_1', value: true }] } }));
+    }
+    if (req.url === '/v1.0/devices/dev_valid_456/functions') {
+      return res.end(JSON.stringify({ success: true, result: { category: 'cz', functions: [{ code: 'switch_1', type: 'Boolean', values: '{}' }] } }));
+    }
+    res.end(JSON.stringify({ success: false, code: 1106, msg: 'permission deny' }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const apiBase = `http://127.0.0.1:${server.address().port}`;
+  const client = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase });
+
+  assert.deepStrictEqual(await client.inspect('lixo!'), { ok: false, error: 'tuyaid' });
+  const r = await client.inspect();
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.online, false);
+  assert.strictEqual(r.category, 'cz');
+  assert.strictEqual(r.product, 'Smart Plug');
+  assert.strictEqual(r.commandCode, 'switch_1');
+  assert.strictEqual(r.functions[0].code, 'switch_1');
+  assert.deepStrictEqual(r.errors, { info: null, functions: null });
+});

@@ -67,6 +67,7 @@ function initTuya() {
     getStatus: (id) => backendOf(id).getStatus(id),
     setSwitch: (on, id) => (plugGuard(id, on ? 'on' : 'off') || backendOf(id).setSwitch(on, id)),
     powerCycle: (ms, id) => (plugGuard(id, 'reboot') || backendOf(id).powerCycle(ms, id)),
+    inspect: (id) => { const b = backendOf(id); return b.inspect ? b.inspect(id) : Promise.resolve({ ok: false, error: 'noinspect' }); },
   } : null;
   tuyaPlugsState = new Map(TUYA_PLUGS.map((p) => [p.deviceId, { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 }]));
   return { plugs: TUYA_PLUGS, client: tuyaClient, state: tuyaPlugsState };
@@ -2184,6 +2185,7 @@ function requestHandler(req, res) {
       let r;
       if (act === 'on' || act === 'off') r = await tuyaClient.setSwitch(act === 'on', target.deviceId);
       else if (act === 'reboot') r = await tuyaClient.powerCycle(8000, target.deviceId);
+      else if (act === 'info') return json(200, await tuyaClient.inspect(target.deviceId));   // diagnóstico: só leitura
       else return json(400, { ok: false, error: 'option' });
       if (r && r.ok) {
         const st = tuyaPlugsState.get(target.deviceId);

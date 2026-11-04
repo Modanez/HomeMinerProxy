@@ -285,7 +285,27 @@ function createClient(opts = {}) {
     return on.ok ? { ok: true, rebootedAt: new Date().toISOString() } : on;
   }
 
-  return { cfg, getStatus, setSwitch, powerCycle };
+  // Diagnóstico: o que a nuvem sabe do aparelho (online, categoria, status bruto) e as funções que ele aceita
+  async function inspect(devId = cfg.deviceId) {
+    const targetId = String(devId || cfg.deviceId).replace(/[\s"']/g, '');
+    if (!ID_RE.test(targetId)) return { ok: false, error: 'tuyaid' };
+    const id = encodeURIComponent(targetId);
+    const info = await signedCall('GET', `/v1.0/devices/${id}`);
+    const fn = await signedCall('GET', `/v1.0/devices/${id}/functions`);
+    const res = info.ok && info.result ? info.result : {};
+    return {
+      ok: info.ok || fn.ok,
+      online: res.online,
+      category: res.category || (fn.result && fn.result.category) || null,
+      product: res.product_name || null,
+      status: res.status || null,
+      commandCode: switchCodes.get(targetId) || lastSwitchCode,
+      functions: fn.ok && fn.result ? fn.result.functions : null,
+      errors: { info: info.ok ? null : info.error, functions: fn.ok ? null : fn.error },
+    };
+  }
+
+  return { cfg, getStatus, setSwitch, powerCycle, inspect };
 }
 
 async function testPlug(opts = {}) {
