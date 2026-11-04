@@ -700,6 +700,7 @@ function energy(view) {
       watchdogMin: p.watchdogMin >= 5 ? p.watchdogMin : null,
       okAt: st.okAt,
       error: st.error,
+      offline: st.error === 'tuyaoffline',
       on: s ? s.on : null,
       watts: s ? s.watts : null,
       volts: s ? s.volts : null,
@@ -731,7 +732,11 @@ async function tickTuya() {
     const st = tuyaPlugsState.get(p.deviceId) || { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 };
     tuyaPlugsState.set(p.deviceId, st);
     const r = await tuyaClient.getStatus(p.deviceId);
-    if (!r.ok) { st.error = r.error; continue; }
+    if (!r.ok) {
+      st.error = r.error;
+      if (r.error === 'tuyaoffline') st.status = null;   // leitura velha não pode passar por ao vivo
+      continue;
+    }
     st.status = r.status;
     st.okAt = new Date().toISOString();
     st.error = null;
@@ -1860,7 +1865,7 @@ function renderHistory(j) {
     const box = $('enP');
     box.replaceChildren();
     for (const p of plugs) {
-      if (!p || !p.okAt) continue;
+      if (!p || (!p.okAt && !p.offline)) continue;
       const row = document.createElement('div');
       row.className = 'en-prow';
       const txt = document.createElement('span');
@@ -1868,7 +1873,7 @@ function renderHistory(j) {
       const pState = p.on === false ? 'desligada' : 'ligada';
       const pWatts = p.watts != null ? ' · ' + nf(p.watts, 1) + ' W' : '';
       const pVolts = p.volts != null ? ' · ' + nf(p.volts, 0) + ' V' : '';
-      txt.textContent = '🔌 ' + label + ': ' + pState + pWatts + pVolts;
+      txt.textContent = p.offline ? '🔌 ' + label + ': offline na nuvem Tuya' : '🔌 ' + label + ': ' + pState + pWatts + pVolts;
       row.appendChild(txt);
       if (p.deviceId && !kiosk) {
         const btns = document.createElement('span');
@@ -1893,7 +1898,7 @@ function renderHistory(j) {
 }
 
 let savedPin = '', pendingPlug = null;
-const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaauth: 'A Tuya recusou o comando' };
+const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaoffline: 'A tomada está offline na nuvem Tuya (sem Wi-Fi ou sem energia). Confira o app SmartLife', tuyaauth: 'A Tuya recusou o comando' };
 function askPlugAction(deviceId, action) {
   pendingPlug = { deviceId, action };
   set('enPinMsg', '');

@@ -480,3 +480,33 @@ test('inspect: traz online, status bruto, funções e o código de comando usado
   assert.strictEqual(r.functions[0].code, 'switch_1');
   assert.deepStrictEqual(r.errors, { info: null, functions: null });
 });
+
+test('aparelho offline na nuvem: leitura velha é descartada e o comando nem é enviado', async (t) => {
+  let online = false, posts = 0;
+  const server = http.createServer((req, res) => {
+    res.setHeader('Content-Type', 'application/json');
+    if (req.url.startsWith('/v1.0/token')) return res.end(JSON.stringify({ success: true, result: { access_token: 'tok', expire_time: 7200 } }));
+    if (req.method === 'POST') { posts++; return res.end(JSON.stringify({ success: true, result: true })); }
+    if (req.url === '/v1.0/iot-03/devices/dev_valid_456/status') {
+      return res.end(JSON.stringify({ success: true, result: [{ code: 'switch_1', value: true }, { code: 'cur_power', value: 225 }] }));
+    }
+    if (req.url === '/v1.0/devices/dev_valid_456') return res.end(JSON.stringify({ success: true, result: { online } }));
+    res.end(JSON.stringify({ success: false, code: 1106, msg: 'permission deny' }));
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const apiBase = `http://127.0.0.1:${server.address().port}`;
+  const client = tuya.createClient({ clientId: 'client_valid_123', secret: 'secret_valid_123', deviceId: 'dev_valid_456', apiBase });
+
+  assert.deepStrictEqual(await client.getStatus(), { ok: false, error: 'tuyaoffline' });
+  assert.deepStrictEqual(await client.setSwitch(false), { ok: false, error: 'tuyaoffline' });
+  assert.deepStrictEqual(await client.powerCycle(10), { ok: false, error: 'tuyaoffline' });
+  assert.strictEqual(posts, 0);
+
+  online = true;   // de volta à rede: tudo normal
+  const st = await client.getStatus();
+  assert.strictEqual(st.ok, true);
+  assert.strictEqual(st.status.watts, 22.5);
+  assert.strictEqual((await client.setSwitch(false)).ok, true);
+  assert.strictEqual(posts, 1);
+});

@@ -235,6 +235,11 @@ function createClient(opts = {}) {
     return first;
   }
 
+  async function isOffline(targetId) {
+    const d = await callOnCurrentBase('GET', `/v1.0/devices/${encodeURIComponent(targetId)}`, null, false);
+    return !!(d && d.ok && d.result && d.result.online === false);
+  }
+
   async function getStatus(devId = cfg.deviceId) {
     const targetId = String(devId || cfg.deviceId).replace(/[\s"']/g, '');
     if (!ID_RE.test(targetId)) return { ok: false, error: 'tuyaid' };
@@ -252,6 +257,8 @@ function createClient(opts = {}) {
       if (!r) r = attempt;
     }
     if (!r || !r.ok) return r;
+    // A nuvem devolve o último status conhecido mesmo com o aparelho fora da rede: só o campo "online" diz a verdade
+    if (await isOffline(targetId)) return { ok: false, error: 'tuyaoffline' };
     const status = parseStatus(r.result);
     if (status.switchCode && status.switchCode !== '1') {
       lastSwitchCode = status.switchCode;
@@ -265,6 +272,7 @@ function createClient(opts = {}) {
     if (!ID_RE.test(targetId)) return { ok: false, error: 'tuyaid' };
     const code = switchCodes.get(targetId) || lastSwitchCode;
     const id = encodeURIComponent(targetId);
+    if (await isOffline(targetId)) return { ok: false, error: 'tuyaoffline' };
     let r = await signedCall('POST', `/v1.0/iot-03/devices/${id}/commands`, {
       commands: [{ code, value: !!on }],
     });
