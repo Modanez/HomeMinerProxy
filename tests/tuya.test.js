@@ -60,6 +60,20 @@ test('parseStatus converte DPs padrão Tuya (switch_1, cur_power em dW, cur_volt
   const s3 = tuya.parseStatus({ properties: [{ code: 'switch_1', value: true }, { code: 'cur_power', value: 650 }] });
   assert.strictEqual(s3.on, true);
   assert.strictEqual(s3.watts, 65);
+
+  // normalizePlugs: valida lista dinâmica e migra configuração legada de tomada única
+  const leg = tuya.normalizePlugs('', { deviceId: 'eb49d08081c5ba5e80ackt', worker: 'bitaxe', watchdogMin: 10 });
+  assert.deepStrictEqual(leg.list, [{ name: 'bitaxe', deviceId: 'eb49d08081c5ba5e80ackt', worker: 'bitaxe', watchdogMin: 10 }]);
+  const multi = tuya.normalizePlugs([
+    { name: 'Ventilador', deviceId: 'eb1111111111111111', worker: '', watchdogMin: 0 },
+    { name: 'Bitaxe Supra', deviceId: 'eb2222222222222222', worker: 'bitaxe', watchdogMin: 15 },
+    { name: 'Duplicada', deviceId: 'eb1111111111111111', worker: '*', watchdogMin: 0 },
+  ]);
+  assert.strictEqual(multi.list.length, 2);
+  assert.strictEqual(multi.list[0].name, 'Ventilador');
+  assert.strictEqual(multi.list[1].watchdogMin, 15);
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'curto' }]).error, 'tuyaid');
+  assert.strictEqual(tuya.normalizePlugs([{ deviceId: 'eb1111111111111111', watchdogMin: 2 }]).error, 'watchdog');
 });
 
 test('createClient e testPlug conversam com servidor Tuya OpenAPI v1.0 (token, renovação 1010, leitura e comandos)', async (t) => {

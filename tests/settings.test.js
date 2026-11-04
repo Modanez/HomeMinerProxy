@@ -77,6 +77,9 @@ test('validação dos campos', () => {
   assert.ok(st.clean(field('TUYA_WORKER'), 'bad worker').error);
   assert.deepStrictEqual(st.clean(field('TUYA_WATCHDOG_MIN'), '30'), { value: '30' });
   assert.ok(st.clean(field('TUYA_WATCHDOG_MIN'), '3').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_PLUGS'), [{ name: 'Bitaxe', deviceId: 'eb1234567890abcdef', worker: 'bitaxe', watchdogMin: 10 }]),
+    { value: '[{"name":"Bitaxe","deviceId":"eb1234567890abcdef","worker":"bitaxe","watchdogMin":10}]' });
+  assert.ok(st.clean(field('TUYA_PLUGS'), [{ name: 'Ruim', deviceId: 'curto' }]).error);
 });
 
 test('só o que mudou vai para o settings.json, por cima do .env', () => {

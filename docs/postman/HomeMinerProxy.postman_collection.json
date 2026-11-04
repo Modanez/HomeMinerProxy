@@ -254,6 +254,25 @@
             },
             "description": "Sends a 1-byte event code to the Arduino USB siren (`ALARM_PORT`). During `QUIET_HOURS`, sound codes (`R`, `P`, `S`, `T`) are sent in lowercase (`r`, `p`, `s`, `t`) for LED-only feedback."
           }
+        },
+        {
+          "name": "Control SmartLife Plug (/api/plug)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"deviceId\": \"eb1234567890abcdef\",\n  \"action\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/plug",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plug"]
+            },
+            "description": "Switches a registered SmartLife / Tuya plug on (`on`), off (`off`), or power-cycles it (`reboot`). Protected by `SETTINGS_PIN`."
+          }
         }
       ]
     },

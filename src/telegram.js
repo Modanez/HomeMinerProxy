@@ -155,7 +155,9 @@ function formatter(lang) {
 // Resumo do /api/mining só com o que os avisos precisam.
 function digest(snap) {
   const f = snap.farm || {};
-  const plug = (snap.energy || {}).plug || {};
+  const en = snap.energy || {};
+  const plugs = Array.isArray(en.plugs) && en.plugs.length ? en.plugs : (en.plug ? [en.plug] : []);
+  const lastRb = [...plugs].filter((p) => p && p.lastRebootAt).sort((a, b) => new Date(b.lastRebootAt) - new Date(a.lastRebootAt))[0] || plugs[0] || {};
   return {
     hasData: !!f.hasData,
     best: Number(f.best) || 0,
@@ -164,8 +166,8 @@ function digest(snap) {
     failover: ((snap.proxy || {}).failover || []).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
     sats: (snap.wallet || {}).okAt ? (snap.wallet || {}).sats : null,
     achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
-    plugReboots: Number(plug.rebootCount) || 0,
-    plugWorker: plug.worker || '',
+    plugReboots: plugs.reduce((s, p) => s + (Number(p && p.rebootCount) || 0), 0),
+    plugWorker: lastRb.worker || lastRb.name || '',
   };
 }
 
@@ -295,15 +297,31 @@ function achievementsText(snap, opts = {}) {
 
 function plugText(snap, opts = {}) {
   const fm = formatter(opts.lang), T = fm.T;
-  const p = opts.live || ((snap.energy || {}).plug) || null;
-  if (!p || (!p.okAt && p.on === undefined && p.watts === undefined)) return T.plugNone;
-  return [
-    T.plugTitle,
-    T.plugState(p.on),
-    T.plugPower(fm.num(p.watts || 0, 1), p.volts != null ? fm.num(p.volts, 0) : null, p.currentMa != null ? fm.num(p.currentMa, 0) : null),
-    T.plugWorker(escHtml(p.worker || '')),
-    T.plugActions,
-  ].join('\n');
+  const en = (snap && snap.energy) || {};
+  const list = Array.isArray(opts.liveList) && opts.liveList.length
+    ? opts.liveList
+    : (opts.live ? [opts.live] : (Array.isArray(en.plugs) && en.plugs.length ? en.plugs : (en.plug ? [en.plug] : [])));
+  const active = list.filter((p) => p && (p.okAt || p.on !== undefined || p.watts !== undefined));
+  if (!active.length) return T.plugNone;
+  if (active.length === 1) {
+    const p = active[0];
+    return [
+      T.plugTitle + (p.name ? ` · <b>${escHtml(p.name)}</b>` : ''),
+      T.plugState(p.on),
+      T.plugPower(fm.num(p.watts || 0, 1), p.volts != null ? fm.num(p.volts, 0) : null, p.currentMa != null ? fm.num(p.currentMa, 0) : null),
+      T.plugWorker(escHtml(p.worker || '')),
+      T.plugActions,
+    ].join('\n');
+  }
+  const rows = active.map((p, i) => {
+    const label = escHtml(p.name || p.worker || `#${i + 1}`);
+    const st = p.on === false ? '🔴' : '🟢';
+    const w = fm.num(p.watts || 0, 1) + ' W';
+    const v = p.volts != null ? ' · ' + fm.num(p.volts, 0) + ' V' : '';
+    const wk = p.worker ? ` (${escHtml(p.worker === '*' ? 'fazenda' : p.worker)})` : '';
+    return `${i + 1}. ${st} <b>${label}</b> · ${w}${v}${wk}`;
+  });
+  return [T.plugTitle, ...rows, T.plugActions].join('\n');
 }
 
 function dailyText(snap, opts = {}) {
@@ -439,28 +457,47 @@ function start(opts) {
       return sendPhoto(id, png, T.ticketCaption(fm.diff(b.diff), escHtml(b.worker)));
     }
     if (cmd === 'plug') {
-      const arg = ((/^\/\S+\s+(\S+)/.exec(msg.text.trim()) || [])[1] || '').toLowerCase();
+      const parts = msg.text.trim().split(/\s+/).slice(1);
+      const arg = (parts[0] || '').toLowerCase();
+      const targetQuery = parts.slice(1).join(' ').trim().toLowerCase();
+      const cfgPlugs = Array.isArray(opts.plugs) && opts.plugs.length ? opts.plugs : (((snap.energy || {}).plugs) || []);
+      const pickPlug = () => {
+        if (!targetQuery || !cfgPlugs.length) return cfgPlugs[0] || null;
+        const idx = Number(targetQuery);
+        if (Number.isInteger(idx) && idx >= 1 && idx <= cfgPlugs.length) return cfgPlugs[idx - 1];
+        return cfgPlugs.find((p) => (p.name || '').toLowerCase() === targetQuery || (p.worker || '').toLowerCase() === targetQuery || (p.deviceId || '').toLowerCase() === targetQuery) || cfgPlugs[0];
+      };
+      const target = pickPlug();
+      const devId = target && target.deviceId ? target.deviceId : undefined;
       if (arg === 'ligar' || arg === 'on') {
         if (!opts.tuya) return send(id, T.plugNone);
-        const r = await opts.tuya.setSwitch(true);
+        const r = await opts.tuya.setSwitch(true, devId);
         return send(id, r && r.ok ? T.plugSwitched(true) : T.plugErr(escHtml((r && r.error) || 'erro')));
       }
       if (arg === 'desligar' || arg === 'off') {
         if (!opts.tuya) return send(id, T.plugNone);
-        const r = await opts.tuya.setSwitch(false);
+        const r = await opts.tuya.setSwitch(false, devId);
         return send(id, r && r.ok ? T.plugSwitched(false) : T.plugErr(escHtml((r && r.error) || 'erro')));
       }
       if (arg === 'reiniciar' || arg === 'reboot') {
         if (!opts.tuya) return send(id, T.plugNone);
-        const r = await opts.tuya.powerCycle(opts.rebootOffMs || 8000);
+        const r = await opts.tuya.powerCycle(opts.rebootOffMs || 8000, devId);
         return send(id, r && r.ok ? T.plugRebooted : T.plugErr(escHtml((r && r.error) || 'erro')));
       }
-      let live = null;
+      let live = null, liveList = null;
       if (opts.tuya && typeof opts.tuya.getStatus === 'function') {
-        const r = await opts.tuya.getStatus();
-        if (r && r.ok && r.status) live = { ...((snap.energy || {}).plug || {}), ...r.status, okAt: new Date().toISOString() };
+        if (cfgPlugs.length > 1) {
+          liveList = [];
+          for (const cp of cfgPlugs) {
+            const r = await opts.tuya.getStatus(cp.deviceId);
+            if (r && r.ok && r.status) liveList.push({ ...cp, ...r.status, okAt: new Date().toISOString() });
+          }
+        } else {
+          const r = await opts.tuya.getStatus(devId);
+          if (r && r.ok && r.status) live = { ...((snap.energy || {}).plug || {}), ...(target || {}), ...r.status, okAt: new Date().toISOString() };
+        }
       }
-      return send(id, plugText(snap, { ...o, live }));
+      return send(id, plugText(snap, { ...o, live, liveList }));
     }
     const text = cmd === 'status' ? statusText(snap, o)
       : cmd === 'workers' ? workersText(snap, o)

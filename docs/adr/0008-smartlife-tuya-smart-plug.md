@@ -24,10 +24,15 @@ We implemented a native, zero-dependency **Tuya OpenAPI v1.0** client in [`src/t
 2. **Standard DP Normalization (`parseStatus`) & Multi-Path Status Fallback**:
    - Queries `/v1.0/iot-03/devices/{id}/status` with automatic fallback to `/v1.0/devices/{id}/status`, `/v1.0/devices/{id}`, and `/v2.0/cloud/thing/{id}/shadow/properties`.
    - Parses both standard Tuya Socket/Plug data points (`switch_1`, `cur_power` in `0.1 W`, `cur_voltage` in `0.1 V`, `cur_current` in `mA`, `add_ele` in `0.001 kWh`) and legacy numeric DPs (`1`, `19`, `20`, `18`, `17`).
-3. **Secret Masking in `/config`**:
+3. **Dynamic Multi-Plug List (`TUYA_PLUGS`) & Backward-Compatible Migration**:
+   - Users can register any number of SmartLife / Tuya plugs or devices (`TUYA_PLUGS` JSON array of `{ name, deviceId, worker, watchdogMin }`) under a single Tuya Cloud project, sharing the cached OAuth token.
+   - `normalizePlugs()` automatically migrates legacy single-plug configurations (`TUYA_DEVICE_ID`, `TUYA_WORKER`, `TUYA_WATCHDOG_MIN`) into `TUYA_PLUGS` without user intervention.
+4. **Secret Masking in `/config` & Direct Dashboard Control (`POST /api/plug`)**:
    - `TUYA_SECRET` is treated as a secret field in [`src/settings.js`](../../src/settings.js) (masked to its last 4 characters on `GET /api/config`, stored with `0600` file permissions in `settings.json`).
-4. **Watchdog Cooldown**:
-   - When `TUYA_WATCHDOG_MIN >= 5` and a specific `TUYA_WORKER` is linked, [`src/painel.js`](../../src/painel.js) power-cycles the plug (off for 8s, then back on) if the worker is `stale` for longer than the threshold, enforcing a 60-minute cooldown between automatic reboots and notifying Telegram/MQTT (`plug_reboot`).
+   - `POST /api/plug` allows turning on, turning off, or power-cycling any registered plug directly from the main dashboard Energy card, protected by timing-safe `SETTINGS_PIN` verification and brute-force lockout.
+5. **Watchdog Cooldown & 24h Power History**:
+   - When `watchdogMin >= 5` and a specific `worker` is linked on a plug, [`src/painel.js`](../../src/painel.js) power-cycles that plug (off for 8s, then back on) if the worker is `stale` for longer than the threshold, enforcing a 60-minute cooldown between automatic reboots and notifying Telegram/MQTT (`plug_reboot`).
+   - `sampleHistory()` records live Watts (`w`) alongside farm hashrate (`hr`) in `history.json`.
 
 ## Consequences
 

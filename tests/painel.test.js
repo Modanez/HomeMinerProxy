@@ -13,6 +13,7 @@ const OFFLINE = path.join(__dirname, 'helpers/offline.js');
 
 const freePort = () => new Promise((res) => { const s = net.createServer().listen(0, () => { const p = s.address().port; s.close(() => res(p)); }); });
 const get = (url) => new Promise((res, rej) => http.get(url, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => res({ status: r.statusCode, body: b })); }).on('error', rej));
+const post = (url, body) => new Promise((res, rej) => { const d = JSON.stringify(body); const u = new URL(url); const req = http.request({ hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(d) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => res({ status: r.statusCode, body: JSON.parse(b || '{}') })); }); req.on('error', rej); req.write(d); req.end(); });
 const waitFor = async (fn, ms = 8000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch (_) { /* tenta de novo */ } if (Date.now() > end) throw new Error('tempo esgotado'); await new Promise((r) => setTimeout(r, 100)); } };
 
 test('sem BTC_ADDRESS o painel não sobe', () => {
@@ -27,7 +28,7 @@ test('painel serve a página e as APIs sem internet', async (t) => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-'));
   fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({ vovo: { name: 'vovo', hashRate: 3.5e5, bestDifficulty: 38.76, lastSeen: new Date().toISOString(), pool: 'nerdminers' } }));
   const p = spawn(process.execPath, ['-r', OFFLINE, PAINEL], {
-    env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'sem-sirene'), CKPOOL_URLS: '', OCEAN_API: '' },
+    env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'sem-sirene'), CKPOOL_URLS: '', OCEAN_API: '', SETTINGS_PIN: '123456' },
     stdio: 'ignore',
   });
   t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
@@ -53,6 +54,14 @@ test('painel serve a página e as APIs sem internet', async (t) => {
   assert.match(en.body, /<html lang="en">/);
   assert.match(en.body, /Almost a block/);
   assert.match(en.body, /const LOC = 'en-US', CUR = 'USD';/);
+
+  const plugBadPin = await post(`http://127.0.0.1:${port}/api/plug`, { pin: '000000', action: 'on' });
+  assert.strictEqual(plugBadPin.status, 403);
+  assert.strictEqual(plugBadPin.body.error, 'wrong');
+
+  const plugUnconfigured = await post(`http://127.0.0.1:${port}/api/plug`, { pin: '123456', action: 'on' });
+  assert.strictEqual(plugUnconfigured.status, 404);
+  assert.strictEqual(plugUnconfigured.body.ok, false);
 });
 
 test('conta de luz: moeda e preço do kWh configuráveis', async (t) => {

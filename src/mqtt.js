@@ -185,7 +185,8 @@ function statePayload(snap) {
   const active = ws.filter((w) => w.state === 'ok' || w.state === 'quiet');
   const stopped = ws.filter((w) => w.state === 'stale');
   const leader = (snap && snap.championship && snap.championship.leader) || null;
-  const p = e.plug || null;
+  const plugs = Array.isArray(e.plugs) && e.plugs.length ? e.plugs.filter((x) => x && x.okAt) : (e.plug && e.plug.okAt ? [e.plug] : []);
+  const p = plugs[0] || null;
   const out = {
     hashrate: Math.round(Number(f.hashrate) || 0),
     best_difficulty: Number((Number(f.best) || 0).toFixed(4)),
@@ -204,9 +205,10 @@ function statePayload(snap) {
     pool_failover: (((snap && snap.proxy) || {}).failover || []).length > 0 ? 'ON' : 'OFF',
     server_temp_c: h.tempC != null ? Number(h.tempC.toFixed(1)) : null,
   };
-  if (p && p.okAt) {
-    out.plug_on = p.on === false ? 'OFF' : 'ON';
-    out.plug_watts = p.watts != null ? Number(p.watts.toFixed(1)) : null;
+  if (p) {
+    out.plug_on = plugs.some((x) => x.on !== false) ? 'ON' : 'OFF';
+    const totalPlugWatts = plugs.reduce((s, x) => s + (x.watts != null ? Number(x.watts) : 0), 0);
+    out.plug_watts = p.watts != null ? Number(totalPlugWatts.toFixed(1)) : null;
     out.plug_volts = p.volts != null ? Number(p.volts.toFixed(1)) : null;
   }
   return out;
@@ -282,6 +284,20 @@ function start(opts = {}) {
         pool: w.pool || null,
         via_proxy: !!w.viaProxy,
         last_seen: w.lastSeen || null,
+      }, true);
+    }
+    for (const p of ((snap.energy && snap.energy.plugs) || []).filter((x) => x && x.okAt)) {
+      const safePlug = String(p.name || p.deviceId || '').replace(/[^a-zA-Z0-9_.-]/g, '_');
+      if (!safePlug) continue;
+      publish(`${prefix}/plug/${safePlug}`, {
+        name: p.name || p.deviceId,
+        device_id: p.deviceId,
+        worker: p.worker || null,
+        on: p.on === false ? 'OFF' : 'ON',
+        watts: p.watts != null ? Number(Number(p.watts).toFixed(1)) : null,
+        volts: p.volts != null ? Number(Number(p.volts).toFixed(1)) : null,
+        current_ma: p.currentMa != null ? Number(p.currentMa) : null,
+        kwh_total: p.kwhTotal != null ? Number(p.kwhTotal) : null,
       }, true);
     }
     const cur = digest(snap);

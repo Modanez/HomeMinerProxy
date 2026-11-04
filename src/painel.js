@@ -40,14 +40,20 @@ const EXPECTED = Object.assign({}, safeJson(process.env.EXPECTED));
 const WATTS_DEFAULT = Number(process.env.WATTS_DEFAULT || 5);
 const TUYA_WORKER = (process.env.TUYA_WORKER || '').trim();
 const TUYA_WATCHDOG_MIN = Number(process.env.TUYA_WATCHDOG_MIN || 0);
-const tuyaClient = require('./tuya').createClient({
+const TUYA_PLUGS = require('./tuya').normalizePlugs(process.env.TUYA_PLUGS, {
+  deviceId: process.env.TUYA_DEVICE_ID,
+  worker: TUYA_WORKER,
+  watchdogMin: TUYA_WATCHDOG_MIN,
+}).list;
+const tuyaClient = TUYA_PLUGS.length ? require('./tuya').createClient({
   clientId: process.env.TUYA_CLIENT_ID,
   secret: process.env.TUYA_SECRET,
-  deviceId: process.env.TUYA_DEVICE_ID,
+  deviceId: TUYA_PLUGS[0].deviceId,
   region: process.env.TUYA_REGION || 'us',
   apiBase: process.env.TUYA_API,
-});
-const tuyaState = { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 };
+  allowNoDevice: true,
+}) : null;
+const tuyaPlugsState = new Map(TUYA_PLUGS.map((p) => [p.deviceId, { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 }]));
 
 const POOL_API = 'https://public-pool.io:40557/api';
 // Pools no formato ckpool, consultadas junto com a public-pool:
@@ -273,7 +279,10 @@ function sampleHistory() {
   const now = Date.now();
   const last = history[history.length - 1];
   if (last && now - last.t < SAMPLE_MS - 5000) return;
-  history.push({ t: now, hr: Math.round(farmHashrate(workersView())) });
+  const view = workersView();
+  const en = energy(view);
+  const w = Number((en.plugsWatts > 0 ? en.plugsWatts : en.watts).toFixed(1));
+  history.push({ t: now, hr: Math.round(farmHashrate(view)), w });
   history = history.filter((s) => now - s.t <= HISTORY_KEEP_MS);
   saveJson('history.json', history);
 }
@@ -638,50 +647,65 @@ function health() {
 }
 
 function energy(view) {
-  const st = tuyaState.status;
-  const plug = tuyaClient ? {
-    worker: TUYA_WORKER || null,
-    watchdogMin: TUYA_WATCHDOG_MIN >= 5 ? TUYA_WATCHDOG_MIN : null,
-    okAt: tuyaState.okAt,
-    error: tuyaState.error,
-    on: st ? st.on : null,
-    watts: st ? st.watts : null,
-    volts: st ? st.volts : null,
-    currentMa: st ? st.currentMa : null,
-    kwhTotal: st ? st.kwhTotal : null,
-    lastRebootAt: tuyaState.lastRebootIso,
-    rebootCount: tuyaState.rebootCount,
-  } : null;
+  const plugs = tuyaClient ? TUYA_PLUGS.map((p) => {
+    const st = tuyaPlugsState.get(p.deviceId) || { okAt: null, error: null, status: null, lastRebootIso: null, rebootCount: 0 };
+    const s = st.status;
+    return {
+      name: p.name,
+      deviceId: p.deviceId,
+      worker: p.worker || null,
+      watchdogMin: p.watchdogMin >= 5 ? p.watchdogMin : null,
+      okAt: st.okAt,
+      error: st.error,
+      on: s ? s.on : null,
+      watts: s ? s.watts : null,
+      volts: s ? s.volts : null,
+      currentMa: s ? s.currentMa : null,
+      kwhTotal: s ? s.kwhTotal : null,
+      lastRebootAt: st.lastRebootIso,
+      rebootCount: st.rebootCount,
+    };
+  }) : [];
+  const plug = plugs[0] || null;
   const parts = view.filter((w) => w.state === 'ok' || w.state === 'quiet').map((w) => {
-    const liveWatts = plug && plug.worker === w.name && plug.watts != null ? plug.watts : null;
+    const linked = plugs.filter((p) => p.worker === w.name && p.watts != null);
+    const liveWatts = linked.length ? Number(linked.reduce((s, p) => s + p.watts, 0).toFixed(1)) : null;
     return { name: w.name, watts: liveWatts != null ? liveWatts : (WATTS[w.name] ?? WATTS_DEFAULT), live: liveWatts != null };
   });
-  const watts = plug && plug.worker === '*' && plug.watts != null
-    ? plug.watts
+  const wholeFarm = plugs.filter((p) => p.worker === '*' && p.watts != null);
+  const watts = wholeFarm.length
+    ? Number(wholeFarm.reduce((s, p) => s + p.watts, 0).toFixed(1))
     : parts.reduce((s, p) => s + p.watts, 0);
+  const plugsWatts = Number(plugs.reduce((s, p) => s + (p.watts != null ? p.watts : 0), 0).toFixed(1));
   const kwhMonth = watts * 730 / 1000;
-  return { parts, watts, kwhMonth, costMonth: kwhMonth * TARIFA_KWH, tarifa: TARIFA_KWH, plug };
+  return { parts, watts, plugsWatts, kwhMonth, costMonth: kwhMonth * TARIFA_KWH, tarifa: TARIFA_KWH, plug, plugs };
 }
 
 async function tickTuya() {
-  if (!tuyaClient) return;
-  const r = await tuyaClient.getStatus();
-  if (!r.ok) { tuyaState.error = r.error; return; }
-  tuyaState.status = r.status;
-  tuyaState.okAt = new Date().toISOString();
-  tuyaState.error = null;
-  if (TUYA_WATCHDOG_MIN >= 5 && TUYA_WORKER && TUYA_WORKER !== '*') {
-    const w = workersView().find((x) => x.name === TUYA_WORKER);
-    const staleMs = w && w.state === 'stale' && !w.inactive && w.lastSeen ? Date.now() - new Date(w.lastSeen).getTime() : 0;
-    if (staleMs >= TUYA_WATCHDOG_MIN * 60e3 && Date.now() - tuyaState.lastRebootAt >= 60 * 60e3) {
-      tuyaState.lastRebootAt = Date.now();
-      const rb = await tuyaClient.powerCycle(8000);
-      if (rb.ok) {
-        tuyaState.rebootCount++;
-        tuyaState.lastRebootIso = rb.rebootedAt;
+  if (!tuyaClient || !TUYA_PLUGS.length) return;
+  const view = workersView();
+  for (const p of TUYA_PLUGS) {
+    const st = tuyaPlugsState.get(p.deviceId) || { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 };
+    tuyaPlugsState.set(p.deviceId, st);
+    const r = await tuyaClient.getStatus(p.deviceId);
+    if (!r.ok) { st.error = r.error; continue; }
+    st.status = r.status;
+    st.okAt = new Date().toISOString();
+    st.error = null;
+    if (p.watchdogMin >= 5 && p.worker && p.worker !== '*') {
+      const w = view.find((x) => x.name === p.worker);
+      const staleMs = w && w.state === 'stale' && !w.inactive && w.lastSeen ? Date.now() - new Date(w.lastSeen).getTime() : 0;
+      if (staleMs >= p.watchdogMin * 60e3 && Date.now() - st.lastRebootAt >= 60 * 60e3) {
+        st.lastRebootAt = Date.now();
+        const rb = await tuyaClient.powerCycle(8000, p.deviceId);
+        if (rb.ok) {
+          st.rebootCount++;
+          st.lastRebootIso = rb.rebootedAt;
+        }
       }
     }
   }
+  sampleHistory();
 }
 
 // ---------------------------------------------------------------- resposta da API
@@ -922,6 +946,16 @@ const PAGE = `<!doctype html>
   .mini { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:8px; margin-top:8px; }
   .mini .v { font-size:24px; font-weight:700; font-variant-numeric:tabular-nums; }
   .mini .k { color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .en-plugs { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
+  .en-prow { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--dim); }
+  .en-pbtns { display:inline-flex; gap:5px; }
+  body.kiosk .en-pbtns, body.kiosk .en-pin { display:none !important; }
+  .en-btn { background:transparent; color:var(--gold); border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-size:11px; font-family:inherit; cursor:pointer; }
+  .en-btn:hover { border-color:var(--gold); }
+  .en-pin { display:none; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
+  .en-pin.on { display:flex; }
+  .en-pin input { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:4px 8px; width:100px; font-size:12px; font-family:ui-monospace, monospace; }
+  .en-pin span { font-size:12px; color:var(--warn); }
   .tooltip { position:fixed; pointer-events:none; background:#0b0e14; border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
   .tooltip b { color:var(--txt); } .tooltip span { color:var(--dim); }
 
@@ -1065,7 +1099,8 @@ const PAGE = `<!doctype html>
       <div class="label">Energia (estimativa)</div>
       <div class="big" id="enC" style="font-size:28px">–</div>
       <div class="sub" id="enS">–</div>
-      <div class="sub" id="enP"></div>
+      <div class="en-plugs" id="enP"></div>
+      <div class="en-pin" id="enPin"><input type="password" id="enPinInp" inputmode="numeric" placeholder="PIN"><button type="button" class="en-btn" id="enPinOk">Confirmar</button><button type="button" class="en-btn" id="enPinCancel">✕</button><span id="enPinMsg"></span></div>
       <div class="sub" id="enJ">–</div>
     </div>
   </div>
@@ -1733,20 +1768,74 @@ function renderHistory(j) {
   const e = j.energy || {}, od = odds(j.farm.hashrate, j.farm.difficulty);
   if (e.parts) {
     set('enC', money(e.costMonth) + '/mês');
-    set('enS', nf(e.watts) + ' W · ' + nf(e.kwhMonth) + ' kWh/mês · ' + money(e.tarifa) + '/kWh');
-    const p = e.plug;
-    if (p && p.okAt) {
-      const pName = p.worker && p.worker !== '*' ? ' (' + p.worker + ')' : '';
+    const eff = j.farm.hashrate >= 1e9 && e.watts > 0 ? ' · ' + nf(e.watts / (j.farm.hashrate / 1e12), 1) + ' J/TH' : '';
+    set('enS', nf(e.watts) + ' W · ' + nf(e.kwhMonth) + ' kWh/mês · ' + money(e.tarifa) + '/kWh' + eff);
+    const plugs = Array.isArray(e.plugs) && e.plugs.length ? e.plugs : (e.plug ? [e.plug] : []);
+    const box = $('enP');
+    box.replaceChildren();
+    for (const p of plugs) {
+      if (!p || !p.okAt) continue;
+      const row = document.createElement('div');
+      row.className = 'en-prow';
+      const txt = document.createElement('span');
+      const label = p.name || (p.worker && p.worker !== '*' ? p.worker : 'Tomada');
       const pState = p.on === false ? 'desligada' : 'ligada';
       const pWatts = p.watts != null ? ' · ' + nf(p.watts, 1) + ' W' : '';
       const pVolts = p.volts != null ? ' · ' + nf(p.volts, 0) + ' V' : '';
-      set('enP', '🔌 Tomada' + pName + ': ' + pState + pWatts + pVolts);
-    } else {
-      set('enP', '');
+      txt.textContent = '🔌 ' + label + ': ' + pState + pWatts + pVolts;
+      row.appendChild(txt);
+      if (p.deviceId && !kiosk) {
+        const btns = document.createElement('span');
+        btns.className = 'en-pbtns';
+        const b1 = document.createElement('button');
+        b1.type = 'button';
+        b1.className = 'en-btn';
+        b1.textContent = p.on === false ? 'Ligar' : 'Desligar';
+        b1.addEventListener('click', () => askPlugAction(p.deviceId, p.on === false ? 'on' : 'off'));
+        const b2 = document.createElement('button');
+        b2.type = 'button';
+        b2.className = 'en-btn';
+        b2.textContent = 'Reiniciar';
+        b2.addEventListener('click', () => askPlugAction(p.deviceId, 'reboot'));
+        btns.append(b1, b2);
+        row.appendChild(btns);
+      }
+      box.appendChild(row);
     }
     set('enJ', od ? 'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄' : '');
   }
 }
+
+let savedPin = '', pendingPlug = null;
+function askPlugAction(deviceId, action) {
+  pendingPlug = { deviceId, action };
+  set('enPinMsg', '');
+  if (savedPin) return execPlugAction(savedPin);
+  $('enPin').classList.add('on');
+  $('enPinInp').focus();
+}
+async function execPlugAction(pinVal) {
+  if (!pendingPlug) return;
+  const { deviceId, action } = pendingPlug;
+  try {
+    const r = await fetch('/api/plug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pinVal, deviceId, action }) }).then((x) => x.json());
+    if (!r.ok) {
+      savedPin = '';
+      $('enPin').classList.add('on');
+      set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (r.error || 'erro'));
+      return;
+    }
+    savedPin = pinVal;
+    pendingPlug = null;
+    $('enPin').classList.remove('on');
+    $('enPinInp').value = '';
+    set('enPinMsg', '');
+    load();
+  } catch (_) { set('enPinMsg', 'erro'); }
+}
+$('enPinOk').addEventListener('click', () => execPlugAction($('enPinInp').value.trim()));
+$('enPinCancel').addEventListener('click', () => { pendingPlug = null; $('enPin').classList.remove('on'); set('enPinMsg', ''); });
+$('enPinInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); execPlugAction($('enPinInp').value.trim()); } });
 
 // ------------------------------------------------ narrador sarcástico
 const RAIO_ANO = 1.2e6;   // chance aproximada de uma pessoa ser atingida por um raio em um ano
@@ -1988,6 +2077,36 @@ http.createServer((req, res) => {
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ sent, port: ALARM_PORT, connected: alarmFd !== null, quiet: quietNow() }));
   }
+  if (req.url === '/api/plug' && req.method === 'POST') {
+    const json = (code, obj) => {
+      res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
+      res.end(JSON.stringify(obj));
+    };
+    if (!/^application\/json/.test(req.headers['content-type'] || '')) return json(405, { ok: false, error: 'option' });
+    let body = '', tooLarge = false;
+    req.on('data', (c) => { body += c; if (body.length > 8192) { tooLarge = true; req.destroy(); } });
+    req.on('end', async () => {
+      if (tooLarge) return;
+      let j;
+      try { j = JSON.parse(body); } catch (_) { return json(400, { ok: false, error: 'option' }); }
+      const pinCheck = settings.checkPin(j.pin, (process.env.SETTINGS_PIN || '').trim());
+      if (pinCheck !== 'ok') return json(pinCheck === 'wrong' ? 403 : pinCheck === 'locked' ? 429 : 409, { ok: false, error: pinCheck });
+      if (!tuyaClient || !TUYA_PLUGS.length) return json(404, { ok: false, error: 'tuyamissing' });
+      const target = j.deviceId ? TUYA_PLUGS.find((p) => p.deviceId === j.deviceId) : TUYA_PLUGS[0];
+      if (!target) return json(404, { ok: false, error: 'tuyaid' });
+      const act = String(j.action || '');
+      let r;
+      if (act === 'on' || act === 'off') r = await tuyaClient.setSwitch(act === 'on', target.deviceId);
+      else if (act === 'reboot') r = await tuyaClient.powerCycle(8000, target.deviceId);
+      else return json(400, { ok: false, error: 'option' });
+      if (r && r.ok) {
+        const st = tuyaPlugsState.get(target.deviceId);
+        if (st && st.status) st.status.on = act === 'reboot' ? true : act === 'on';
+      }
+      return json(r && r.ok ? 200 : 502, r || { ok: false, error: 'tuyaauth' });
+    });
+    return;
+  }
   if (req.url === '/api/mining') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(snapshot()));
@@ -2023,6 +2142,7 @@ function startTelegram() {
     lang: LANGUAGE || 'en',
     snapshot: () => snapshot(true),
     tuya: tuyaClient,
+    plugs: TUYA_PLUGS,
     quiet: quietNow,
     ignore: ALARM_IGNORE,
     personal: process.env.TELEGRAM_PERSONAL === '1',

@@ -24,10 +24,15 @@ Implementamos um cliente nativo **Tuya OpenAPI v1.0** sem dependências externas
 2. **Normalização dos DPs de Energia (`parseStatus`) e Fallback de Rotas**:
    - Consulta `/v1.0/iot-03/devices/{id}/status` com fallback automático para `/v1.0/devices/{id}/status`, `/v1.0/devices/{id}` e `/v2.0/cloud/thing/{id}/shadow/properties`.
    - Converte tanto os nomes padrão de tomadas Tuya (`switch_1`, `cur_power` em `0,1 W`, `cur_voltage` em `0,1 V`, `cur_current` em `mA`, `add_ele` em `0,001 kWh`) quanto os códigos numéricos legados (`1`, `19`, `20`, `18`, `17`).
-3. **Mascaramento de Segredo em `/config`**:
+3. **Lista Dinâmica de Múltiplas Tomadas (`TUYA_PLUGS`) e Migração Automática**:
+   - Permite cadastrar quantas tomadas ou dispositivos SmartLife / Tuya o usuário quiser (`TUYA_PLUGS` como array JSON de `{ name, deviceId, worker, watchdogMin }`) usando o mesmo projeto e o mesmo token OAuth em cache.
+   - `normalizePlugs()` migra automaticamente a configuração legada de tomada única (`TUYA_DEVICE_ID`, `TUYA_WORKER`, `TUYA_WATCHDOG_MIN`) para a lista dinâmica sem perder nada.
+4. **Mascaramento de Segredo em `/config` e Controle Direto pelo Painel (`POST /api/plug`)**:
    - `TUYA_SECRET` é tratado como campo secreto em [`src/settings.js`](../../src/settings.js) (mascarado para os 4 últimos caracteres em `GET /api/config` e salvo com permissão `0600` em `settings.json`).
-4. **Cooldown do Watchdog**:
-   - Quando `TUYA_WATCHDOG_MIN >= 5` e há um `TUYA_WORKER` vinculado, [`src/painel.js`](../../src/painel.js) faz o *power-cycle* da tomada (desliga por 8 s e religa) se o minerador ficar `stale` acima do limite, respeitando um intervalo mínimo de 60 minutos entre reinícios automáticos e avisando no Telegram/MQTT (`plug_reboot`).
+   - `POST /api/plug` permite ligar, desligar ou reiniciar qualquer tomada cadastrada direto pelo card de Energia do painel principal, exigindo validação timing-safe do `SETTINGS_PIN` com bloqueio contra força bruta.
+5. **Cooldown do Watchdog e Histórico de Consumo 24h**:
+   - Quando `watchdogMin >= 5` e há um `worker` vinculado à tomada, [`src/painel.js`](../../src/painel.js) faz o *power-cycle* daquela tomada (desliga por 8 s e religa) se o minerador ficar `stale` acima do limite, respeitando um intervalo mínimo de 60 minutos entre reinícios automáticos e avisando no Telegram/MQTT (`plug_reboot`).
+   - `sampleHistory()` registra os Watts (`w`) junto com o hashrate (`hr`) em `history.json`.
 
 ## Consequências
 

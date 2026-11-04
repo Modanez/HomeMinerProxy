@@ -148,6 +148,17 @@ test('textos dos comandos', () => {
   const rbEv = tg.diffEvents(d1, tg.digest(sPlug), { lang: 'pt' });
   assert.deepStrictEqual(rbEv.map((e) => e.type), ['plug_reboot']);
   assert.match(rbEv[0].text, /Tomada reiniciada automaticamente<\/b> \(bitaxe\)/);
+  // múltiplas tomadas no /tomada
+  const sMultiPlug = {
+    ...s,
+    energy: {
+      plugs: [
+        { name: 'Ventilador', okAt: '2026-11-04T00:00:00Z', on: true, watts: 42.5, volts: 220, worker: '' },
+        { name: 'Bitaxe', okAt: '2026-11-04T00:00:00Z', on: true, watts: 18.2, volts: 220, worker: 'bitaxe' },
+      ],
+    },
+  };
+  assert.match(tg.plugText(sMultiPlug, { lang: 'pt' }), /1\. 🟢 <b>Ventilador<\/b> · 42,5 W · 220 V[\s\S]*2\. 🟢 <b>Bitaxe<\/b> · 18,2 W · 220 V \(bitaxe\)/);
   const fm = tg.formatter('pt');
   assert.strictEqual(fm.diff(148.4e12), '148,4 tri');
   assert.strictEqual(tg.formatter('en').diff(148.4e12), '148.4T');

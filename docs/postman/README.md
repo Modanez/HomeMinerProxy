@@ -30,6 +30,7 @@ This directory contains the **Postman v2.1 collections** and environment file co
 - `GET /api/mining` — Full farm snapshot (`farm`, `hall`, `recentRecords`, `history`, `energy`, `wallet`, `net`, `nearBlock`, `luck`, `proxy`, `ocean`, `ckpools`, `health`).
 - `GET /api/widget?lang=en` & `GET /api/widget?lang=pt` — Pre-formatted compact JSON for mobile widgets (KWGT).
 - `GET /api/alarm?e=T` — Sends a command to the Arduino USB siren (`T` test, `R` farm record, `P` personal record, `S` share, `0` green, `1` yellow, `2` red).
+- `POST /api/plug` — Controls a configured SmartLife / Tuya smart plug (`action: "on" | "off" | "reboot"`, optional `id` for multi-plug targeting; requires `pin`).
 
 ### 3. Settings & Backup APIs (`:3000`)
 - `GET /api/config` — Returns current effective settings (including `WATTS` and `EXPECTED` maps, and masking `TELEGRAM_BOT_TOKEN` to its last 4 chars), known worker names, and whether `SETTINGS_PIN` is set.

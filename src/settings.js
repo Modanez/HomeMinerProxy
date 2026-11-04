@@ -9,7 +9,7 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
-const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, testPlug } = require('./tuya');
+const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, normalizePlugs, testPlug } = require('./tuya');
 
 const FIELDS = [
   { key: 'BTC_ADDRESS', group: 'farm', type: 'address', required: true },
@@ -34,6 +34,7 @@ const FIELDS = [
   { key: 'TUYA_REGION', group: 'tuya', type: 'select', options: ['', 'us', 'us-east', 'eu', 'eu-west', 'cn', 'in'] },
   { key: 'TUYA_CLIENT_ID', group: 'tuya', type: 'tuyaid' },
   { key: 'TUYA_SECRET', group: 'tuya', type: 'secret' },
+  { key: 'TUYA_PLUGS', group: 'tuya', type: 'tuyaplugs' },
   { key: 'TUYA_DEVICE_ID', group: 'tuya', type: 'tuyaid' },
   { key: 'TUYA_WORKER', group: 'tuya', type: 'tuyaworker' },
   { key: 'TUYA_WATCHDOG_MIN', group: 'tuya', type: 'watchdog' },
@@ -61,6 +62,11 @@ function effective(f, raw) {
     if (!raw) return '';
     const r = cleanMap(raw, f.type);
     return r.error ? String(raw) : r.value;
+  }
+  if (f.type === 'tuyaplugs') {
+    if (!raw) return '';
+    const r = normalizePlugs(raw);
+    return r.error ? String(raw) : (r.list.length ? JSON.stringify(r.list) : '');
   }
   return raw == null ? '' : String(raw);
 }
@@ -132,6 +138,10 @@ function cleanMap(raw, kind) {
 // Normaliza e valida um valor vindo do formulário. Devolve { value } ou { error: códigoDoErro }.
 function clean(field, raw) {
   if (field.type === 'watts' || field.type === 'expected') return cleanMap(raw, field.type);
+  if (field.type === 'tuyaplugs') {
+    const r = normalizePlugs(raw);
+    return r.error ? { error: r.error } : { value: r.list.length ? JSON.stringify(r.list) : '' };
+  }
   let v = raw;
   if (field.type === 'workers') v = Array.isArray(raw) ? raw.map(String) : String(raw || '').split(',');
   else if (field.type === 'bool') v = raw === true || raw === '1' || raw === 'true' ? '1' : '0';
@@ -209,6 +219,14 @@ function current(env = process.env) {
     if (f.type === 'workers') v = String(v).split(',').map((s) => s.trim()).filter(Boolean);
     if (f.type === 'watts' || f.type === 'expected') {
       try { v = v ? JSON.parse(v) : {}; } catch (_) { v = {}; }
+    }
+    if (f.type === 'tuyaplugs') {
+      const r = normalizePlugs(v, {
+        deviceId: rawOf(FIELDS.find((x) => x.key === 'TUYA_DEVICE_ID'), env),
+        worker: rawOf(FIELDS.find((x) => x.key === 'TUYA_WORKER'), env),
+        watchdogMin: rawOf(FIELDS.find((x) => x.key === 'TUYA_WATCHDOG_MIN'), env),
+      });
+      v = r.list || [];
     }
     if (f.type === 'secret') v = v ? { set: true, tail: String(v).slice(-4) } : { set: false };
     out[f.key] = v;
@@ -326,7 +344,9 @@ function validateBackupData(raw) {
       if (!isPlainObj(h)) return { error: 'backup' };
       const t = Number(h.t), hr = Number(h.hr);
       if (!Number.isFinite(t) || t <= 0 || !Number.isFinite(hr) || hr < 0) return { error: 'backup' };
-      hist.push({ t: Math.round(t), hr: Math.round(hr) });
+      const pt = { t: Math.round(t), hr: Math.round(hr) };
+      if (h.w != null && Number.isFinite(Number(h.w)) && Number(h.w) >= 0) pt.w = Number(Number(h.w).toFixed(1));
+      hist.push(pt);
     }
     out.history = hist;
   }
@@ -447,11 +467,13 @@ const T = {
     TUYA_REGION: ['Região Tuya Cloud', 'Américas (us) atende o Brasil. Só mude se sua conta no iot.tuya.com foi criada em outro datacenter (eu, cn, in).'],
     TUYA_CLIENT_ID: ['Access ID (Client ID)', 'Do seu projeto Cloud em iot.tuya.com (vinculado ao app SmartLife por QR Code). Vazio desliga.'],
     TUYA_SECRET: ['Access Secret (Client Secret)', 'Chave secreta do projeto em iot.tuya.com.'],
+    TUYA_PLUGS: ['Tomadas e dispositivos SmartLife', 'Cadastre quantas tomadas ou dispositivos quiser da sua conta SmartLife. Em cada um: Nome, Device ID (ID Virtual no app SmartLife), qual minerador está ligado nele (ou "Só monitorar") e o watchdog opcional em minutos (mín. 5).'],
     TUYA_DEVICE_ID: ['Device ID da tomada', 'No app SmartLife: toque na tomada → ícone ✏️ no canto superior → Informações do Dispositivo → ID Virtual.'],
     TUYA_WORKER: ['Aparelho ligado na tomada', 'Se escolher um worker (ex.: bitaxe), os Watts reais da tomada entram no consumo dele. Em "Só monitorar", mostra a leitura no painel sem somar na conta dos mineradores.'],
     TUYA_WATCHDOG_MIN: ['Reiniciar tomada se parar (min)', 'Se o worker da tomada ficar parado por esses minutos (mín. 5), desliga a tomada por 8s e religa sozinho. Vazio desliga.'],
     auto: 'Automático', none: 'Nenhum', yes: 'Sim', tuyaNone: 'Só monitorar (não somar nos mineradores)', tuyaAll: 'Fazenda inteira (*)',
     addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWattsPlaceholder: 'W (ex.: 20)', addHrPlaceholder: 'Hashrate (ex.: 1.2)', addWorkerBtn: '+ Adicionar worker',
+    addPlugNamePlaceholder: 'Apelido (ex.: Bitaxe, Ventilador)', addPlugIdPlaceholder: 'Device ID (ID Virtual no app)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Adicionar tomada',
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
@@ -464,7 +486,7 @@ const T = {
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
     mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
     tuyaOk: (s) => `Tomada respondeu: ${s}`, tuyaFail: (e) => `Falha na tomada: ${e}`,
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
@@ -492,11 +514,13 @@ const T = {
     TUYA_REGION: ['Tuya Cloud region', 'Americas (us) covers the US and Brazil. Change only if your iot.tuya.com project is in another region (eu, cn, in).'],
     TUYA_CLIENT_ID: ['Access ID (Client ID)', 'From your Cloud project at iot.tuya.com (linked to the SmartLife app via QR code). Empty turns it off.'],
     TUYA_SECRET: ['Access Secret (Client Secret)', 'Secret key from your iot.tuya.com project.'],
+    TUYA_PLUGS: ['SmartLife plugs & devices', 'Add as many smart plugs or devices from your SmartLife account as you want. For each one: Name, Device ID (Virtual ID in the SmartLife app), linked miner (or "Monitor only") and optional watchdog minutes (min 5).'],
     TUYA_DEVICE_ID: ['Plug Device ID', 'In the SmartLife app: tap the plug → ✏️ icon at top right → Device Information → Virtual ID.'],
     TUYA_WORKER: ['Device plugged in', 'If set to a worker (e.g. bitaxe), the plug\'s live Watts are used for that worker. "Monitor only" shows the reading on the dashboard without adding it to the miners\' power bill.'],
     TUYA_WATCHDOG_MIN: ['Auto-reboot plug when stopped (min)', 'If the linked worker is stopped for this many minutes (min 5), turns the plug off for 8s and back on. Empty disables.'],
     auto: 'Automatic', none: 'None', yes: 'Yes', tuyaNone: 'Monitor only (do not add to miners)', tuyaAll: 'Whole farm (*)',
     addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWattsPlaceholder: 'W (e.g. 20)', addHrPlaceholder: 'Hashrate (e.g. 1.2)', addWorkerBtn: '+ Add worker',
+    addPlugNamePlaceholder: 'Label (e.g. Bitaxe, Fan)', addPlugIdPlaceholder: 'Device ID (Virtual ID in app)', addPlugWdPlaceholder: 'Watchdog min', addPlugBtn: '+ Add plug',
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
@@ -509,7 +533,7 @@ const T = {
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
     mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
     tuyaOk: (s) => `Plug answered: ${s}`, tuyaFail: (e) => `Plug failed: ${e}`,
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -537,6 +561,13 @@ function page(lang, hasPin) {
         `<input type="text" id="new_worker_hr" class="addw-hr" inputmode="decimal" placeholder="${htmlEsc(S.addHrPlaceholder)}" autocomplete="off">` +
         `<select id="new_worker_unit" class="addw-u"><option value="">H/s</option><option value="k">kH/s</option><option value="M">MH/s</option><option value="G">GH/s</option><option value="T" selected>TH/s</option><option value="P">PH/s</option></select>` +
         `<button type="button" class="ghost" id="add_worker_btn">${htmlEsc(S.addWorkerBtn)}</button></div>`;
+    } else if (f.type === 'tuyaplugs') {
+      input = `<div class="plist" id="plug_list"></div>` +
+        `<div class="addw addp"><input type="text" id="new_plug_name" placeholder="${htmlEsc(S.addPlugNamePlaceholder)}" autocomplete="off" spellcheck="false">` +
+        `<input type="text" id="new_plug_id" placeholder="${htmlEsc(S.addPlugIdPlaceholder)}" autocomplete="off" spellcheck="false">` +
+        `<select id="new_plug_worker" data-workers="2"><option value="">${htmlEsc(S.tuyaNone)}</option><option value="*">${htmlEsc(S.tuyaAll)}</option></select>` +
+        `<input type="text" id="new_plug_wd" class="addw-w" inputmode="numeric" maxlength="4" placeholder="${htmlEsc(S.addPlugWdPlaceholder)}" autocomplete="off">` +
+        `<button type="button" class="ghost" id="add_plug_btn">${htmlEsc(S.addPlugBtn)}</button></div>`;
     } else if (f.type === 'bool') {
       input = `<label class="inline"><input type="checkbox" name="${f.key}"> ${S.yes}</label>`;
     } else if (f.type === 'secret') {
@@ -550,8 +581,9 @@ function page(lang, hasPin) {
       : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>`
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>` : '';
-    const half = ['LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TUYA_REGION', 'TUYA_WORKER', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
-    return `<div class="f${half}" data-key="${f.key}"><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
+    const half = ['LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
+    return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };
   const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'backup'];
   const tabBar = `<nav class="tabs" id="tabs">` + tabOrder.map((g, i) =>
@@ -565,6 +597,7 @@ function page(lang, hasPin) {
     saved: S.saved, back2: S.back2, nothing: S.nothing, cubeOk: S.cubeOk, cubeFail: S.cubeFail,
     tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'),
     tuyaOk: S.tuyaOk('%s'), tuyaFail: S.tuyaFail('%s'), tokenSet: S.tokenSet('%s'),
+    tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
   };
   return `<!doctype html>
@@ -613,6 +646,16 @@ function page(lang, hasPin) {
   .addw .addw-hr { width:125px; padding:7px 8px; font-size:14px; text-align:right; }
   .addw .addw-u { width:78px; padding:7px 4px; font-size:13px; }
   .addw button { margin:0; white-space:nowrap; }
+  .plist { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
+  .prow { display:grid; grid-template-columns:minmax(110px,1fr) minmax(150px,1.4fr) minmax(150px,1.2fr) 74px auto auto; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  .prow input, .prow select { padding:6px 8px; font-size:13px; }
+  .prow .p-id { font-family:ui-monospace, Menlo, monospace; font-size:12px; }
+  .prow .p-wd { text-align:right; }
+  .prow button { margin:0; padding:6px 9px; font-size:12px; }
+  .addp #new_plug_name { flex:1; min-width:130px; padding:7px 9px; font-size:14px; }
+  .addp #new_plug_id { flex:1.4; min-width:170px; padding:7px 9px; font-size:13px; font-family:ui-monospace, Menlo, monospace; }
+  .addp #new_plug_worker { flex:1.1; min-width:150px; padding:7px 8px; font-size:13px; }
+  @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
   .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
   button { background:var(--gold); color:#111; border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
@@ -640,7 +683,7 @@ const UNITS = [['', 'H/s', 1], ['k', 'kH/s', 1e3], ['M', 'MH/s', 1e6], ['G', 'GH
 const form = document.getElementById('form'), msg = document.getElementById('msg');
 const say = (t, ok) => { msg.textContent = t; msg.className = ok ? 'ok' : 'bad'; };
 const el = (n) => form.elements[n];
-let workers = [], stateValues = { ALARM_IGNORE: [], WATTS: {}, EXPECTED: {} }, secretSet = {};
+let workers = [], stateValues = { ALARM_IGNORE: [], WATTS: {}, EXPECTED: {}, TUYA_PLUGS: [] }, secretSet = {};
 
 function selectTab(id) {
   if (!form.querySelector('.tab-pane[data-pane="' + id + '"]')) return;
@@ -655,13 +698,14 @@ if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.sl
 
 function updateTabDots() {
   const hasVal = (k) => Boolean((el(k) && el(k).value && el(k).value.trim()) || secretSet[k]);
+  const hasPlugs = (stateValues.TUYA_PLUGS && stateValues.TUYA_PLUGS.length > 0) || hasVal('TUYA_DEVICE_ID');
   const activeMap = {
     farm: hasVal('BTC_ADDRESS'),
     miners: workers.length > 0,
     cube: hasVal('CUBE_IP'),
     telegram: hasVal('TELEGRAM_CHAT_ID') || hasVal('TELEGRAM_BOT_TOKEN'),
     mqtt: hasVal('MQTT_URL'),
-    tuya: hasVal('TUYA_DEVICE_ID') && hasVal('TUYA_CLIENT_ID'),
+    tuya: hasPlugs && hasVal('TUYA_CLIENT_ID'),
   };
   for (const b of form.querySelectorAll('.tab[data-tab]')) {
     b.classList.toggle('on', !!activeMap[b.dataset.tab]);
@@ -763,6 +807,79 @@ function renderWorkerControls() {
       eBox.appendChild(row);
     }
   }
+  renderPlugs();
+}
+
+async function testPlugById(devId, btn) {
+  if (btn) btn.disabled = true;
+  try {
+    const v = values();
+    v.TUYA_DEVICE_ID = devId;
+    const r = await post('/api/config/test', { pin: pin(), what: 'tuya', values: v });
+    showErrors(r.errors || {});
+    if (r.error) say(M.err[r.error] || r.error, false);
+    else if (r.ok && r.status) {
+      const parts = [r.status.on === false ? 'OFF' : 'ON'];
+      if (r.status.watts != null) parts.push(r.status.watts + ' W');
+      if (r.status.volts != null) parts.push(r.status.volts + ' V');
+      if (r.status.currentMa != null) parts.push(r.status.currentMa + ' mA');
+      say(M.tuyaOk.replace('%s', parts.join(' · ')), true);
+    } else {
+      say(M.tuyaFail.replace('%s', M.err[r.detail] || r.detail || ''), false);
+    }
+  } finally { if (btn) btn.disabled = false; }
+}
+
+function renderPlugs() {
+  const box = document.getElementById('plug_list');
+  if (!box) return;
+  box.replaceChildren();
+  const list = stateValues.TUYA_PLUGS || [];
+  list.forEach((p, idx) => {
+    const row = document.createElement('div');
+    row.className = 'prow';
+    const nInp = document.createElement('input');
+    nInp.type = 'text';
+    nInp.value = p.name || '';
+    nInp.placeholder = 'Tomada ' + (idx + 1);
+    nInp.addEventListener('input', () => { p.name = nInp.value; });
+    const idInp = document.createElement('input');
+    idInp.type = 'text';
+    idInp.className = 'p-id';
+    idInp.value = p.deviceId || '';
+    idInp.addEventListener('input', () => { p.deviceId = idInp.value.trim(); });
+    const wSel = document.createElement('select');
+    wSel.add(new Option(M.tuyaNone, ''));
+    wSel.add(new Option(M.tuyaAll, '*'));
+    for (const w of workers) wSel.add(new Option(w, w));
+    if (p.worker && ![...wSel.options].some((o) => o.value === p.worker)) wSel.add(new Option(p.worker, p.worker));
+    wSel.value = p.worker || '';
+    wSel.addEventListener('change', () => { p.worker = wSel.value; });
+    const wdInp = document.createElement('input');
+    wdInp.type = 'text';
+    wdInp.className = 'p-wd';
+    wdInp.inputMode = 'numeric';
+    wdInp.maxLength = 4;
+    wdInp.placeholder = 'min';
+    wdInp.value = p.watchdogMin ? String(p.watchdogMin) : '';
+    wdInp.addEventListener('input', () => { p.watchdogMin = wdInp.value.trim() ? Number(wdInp.value.trim()) : 0; });
+    const tBtn = document.createElement('button');
+    tBtn.type = 'button';
+    tBtn.className = 'ghost';
+    tBtn.textContent = M.testTuya;
+    tBtn.addEventListener('click', () => testPlugById(idInp.value.trim(), tBtn));
+    const delBtn = document.createElement('button');
+    delBtn.type = 'button';
+    delBtn.className = 'ghost';
+    delBtn.textContent = '✕';
+    delBtn.addEventListener('click', () => {
+      stateValues.TUYA_PLUGS.splice(idx, 1);
+      renderPlugs();
+      updateTabDots();
+    });
+    row.append(nInp, idInp, wSel, wdInp, tBtn, delBtn);
+    box.appendChild(row);
+  });
 }
 
 fetch('/api/config').then((r) => r.json()).then((c) => {
@@ -772,9 +889,10 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
   stateValues.ALARM_IGNORE = (c.values && c.values.ALARM_IGNORE) || [];
   stateValues.WATTS = Object.assign({}, (c.values && c.values.WATTS) || {});
   stateValues.EXPECTED = Object.assign({}, (c.values && c.values.EXPECTED) || {});
+  stateValues.TUYA_PLUGS = Array.isArray(c.values && c.values.TUYA_PLUGS) ? c.values.TUYA_PLUGS.map((p) => Object.assign({}, p)) : [];
   renderWorkerControls();
   for (const [k, v] of Object.entries(c.values)) {
-    if (k === 'ALARM_IGNORE' || k === 'WATTS' || k === 'EXPECTED') continue;
+    if (k === 'ALARM_IGNORE' || k === 'WATTS' || k === 'EXPECTED' || k === 'TUYA_PLUGS') continue;
     const e = el(k); if (!e) continue;
     if (e.type === 'checkbox') e.checked = !!v;
     else if (e.type === 'password') { secretSet[k] = !!(v && v.set); document.getElementById(k + '_state').textContent = v.set ? M.tokenSet.replace('%s', v.tail) : ''; document.getElementById(k + '_clearbox').hidden = !v.set; }
@@ -783,6 +901,33 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
   }
   updateTabDots();
 });
+
+const addPlugBtn = document.getElementById('add_plug_btn'), newPlugName = document.getElementById('new_plug_name');
+const newPlugId = document.getElementById('new_plug_id'), newPlugWorker = document.getElementById('new_plug_worker'), newPlugWd = document.getElementById('new_plug_wd');
+if (addPlugBtn && newPlugId) {
+  const addP = () => {
+    const devId = newPlugId.value.trim();
+    if (!devId) return;
+    if (!/^[a-zA-Z0-9_-]{8,64}$/.test(devId)) { say(M.err.tuyaid, false); return; }
+    const w = newPlugWorker ? newPlugWorker.value : '';
+    const n = (newPlugName ? newPlugName.value.trim() : '') || (w && w !== '*' ? w : 'Tomada ' + ((stateValues.TUYA_PLUGS || []).length + 1));
+    const wdRaw = newPlugWd ? newPlugWd.value.trim() : '';
+    const wd = wdRaw ? Number(wdRaw) : 0;
+    if (wdRaw && (!Number.isInteger(wd) || wd < 5 || wd > 1440)) { say(M.err.watchdog, false); return; }
+    stateValues.TUYA_PLUGS = (stateValues.TUYA_PLUGS || []).filter((x) => x.deviceId !== devId);
+    stateValues.TUYA_PLUGS.push({ name: n, deviceId: devId, worker: w, watchdogMin: wd });
+    if (newPlugName) newPlugName.value = '';
+    newPlugId.value = '';
+    if (newPlugWorker) newPlugWorker.value = '';
+    if (newPlugWd) newPlugWd.value = '';
+    renderPlugs();
+    updateTabDots();
+  };
+  addPlugBtn.addEventListener('click', addP);
+  for (const x of [newPlugName, newPlugId, newPlugWd].filter(Boolean)) {
+    x.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addP(); } });
+  }
+}
 
 const addBtn = document.getElementById('add_worker_btn'), addInp = document.getElementById('new_worker');
 const addWInp = document.getElementById('new_worker_watts'), addHrInp = document.getElementById('new_worker_hr'), addUInp = document.getElementById('new_worker_unit');
@@ -837,6 +982,23 @@ function values() {
       out[k] = map;
       continue;
     }
+    if (k === 'TUYA_PLUGS') {
+      const plugs = (stateValues.TUYA_PLUGS || []).map((p) => Object.assign({}, p)).filter((p) => p.deviceId);
+      const pendingId = newPlugId && newPlugId.value.trim();
+      if (pendingId && !plugs.some((p) => p.deviceId === pendingId)) {
+        const w = newPlugWorker ? newPlugWorker.value : '';
+        const n = (newPlugName ? newPlugName.value.trim() : '') || (w && w !== '*' ? w : 'Tomada ' + (plugs.length + 1));
+        const wd = newPlugWd && newPlugWd.value.trim() ? Number(newPlugWd.value.trim()) : 0;
+        plugs.push({ name: n, deviceId: pendingId, worker: w, watchdogMin: wd });
+      }
+      out.TUYA_PLUGS = plugs;
+      const first = plugs[0] || {};
+      out.TUYA_DEVICE_ID = first.deviceId || '';
+      out.TUYA_WORKER = first.worker || '';
+      out.TUYA_WATCHDOG_MIN = first.watchdogMin ? String(first.watchdogMin) : '';
+      continue;
+    }
+    if (k === 'TUYA_DEVICE_ID' || k === 'TUYA_WORKER' || k === 'TUYA_WATCHDOG_MIN') continue;
     const e = el(k);
     out[k] = e.type === 'checkbox' ? e.checked : e.value;
     if (el(k + '_clear')) out[k + '_clear'] = el(k + '_clear').checked;

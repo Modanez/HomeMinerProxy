@@ -254,6 +254,25 @@
             },
             "description": "Envia um comando de 1 byte para a sirene Arduino (`ALARM_PORT`). Durante o `QUIET_HOURS`, os códigos sonoros (`R`, `P`, `S`, `T`) são enviados em minúsculas (`r`, `p`, `s`, `t`) para acionar apenas os LEDs sem som."
           }
+        },
+        {
+          "name": "Controlar Tomada SmartLife / Tuya (/api/plug)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"id\": \"\",\n  \"action\": \"on\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/plug",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plug"]
+            },
+            "description": "Controla uma tomada inteligente SmartLife / Tuya configurada em `TUYA_PLUGS` (`action: \"on\" | \"off\" | \"reboot\"`), autenticado pelo `SETTINGS_PIN`. Se `id` for vazio, atua na primeira tomada configurada."
+          }
         }
       ]
     },

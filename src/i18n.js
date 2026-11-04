@@ -126,14 +126,19 @@ const EN = [
   ["[t.target, 'alvo da rede', 'var(--dim)'], [t.hashDiff, 'bloco #'", "[t.target, 'network target', 'var(--dim)'], [t.hashDiff, 'block #'"],
 
   // ---------- histórico
+  ['<button type="button" class="en-btn" id="enPinOk">Confirmar</button>', '<button type="button" class="en-btn" id="enPinOk">Confirm</button>'],
   ["'coletando dados… o gráfico aparece em alguns minutos'", "'collecting data… the chart shows up in a few minutes'"],
   ["'o gráfico aparece depois do primeiro recorde registrado'", "'the chart shows up after the first recorded record'"],
   ["'<li><span></span><span class=\"sub\">nenhum recorde ainda</span></li>'", "'<li><span></span><span class=\"sub\">no records yet</span></li>'"],
   ["(h.worker || 'Máquina') + ' · saúde'", "(h.worker || 'Machine') + ' · health'"],
   ["set('enC', money(e.costMonth) + '/mês');", "set('enC', money(e.costMonth) + '/month');"],
   ["' kWh/mês · '", "' kWh/month · '"],
+  ["const label = p.name || (p.worker && p.worker !== '*' ? p.worker : 'Tomada');", "const label = p.name || (p.worker && p.worker !== '*' ? p.worker : 'Plug');"],
   ["const pState = p.on === false ? 'desligada' : 'ligada';", "const pState = p.on === false ? 'off' : 'on';"],
-  ["set('enP', '🔌 Tomada' + pName + ': ' + pState + pWatts + pVolts);", "set('enP', '🔌 Plug' + pName + ': ' + pState + pWatts + pVolts);"],
+  ["b1.textContent = p.on === false ? 'Ligar' : 'Desligar';", "b1.textContent = p.on === false ? 'Turn on' : 'Turn off';"],
+  ["b2.textContent = 'Reiniciar';", "b2.textContent = 'Reboot';"],
+  ["set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (r.error || 'erro'));", "set('enPinMsg', r.error === 'wrong' ? 'Wrong PIN' : (r.error || 'error'));"],
+  ["} catch (_) { set('enPinMsg', 'erro'); }", "} catch (_) { set('enPinMsg', 'error'); }"],
   ["'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄'", "'for a 1 in ' + fmtBig(od.perYear) + ' chance per year 😄'"],
 
   // ---------- narrador

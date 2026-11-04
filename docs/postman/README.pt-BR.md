@@ -30,6 +30,7 @@ Este diretório contém as **coleções Postman v2.1** e o arquivo de ambiente c
 - `GET /api/mining` — Snapshot completo da fazenda (`farm`, `hall`, `recentRecords`, `history`, `energy`, `wallet`, `net`, `nearBlock`, `luck`, `proxy`, `ocean`, `ckpools`, `health`).
 - `GET /api/widget?lang=pt` e `GET /api/widget?lang=en` — Resumo enxuto e já formatado para widgets de celular (KWGT).
 - `GET /api/alarm?e=T` — Envia um comando manual para a sirene Arduino na USB (`T` teste, `R` recorde da fazenda, `P` recorde pessoal, `S` share, `0` verde, `1` amarelo, `2` vermelho).
+- `POST /api/plug` — Controla uma tomada inteligente SmartLife / Tuya cadastrada em `TUYA_PLUGS` (`action: "on" | "off" | "reboot"`, `id` opcional da tomada; exige `pin`).
 
 ### 3. APIs de Configuração e Backup (`:3000`)
 - `GET /api/config` — Retorna os valores atuais (incluindo os mapas `WATTS` e `EXPECTED` por worker e mascarando o `TELEGRAM_BOT_TOKEN` com apenas os 4 últimos caracteres), a lista de workers conhecidos e se há `SETTINGS_PIN` definido.
