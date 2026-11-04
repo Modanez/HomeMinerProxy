@@ -47,12 +47,22 @@ const STRINGS = {
     champLast: (w, d) => `Campeão da semana passada: 🏆 <b>${w}</b> (${d})`,
     sundayWinner: (w, f, d) => `\n🏆 <b>Campeão da semana:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
     achTitle: (u, t) => `🎖️ <b>Conquistas da fazenda</b> (${u}/${t})`,
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
+    plugReboot: (w) => `🔌 <b>Tomada reiniciada automaticamente</b>${w && w !== '*' ? ' (' + w + ')' : ''}: minerador sem shares pelo tempo limite`,
+    plugNone: 'Tomada inteligente não configurada. Configure em Tomada Inteligente (SmartLife / Tuya) na tela /config.',
+    plugTitle: '🔌 <b>Tomada inteligente</b>',
+    plugState: (on) => `Estado: <b>${on === false ? '🔴 desligada' : '🟢 ligada'}</b>`,
+    plugPower: (w, v, ma) => `Consumo: <b>${w} W</b>${v != null ? ' · ' + v + ' V' : ''}${ma != null ? ' · ' + ma + ' mA' : ''}`,
+    plugWorker: (w) => `Vinculada a: <b>${w === '*' ? 'fazenda inteira' : w || 'só monitorar'}</b>`,
+    plugActions: 'Comandos: <code>/tomada ligar</code> · <code>/tomada desligar</code> · <code>/tomada reiniciar</code>',
+    plugSwitched: (on) => on ? '🟢 Tomada <b>ligada</b>.' : '🔴 Tomada <b>desligada</b>.',
+    plugRebooted: '🔄 Tomada <b>reiniciada</b> (desligou 8 s e religou).',
+    plugErr: (e) => `⚠️ Falha ao falar com a tomada: ${e}`,
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle da tomada SmartLife\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
     ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
     noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Tomada inteligente (SmartLife)'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -91,17 +101,27 @@ const STRINGS = {
     champLast: (w, d) => `Last week's champion: 🏆 <b>${w}</b> (${d})`,
     sundayWinner: (w, f, d) => `\n🏆 <b>Champion of the week:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
     achTitle: (u, t) => `🎖️ <b>Farm achievements</b> (${u}/${t})`,
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/ticket · today\'s lottery ticket\n/help · this list',
+    plugReboot: (w) => `🔌 <b>Smart plug auto-rebooted</b>${w && w !== '*' ? ' (' + w + ')' : ''}: miner had no shares for the watchdog limit`,
+    plugNone: 'Smart plug not configured. Set it up under Smart Plug (SmartLife / Tuya) in /config.',
+    plugTitle: '🔌 <b>Smart plug</b>',
+    plugState: (on) => `State: <b>${on === false ? '🔴 off' : '🟢 on'}</b>`,
+    plugPower: (w, v, ma) => `Power: <b>${w} W</b>${v != null ? ' · ' + v + ' V' : ''}${ma != null ? ' · ' + ma + ' mA' : ''}`,
+    plugWorker: (w) => `Linked to: <b>${w === '*' ? 'whole farm' : w || 'monitor only'}</b>`,
+    plugActions: 'Commands: <code>/plug on</code> · <code>/plug off</code> · <code>/plug reboot</code>',
+    plugSwitched: (on) => on ? '🟢 Smart plug turned <b>on</b>.' : '🔴 Smart plug turned <b>off</b>.',
+    plugRebooted: '🔄 Smart plug <b>rebooted</b> (off for 8 s, then back on).',
+    plugErr: (e) => `⚠️ Smart plug error: ${e}`,
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control\n/ticket · today\'s lottery ticket\n/help · this list',
     ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
     noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Smart plug (SmartLife)'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
 };
-const ALIASES = { sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
+const ALIASES = { sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', tomada: 'plug', plug: 'plug', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
 
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -135,6 +155,7 @@ function formatter(lang) {
 // Resumo do /api/mining só com o que os avisos precisam.
 function digest(snap) {
   const f = snap.farm || {};
+  const plug = (snap.energy || {}).plug || {};
   return {
     hasData: !!f.hasData,
     best: Number(f.best) || 0,
@@ -143,6 +164,8 @@ function digest(snap) {
     failover: ((snap.proxy || {}).failover || []).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
     sats: (snap.wallet || {}).okAt ? (snap.wallet || {}).sats : null,
     achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
+    plugReboots: Number(plug.rebootCount) || 0,
+    plugWorker: plug.worker || '',
   };
 }
 
@@ -183,6 +206,9 @@ function diffEvents(prev, cur, opts = {}) {
       const pair = (opts.lang === 'pt' ? a.pt : a.en) || a.pt || [a.id, ''];
       out.push({ type: 'achievement', text: T.achievement(a.icon || '🎖️', escHtml(pair[0]), escHtml(pair[1]), a.worker ? escHtml(a.worker) : '') });
     }
+  }
+  if ((cur.plugReboots || 0) > (prev.plugReboots || 0)) {
+    out.push({ type: 'plug_reboot', text: T.plugReboot(escHtml(cur.plugWorker || '')) });
   }
   return out;
 }
@@ -265,6 +291,19 @@ function achievementsText(snap, opts = {}) {
     lines.push(`${ico} <b>${escHtml(pair[0])}</b>${a.unlocked && a.worker ? ' (' + escHtml(a.worker) + ')' : ''} — ${escHtml(pair[1])}`);
   }
   return lines.join('\n');
+}
+
+function plugText(snap, opts = {}) {
+  const fm = formatter(opts.lang), T = fm.T;
+  const p = opts.live || ((snap.energy || {}).plug) || null;
+  if (!p || (!p.okAt && p.on === undefined && p.watts === undefined)) return T.plugNone;
+  return [
+    T.plugTitle,
+    T.plugState(p.on),
+    T.plugPower(fm.num(p.watts || 0, 1), p.volts != null ? fm.num(p.volts, 0) : null, p.currentMa != null ? fm.num(p.currentMa, 0) : null),
+    T.plugWorker(escHtml(p.worker || '')),
+    T.plugActions,
+  ].join('\n');
 }
 
 function dailyText(snap, opts = {}) {
@@ -399,6 +438,30 @@ function start(opts) {
       const fm = formatter(lang);
       return sendPhoto(id, png, T.ticketCaption(fm.diff(b.diff), escHtml(b.worker)));
     }
+    if (cmd === 'plug') {
+      const arg = ((/^\/\S+\s+(\S+)/.exec(msg.text.trim()) || [])[1] || '').toLowerCase();
+      if (arg === 'ligar' || arg === 'on') {
+        if (!opts.tuya) return send(id, T.plugNone);
+        const r = await opts.tuya.setSwitch(true);
+        return send(id, r && r.ok ? T.plugSwitched(true) : T.plugErr(escHtml((r && r.error) || 'erro')));
+      }
+      if (arg === 'desligar' || arg === 'off') {
+        if (!opts.tuya) return send(id, T.plugNone);
+        const r = await opts.tuya.setSwitch(false);
+        return send(id, r && r.ok ? T.plugSwitched(false) : T.plugErr(escHtml((r && r.error) || 'erro')));
+      }
+      if (arg === 'reiniciar' || arg === 'reboot') {
+        if (!opts.tuya) return send(id, T.plugNone);
+        const r = await opts.tuya.powerCycle(opts.rebootOffMs || 8000);
+        return send(id, r && r.ok ? T.plugRebooted : T.plugErr(escHtml((r && r.error) || 'erro')));
+      }
+      let live = null;
+      if (opts.tuya && typeof opts.tuya.getStatus === 'function') {
+        const r = await opts.tuya.getStatus();
+        if (r && r.ok && r.status) live = { ...((snap.energy || {}).plug || {}), ...r.status, okAt: new Date().toISOString() };
+      }
+      return send(id, plugText(snap, { ...o, live }));
+    }
     const text = cmd === 'status' ? statusText(snap, o)
       : cmd === 'workers' ? workersText(snap, o)
         : cmd === 'luck' ? luckText(snap, o)
@@ -464,4 +527,4 @@ function start(opts) {
   };
 }
 
-module.exports = { start, todayBest, ticketImage, digest, diffEvents, statusText, workersText, luckText, recordsText, championshipText, achievementsText, dailyText, parseCommand, formatter, STRINGS };
+module.exports = { start, todayBest, ticketImage, digest, diffEvents, statusText, workersText, luckText, recordsText, championshipText, achievementsText, plugText, dailyText, parseCommand, formatter, STRINGS };

@@ -9,6 +9,7 @@ const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
 const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
+const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, testPlug } = require('./tuya');
 
 const FIELDS = [
   { key: 'BTC_ADDRESS', group: 'farm', type: 'address', required: true },
@@ -30,6 +31,12 @@ const FIELDS = [
   { key: 'MQTT_USER', group: 'mqtt', type: 'mqttuser' },
   { key: 'MQTT_PASS', group: 'mqtt', type: 'secret' },
   { key: 'MQTT_TOPIC', group: 'mqtt', type: 'mqtttopic' },
+  { key: 'TUYA_REGION', group: 'tuya', type: 'select', options: ['', 'us', 'eu', 'cn', 'in'] },
+  { key: 'TUYA_CLIENT_ID', group: 'tuya', type: 'tuyaid' },
+  { key: 'TUYA_SECRET', group: 'tuya', type: 'secret' },
+  { key: 'TUYA_DEVICE_ID', group: 'tuya', type: 'tuyaid' },
+  { key: 'TUYA_WORKER', group: 'tuya', type: 'tuyaworker' },
+  { key: 'TUYA_WATCHDOG_MIN', group: 'tuya', type: 'watchdog' },
 ];
 const KEYS = FIELDS.map((f) => f.key);
 
@@ -154,6 +161,9 @@ function clean(field, raw) {
       if (field.key === 'MQTT_PASS') {
         return v.length <= 256 && !/[\r\n\0]/.test(v) ? { value: v } : { error: 'option' };
       }
+      if (field.key === 'TUYA_SECRET') {
+        return v === '' || TUYA_SECRET_RE.test(v) ? { value: v } : { error: 'tuyasecret' };
+      }
       v = normToken(v);
       return v === '' || TOKEN_RE.test(v) ? { value: v } : { error: 'token' };
     case 'chatids': {
@@ -174,6 +184,15 @@ function clean(field, raw) {
       if (v === '') return { value: '' };
       const t = cleanTopic(v);
       return t ? { value: t } : { error: 'mqtttopic' };
+    }
+    case 'tuyaid':
+      return v === '' || TUYA_ID_RE.test(v) ? { value: v } : { error: 'tuyaid' };
+    case 'tuyaworker':
+      return v === '' || v === '*' || NAME_RE.test(v) ? { value: v } : { error: 'name' };
+    case 'watchdog': {
+      if (v === '' || v === '0') return { value: '' };
+      const n = Number(v);
+      return Number.isInteger(n) && n >= 5 && n <= 1440 ? { value: String(n) } : { error: 'watchdog' };
     }
     default:
       return { error: 'option' };
@@ -404,7 +423,7 @@ function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
 const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
-    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', backup: 'Backup e restauração' },
+    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomada Inteligente SmartLife / Tuya', backup: 'Backup e restauração' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
@@ -424,7 +443,13 @@ const T = {
     MQTT_USER: ['Usuário MQTT', 'Usuário configurado no broker (Mosquitto / Home Assistant). Opcional se o broker aceitar conexão anônima.'],
     MQTT_PASS: ['Senha MQTT', 'Senha do usuário MQTT.'],
     MQTT_TOPIC: ['Prefixo do tópico', 'Padrão: homeminerproxy. Publica homeassistant/sensor/homeminerproxy/... (Auto-Discovery) e <prefixo>/state + <prefixo>/event.'],
-    auto: 'Automático', none: 'Nenhum', yes: 'Sim',
+    TUYA_REGION: ['Região Tuya Cloud', 'Américas (us) atende o Brasil. Só mude se sua conta no iot.tuya.com foi criada em outro datacenter (eu, cn, in).'],
+    TUYA_CLIENT_ID: ['Access ID (Client ID)', 'Do seu projeto Cloud em iot.tuya.com (vinculado ao app SmartLife por QR Code). Vazio desliga.'],
+    TUYA_SECRET: ['Access Secret (Client Secret)', 'Chave secreta do projeto em iot.tuya.com.'],
+    TUYA_DEVICE_ID: ['Device ID da tomada', 'No app SmartLife: toque na tomada → ícone ✏️ no canto superior → Informações do Dispositivo → ID Virtual.'],
+    TUYA_WORKER: ['Aparelho ligado na tomada', 'Se escolher um worker (ex.: bitaxe), os Watts reais da tomada entram no consumo dele. Em "Só monitorar", mostra a leitura no painel sem somar na conta dos mineradores.'],
+    TUYA_WATCHDOG_MIN: ['Reiniciar tomada se parar (min)', 'Se o worker da tomada ficar parado por esses minutos (mín. 5), desliga a tomada por 8s e religa sozinho. Vazio desliga.'],
+    auto: 'Automático', none: 'Nenhum', yes: 'Sim', tuyaNone: 'Só monitorar (não somar nos mineradores)', tuyaAll: 'Fazenda inteira (*)',
     addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWattsPlaceholder: 'W (ex.: 20)', addHrPlaceholder: 'Hashrate (ex.: 1.2)', addWorkerBtn: '+ Adicionar worker',
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
@@ -432,16 +457,17 @@ const T = {
     backupOk: 'Backup baixado.', restored: 'Backup restaurado! Reiniciando o painel…',
     pin: 'PIN', pinHelp: 'O SETTINGS_PIN que está em /etc/mineracao.env (o instalador cria e mostra no final).',
     noPin: 'Para salvar por aqui, defina SETTINGS_PIN em /etc/mineracao.env e reinicie o painel. Rode o install.sh de novo que ele cria um PIN para você.',
-    save: 'Salvar e reiniciar', testCube: 'Testar cubo', testTg: 'Mandar mensagem de teste', testMqtt: 'Testar MQTT',
+    save: 'Salvar e reiniciar', testCube: 'Testar cubo', testTg: 'Mandar mensagem de teste', testMqtt: 'Testar MQTT', testTuya: 'Testar tomada',
     saved: 'Salvo! Reiniciando o painel…', back2: 'Pronto. Voltando ao painel…', nothing: 'Nada mudou.',
     cubeOk: 'O cubo respondeu.', cubeFail: 'O cubo não respondeu nesse IP.',
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
     mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    tuyaOk: (s) => `Tomada respondeu: ${s}`, tuyaFail: (e) => `Falha na tomada: ${e}`,
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
-    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', backup: 'Backup and restore' },
+    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'SmartLife / Tuya Smart Plug', backup: 'Backup and restore' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
@@ -461,7 +487,13 @@ const T = {
     MQTT_USER: ['MQTT username', 'Username configured on the broker (Mosquitto / Home Assistant). Optional if anonymous access is allowed.'],
     MQTT_PASS: ['MQTT password', 'Password for the MQTT user.'],
     MQTT_TOPIC: ['Topic prefix', 'Default: homeminerproxy. Publishes homeassistant/sensor/homeminerproxy/... (Auto-Discovery) and <prefix>/state + <prefix>/event.'],
-    auto: 'Automatic', none: 'None', yes: 'Yes',
+    TUYA_REGION: ['Tuya Cloud region', 'Americas (us) covers the US and Brazil. Change only if your iot.tuya.com project is in another region (eu, cn, in).'],
+    TUYA_CLIENT_ID: ['Access ID (Client ID)', 'From your Cloud project at iot.tuya.com (linked to the SmartLife app via QR code). Empty turns it off.'],
+    TUYA_SECRET: ['Access Secret (Client Secret)', 'Secret key from your iot.tuya.com project.'],
+    TUYA_DEVICE_ID: ['Plug Device ID', 'In the SmartLife app: tap the plug → ✏️ icon at top right → Device Information → Virtual ID.'],
+    TUYA_WORKER: ['Device plugged in', 'If set to a worker (e.g. bitaxe), the plug\'s live Watts are used for that worker. "Monitor only" shows the reading on the dashboard without adding it to the miners\' power bill.'],
+    TUYA_WATCHDOG_MIN: ['Auto-reboot plug when stopped (min)', 'If the linked worker is stopped for this many minutes (min 5), turns the plug off for 8s and back on. Empty disables.'],
+    auto: 'Automatic', none: 'None', yes: 'Yes', tuyaNone: 'Monitor only (do not add to miners)', tuyaAll: 'Whole farm (*)',
     addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWattsPlaceholder: 'W (e.g. 20)', addHrPlaceholder: 'Hashrate (e.g. 1.2)', addWorkerBtn: '+ Add worker',
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
@@ -469,12 +501,13 @@ const T = {
     backupOk: 'Backup downloaded.', restored: 'Backup restored! Restarting the dashboard…',
     pin: 'PIN', pinHelp: 'The SETTINGS_PIN in /etc/mineracao.env (the installer creates it and shows it at the end).',
     noPin: 'To save from here, set SETTINGS_PIN in /etc/mineracao.env and restart the dashboard. Running install.sh again creates a PIN for you.',
-    save: 'Save and restart', testCube: 'Test cube', testTg: 'Send test message', testMqtt: 'Test MQTT',
+    save: 'Save and restart', testCube: 'Test cube', testTg: 'Send test message', testMqtt: 'Test MQTT', testTuya: 'Test plug',
     saved: 'Saved! Restarting the dashboard…', back2: 'Done. Going back to the dashboard…', nothing: 'Nothing changed.',
     cubeOk: 'The cube answered.', cubeFail: 'The cube did not answer at that IP.',
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
     mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    tuyaOk: (s) => `Plug answered: ${s}`, tuyaFail: (e) => `Plug failed: ${e}`,
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -489,6 +522,8 @@ function page(lang, hasPin) {
       input = `<select name="${f.key}">` + f.options.map((o) => `<option value="${o}">${o === '' ? S.auto : o}</option>`).join('') + '</select>';
     } else if (f.type === 'worker') {
       input = `<select name="${f.key}" data-workers="1"><option value="">${S.none}</option></select>`;
+    } else if (f.type === 'tuyaworker') {
+      input = `<select name="${f.key}" data-workers="2"><option value="">${S.tuyaNone}</option><option value="*">${S.tuyaAll}</option></select>`;
     } else if (f.type === 'workers') {
       input = `<div class="checks" data-name="${f.key}"></div>`;
     } else if (f.type === 'watts') {
@@ -506,22 +541,24 @@ function page(lang, hasPin) {
       input = `<div class="pw"><input type="password" name="${f.key}" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="ghost eye" data-eye="${f.key}">👁</button></div><div class="hint" id="${f.key}_state"></div>` +
         `<label class="inline" id="${f.key}_clearbox" hidden><input type="checkbox" name="${f.key}_clear"> ${S.tokenClear}</label>`;
     } else {
-      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
+      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'watchdog' ? ' inputmode="numeric" maxlength="4" placeholder="10"' : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
       input = `<input name="${f.key}"${extra} autocomplete="off" spellcheck="false">`;
     }
     const test = f.key === 'CUBE_IP' ? ` <button type="button" class="ghost" data-test="cube">${S.testCube}</button>`
       : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>`
-      : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>` : '';
+      : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
+      : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>` : '';
     return `<div class="f" data-key="${f.key}"><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };
-  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt'].map((g) => `<fieldset><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => `<fieldset><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
   const backupGroup = `<fieldset><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
     `<div class="bbar"><button type="button" class="ghost" data-backup="export">${htmlEsc(S.backupDown)}</button>` +
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
     `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div></fieldset>`;
   const msgs = {
     saved: S.saved, back2: S.back2, nothing: S.nothing, cubeOk: S.cubeOk, cubeFail: S.cubeFail,
-    tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'), tokenSet: S.tokenSet('%s'),
+    tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'),
+    tuyaOk: S.tuyaOk('%s'), tuyaFail: S.tuyaFail('%s'), tokenSet: S.tokenSet('%s'),
     backupOk: S.backupOk, restored: S.restored, err: S.err,
   };
   return `<!doctype html>
@@ -593,7 +630,8 @@ function splitHr(n) {
 function renderWorkerControls() {
   for (const s of form.querySelectorAll('select[data-workers]')) {
     const cur = s.value;
-    while (s.options.length > 1) s.remove(1);
+    const keep = Number(s.dataset.workers) || 1;
+    while (s.options.length > keep) s.remove(keep);
     for (const w of workers) s.add(new Option(w, w));
     if (cur && ![...s.options].some((o) => o.value === cur)) s.add(new Option(cur, cur));
     s.value = cur;
@@ -783,6 +821,17 @@ for (const t of form.querySelectorAll('[data-test]')) t.addEventListener('click'
     if (r.error) say(M.err[r.error] || r.error, false);
     else if (t.dataset.test === 'cube') say(r.ok ? M.cubeOk : M.cubeFail, r.ok);
     else if (t.dataset.test === 'mqtt') say(r.ok ? M.mqttOk : M.mqttFail.replace('%s', M.err[r.detail] || r.detail || ''), r.ok);
+    else if (t.dataset.test === 'tuya') {
+      if (r.ok && r.status) {
+        const parts = [r.status.on === false ? 'OFF' : 'ON'];
+        if (r.status.watts != null) parts.push(r.status.watts + ' W');
+        if (r.status.volts != null) parts.push(r.status.volts + ' V');
+        if (r.status.currentMa != null) parts.push(r.status.currentMa + ' mA');
+        say(M.tuyaOk.replace('%s', parts.join(' · ')), true);
+      } else {
+        say(M.tuyaFail.replace('%s', M.err[r.detail] || r.detail || ''), false);
+      }
+    }
     else say(r.ok ? M.tgOk : M.tgFail.replace('%s', M.err[r.detail] || r.detail || ''), r.ok);
   } finally { t.disabled = false; }
 });
@@ -871,6 +920,14 @@ function handle(req, res, ctx) {
         const pass = form.MQTT_PASS_clear ? '' : (String(form.MQTT_PASS || '').trim() || process.env.MQTT_PASS || '');
         const r = await testBroker(u.value, user, pass, tp.value || process.env.MQTT_TOPIC || 'homeminerproxy');
         return json(200, { ok: r.ok, detail: r.error === 'auth' ? 'mqttauth' : r.error });
+      }
+      if (j.what === 'tuya') {
+        const clientId = String(form.TUYA_CLIENT_ID == null ? (process.env.TUYA_CLIENT_ID || '') : form.TUYA_CLIENT_ID).trim();
+        const secret = form.TUYA_SECRET_clear ? '' : (String(form.TUYA_SECRET || '').trim() || process.env.TUYA_SECRET || '');
+        const deviceId = String(form.TUYA_DEVICE_ID == null ? (process.env.TUYA_DEVICE_ID || '') : form.TUYA_DEVICE_ID).trim();
+        const region = String(form.TUYA_REGION == null ? (process.env.TUYA_REGION || 'us') : form.TUYA_REGION).trim() || 'us';
+        const r = await testPlug({ clientId, secret, deviceId, region, apiBase: ctx.tuyaApi });
+        return json(200, { ok: r.ok, status: r.status, detail: r.error });
       }
       return json(400, { error: 'option' });
     }

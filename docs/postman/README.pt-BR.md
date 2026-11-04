@@ -37,6 +37,7 @@ Este diretório contém as **coleções Postman v2.1** e o arquivo de ambiente c
 - `POST /api/config/test` (`what: "cube"`) — Testa se o cubo GeekMagic SmallTV responde em `CUBE_IP`.
 - `POST /api/config/test` (`what: "telegram"`) — Envia uma mensagem de teste no Telegram usando o token informado (ou já salvo) e `TELEGRAM_CHAT_ID`.
 - `POST /api/config/test` (`what: "mqtt"`) — Testa a conexão TCP/TLS e a autenticação com o broker MQTT 3.1.1 (`MQTT_URL`, `MQTT_USER`, `MQTT_PASS`, `MQTT_TOPIC`).
+- `POST /api/config/test` (`what: "tuya"`) — Testa a autenticação HMAC-SHA256 e lê os Watts/Volts reais da tomada inteligente SmartLife / Tuya (`TUYA_REGION`, `TUYA_CLIENT_ID`, `TUYA_SECRET`, `TUYA_DEVICE_ID`).
 - `POST /api/config/backup` — Exporta um backup completo em JSON (`version: 1`) com `settings`, `workers`, `records`, `history`, `achievements`, `proxyStats`, `telegram` e `cubo` (exige `pin`).
 - `POST /api/config/restore` — Valida e restaura um arquivo de backup em `DATA_DIR` (exige `pin`) e reinicia o painel.
 

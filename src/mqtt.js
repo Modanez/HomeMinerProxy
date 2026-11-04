@@ -185,7 +185,8 @@ function statePayload(snap) {
   const active = ws.filter((w) => w.state === 'ok' || w.state === 'quiet');
   const stopped = ws.filter((w) => w.state === 'stale');
   const leader = (snap && snap.championship && snap.championship.leader) || null;
-  return {
+  const p = e.plug || null;
+  const out = {
     hashrate: Math.round(Number(f.hashrate) || 0),
     best_difficulty: Number((Number(f.best) || 0).toFixed(4)),
     best_worker: (((snap && snap.hall) || [])[0] || {}).worker || '—',
@@ -203,6 +204,12 @@ function statePayload(snap) {
     pool_failover: (((snap && snap.proxy) || {}).failover || []).length > 0 ? 'ON' : 'OFF',
     server_temp_c: h.tempC != null ? Number(h.tempC.toFixed(1)) : null,
   };
+  if (p && p.okAt) {
+    out.plug_on = p.on === false ? 'OFF' : 'ON';
+    out.plug_watts = p.watts != null ? Number(p.watts.toFixed(1)) : null;
+    out.plug_volts = p.volts != null ? Number(p.volts.toFixed(1)) : null;
+  }
+  return out;
 }
 
 // ---------------------------------------------------------------- teste rápido (tela /config)

@@ -38,6 +38,16 @@ const WATTS = Object.assign({}, safeJson(process.env.WATTS));   // consumo por w
 //   EXPECTED='{"bitaxe":1.2e12,"devkit":0}'
 const EXPECTED = Object.assign({}, safeJson(process.env.EXPECTED));
 const WATTS_DEFAULT = Number(process.env.WATTS_DEFAULT || 5);
+const TUYA_WORKER = (process.env.TUYA_WORKER || '').trim();
+const TUYA_WATCHDOG_MIN = Number(process.env.TUYA_WATCHDOG_MIN || 0);
+const tuyaClient = require('./tuya').createClient({
+  clientId: process.env.TUYA_CLIENT_ID,
+  secret: process.env.TUYA_SECRET,
+  deviceId: process.env.TUYA_DEVICE_ID,
+  region: process.env.TUYA_REGION || 'us',
+  apiBase: process.env.TUYA_API,
+});
+const tuyaState = { okAt: null, error: null, status: null, lastRebootAt: 0, lastRebootIso: null, rebootCount: 0 };
 
 const POOL_API = 'https://public-pool.io:40557/api';
 // Pools no formato ckpool, consultadas junto com a public-pool:
@@ -628,10 +638,50 @@ function health() {
 }
 
 function energy(view) {
-  const parts = view.filter((w) => w.state === 'ok' || w.state === 'quiet').map((w) => ({ name: w.name, watts: WATTS[w.name] ?? WATTS_DEFAULT }));
-  const watts = parts.reduce((s, p) => s + p.watts, 0);
+  const st = tuyaState.status;
+  const plug = tuyaClient ? {
+    worker: TUYA_WORKER || null,
+    watchdogMin: TUYA_WATCHDOG_MIN >= 5 ? TUYA_WATCHDOG_MIN : null,
+    okAt: tuyaState.okAt,
+    error: tuyaState.error,
+    on: st ? st.on : null,
+    watts: st ? st.watts : null,
+    volts: st ? st.volts : null,
+    currentMa: st ? st.currentMa : null,
+    kwhTotal: st ? st.kwhTotal : null,
+    lastRebootAt: tuyaState.lastRebootIso,
+    rebootCount: tuyaState.rebootCount,
+  } : null;
+  const parts = view.filter((w) => w.state === 'ok' || w.state === 'quiet').map((w) => {
+    const liveWatts = plug && plug.worker === w.name && plug.watts != null ? plug.watts : null;
+    return { name: w.name, watts: liveWatts != null ? liveWatts : (WATTS[w.name] ?? WATTS_DEFAULT), live: liveWatts != null };
+  });
+  const watts = plug && plug.worker === '*' && plug.watts != null
+    ? plug.watts
+    : parts.reduce((s, p) => s + p.watts, 0);
   const kwhMonth = watts * 730 / 1000;
-  return { parts, watts, kwhMonth, costMonth: kwhMonth * TARIFA_KWH, tarifa: TARIFA_KWH };
+  return { parts, watts, kwhMonth, costMonth: kwhMonth * TARIFA_KWH, tarifa: TARIFA_KWH, plug };
+}
+
+async function tickTuya() {
+  if (!tuyaClient) return;
+  const r = await tuyaClient.getStatus();
+  if (!r.ok) { tuyaState.error = r.error; return; }
+  tuyaState.status = r.status;
+  tuyaState.okAt = new Date().toISOString();
+  tuyaState.error = null;
+  if (TUYA_WATCHDOG_MIN >= 5 && TUYA_WORKER && TUYA_WORKER !== '*') {
+    const w = workersView().find((x) => x.name === TUYA_WORKER);
+    const staleMs = w && w.state === 'stale' && !w.inactive && w.lastSeen ? Date.now() - new Date(w.lastSeen).getTime() : 0;
+    if (staleMs >= TUYA_WATCHDOG_MIN * 60e3 && Date.now() - tuyaState.lastRebootAt >= 60 * 60e3) {
+      tuyaState.lastRebootAt = Date.now();
+      const rb = await tuyaClient.powerCycle(8000);
+      if (rb.ok) {
+        tuyaState.rebootCount++;
+        tuyaState.lastRebootIso = rb.rebootedAt;
+      }
+    }
+  }
 }
 
 // ---------------------------------------------------------------- resposta da API
@@ -1015,6 +1065,7 @@ const PAGE = `<!doctype html>
       <div class="label">Energia (estimativa)</div>
       <div class="big" id="enC" style="font-size:28px">–</div>
       <div class="sub" id="enS">–</div>
+      <div class="sub" id="enP"></div>
       <div class="sub" id="enJ">–</div>
     </div>
   </div>
@@ -1683,6 +1734,16 @@ function renderHistory(j) {
   if (e.parts) {
     set('enC', money(e.costMonth) + '/mês');
     set('enS', nf(e.watts) + ' W · ' + nf(e.kwhMonth) + ' kWh/mês · ' + money(e.tarifa) + '/kWh');
+    const p = e.plug;
+    if (p && p.okAt) {
+      const pName = p.worker && p.worker !== '*' ? ' (' + p.worker + ')' : '';
+      const pState = p.on === false ? 'desligada' : 'ligada';
+      const pWatts = p.watts != null ? ' · ' + nf(p.watts, 1) + ' W' : '';
+      const pVolts = p.volts != null ? ' · ' + nf(p.volts, 0) + ' V' : '';
+      set('enP', '🔌 Tomada' + pName + ': ' + pState + pWatts + pVolts);
+    } else {
+      set('enP', '');
+    }
     set('enJ', od ? 'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄' : '');
   }
 }
@@ -1913,6 +1974,7 @@ http.createServer((req, res) => {
     workers: () => [...new Set([...Object.keys(known), ...Object.keys(proxy.workers || {}), ...Object.keys(EXPECTED).filter((k) => EXPECTED[k] > 0)])].sort((a, b) => a.localeCompare(b)),
     onSaved: () => { console.log('configuração salva pela tela; reiniciando'); process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
+    tuyaApi: process.env.TUYA_API,
   })) return;
   if (req.url.startsWith('/api/widget')) {
     // resumo enxuto e já formatado, para widgets (KWGT etc.)
@@ -1944,6 +2006,7 @@ http.createServer((req, res) => {
   every(tickCkpools, 120e3);
   every(tickOcean, 300e3);
   every(tickProxy, PROXY_MS);
+  if (tuyaClient) every(tickTuya, 30e3);
   every(async () => { alarmOpen(); alarmStatus(); }, 60e3);
   startTelegram();
   startMqtt();
@@ -1959,6 +2022,7 @@ function startTelegram() {
     chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
     lang: LANGUAGE || 'en',
     snapshot: () => snapshot(true),
+    tuya: tuyaClient,
     quiet: quietNow,
     ignore: ALARM_IGNORE,
     personal: process.env.TELEGRAM_PERSONAL === '1',

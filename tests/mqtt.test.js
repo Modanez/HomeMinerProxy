@@ -95,7 +95,7 @@ test('codificação MQTT, Auto-Discovery e statePayload', () => {
       ],
     },
     hall: [{ worker: 'bitaxe', value: 9876.54321 }],
-    energy: { watts: 21.5, kwhMonth: 15.48, costMonth: 13.93 },
+    energy: { watts: 21.5, kwhMonth: 15.48, costMonth: 13.93, plug: { okAt: '2026-11-04T00:00:00Z', on: true, watts: 45.2, volts: 220.4 } },
     championship: { leader: { name: 'bitaxe', factor: 1.42 } },
     achievements: { unlocked: 4, total: 10 },
     proxy: { failover: [{ listen: 3333 }] },
@@ -111,6 +111,9 @@ test('codificação MQTT, Auto-Discovery e statePayload', () => {
   assert.strictEqual(st.achievements_unlocked, 4);
   assert.strictEqual(st.pool_failover, 'ON');
   assert.strictEqual(st.server_temp_c, 48.3);
+  assert.strictEqual(st.plug_on, 'ON');
+  assert.strictEqual(st.plug_watts, 45.2);
+  assert.strictEqual(st.plug_volts, 220.4);
 });
 
 test('testBroker e start() conversam com um broker MQTT 3.1.1 real via TCP', async (t) => {

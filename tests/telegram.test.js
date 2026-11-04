@@ -44,6 +44,8 @@ test('comandos em português e inglês, com ou sem @bot', () => {
   assert.strictEqual(tg.parseCommand('/championship'), 'championship');
   assert.strictEqual(tg.parseCommand('/conquistas'), 'achievements');
   assert.strictEqual(tg.parseCommand('/achievements'), 'achievements');
+  assert.strictEqual(tg.parseCommand('/tomada'), 'plug');
+  assert.strictEqual(tg.parseCommand('/plug reiniciar'), 'plug');
   assert.strictEqual(tg.parseCommand('/ajuda'), 'help');
   assert.strictEqual(tg.parseCommand('/bilhete'), 'ticket');
   assert.strictEqual(tg.parseCommand('/ticket'), 'ticket');
@@ -138,6 +140,14 @@ test('textos dos comandos', () => {
   const achEv = tg.diffEvents(d1, d2, { lang: 'pt' });
   assert.deepStrictEqual(achEv.map((e) => e.type), ['achievement']);
   assert.match(achEv[0].text, /Nova conquista!.*<b>Clube dos 1\.000<\/b> · vovo/s);
+  // tomada SmartLife / Tuya: /tomada e aviso de reinício automático
+  assert.match(tg.plugText(s, { lang: 'pt' }), /Tomada inteligente não configurada/);
+  const sPlug = { ...s, energy: { plug: { okAt: '2026-11-04T00:00:00Z', on: true, watts: 45.2, volts: 220, currentMa: 205, worker: 'bitaxe', rebootCount: 1 } } };
+  assert.match(tg.plugText(sPlug, { lang: 'pt' }), /Consumo: <b>45,2 W<\/b> · 220 V · 205 mA/);
+  assert.match(tg.plugText(sPlug, { lang: 'en' }), /Power: <b>45\.2 W<\/b> · 220 V · 205 mA/);
+  const rbEv = tg.diffEvents(d1, tg.digest(sPlug), { lang: 'pt' });
+  assert.deepStrictEqual(rbEv.map((e) => e.type), ['plug_reboot']);
+  assert.match(rbEv[0].text, /Tomada reiniciada automaticamente<\/b> \(bitaxe\)/);
   const fm = tg.formatter('pt');
   assert.strictEqual(fm.diff(148.4e12), '148,4 tri');
   assert.strictEqual(tg.formatter('en').diff(148.4e12), '148.4T');
@@ -185,7 +195,7 @@ test('bot responde só ao chat configurado e manda os avisos', async (t) => {
 
   await waitFor(() => api.calls.some((c) => c.method === 'setMyCommands'));
   const cmds = api.calls.find((c) => c.method === 'setMyCommands').body.commands.map((c) => c.command);
-  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'bilhete', 'ajuda']);
+  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'tomada', 'bilhete', 'ajuda']);
 
   api.push(999, '/status');   // estranho: ignorado
   api.push(42, '/status');

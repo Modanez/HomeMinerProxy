@@ -63,6 +63,20 @@ test('validação dos campos', () => {
   assert.deepStrictEqual(st.clean(field('MQTT_PASS'), 'QualquerSenha!123'), { value: 'QualquerSenha!123' });
   assert.deepStrictEqual(st.clean(field('MQTT_TOPIC'), '/fazenda/miner/'), { value: 'fazenda/miner' });
   assert.ok(st.clean(field('MQTT_TOPIC'), 'bad#topic').error);
+  // Tomada Inteligente (SmartLife / Tuya)
+  assert.deepStrictEqual(st.clean(field('TUYA_REGION'), 'us'), { value: 'us' });
+  assert.ok(st.clean(field('TUYA_REGION'), 'mars').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_CLIENT_ID'), 'client_123456'), { value: 'client_123456' });
+  assert.ok(st.clean(field('TUYA_CLIENT_ID'), 'curto').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_SECRET'), 'secret_123456'), { value: 'secret_123456' });
+  assert.ok(st.clean(field('TUYA_SECRET'), 'curto').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_DEVICE_ID'), 'eb1234567890abcdef'), { value: 'eb1234567890abcdef' });
+  assert.ok(st.clean(field('TUYA_DEVICE_ID'), 'bad id').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_WORKER'), '*'), { value: '*' });
+  assert.deepStrictEqual(st.clean(field('TUYA_WORKER'), 'bitaxe'), { value: 'bitaxe' });
+  assert.ok(st.clean(field('TUYA_WORKER'), 'bad worker').error);
+  assert.deepStrictEqual(st.clean(field('TUYA_WATCHDOG_MIN'), '30'), { value: '30' });
+  assert.ok(st.clean(field('TUYA_WATCHDOG_MIN'), '3').error);
 });
 
 test('só o que mudou vai para o settings.json, por cima do .env', () => {

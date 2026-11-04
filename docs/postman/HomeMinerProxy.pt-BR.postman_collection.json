@@ -421,6 +421,25 @@
             },
             "description": "Testa a conexão e autenticação com o broker MQTT 3.1.1 em `MQTT_URL` (`CONNECT` -> `CONNACK` -> `PUBLISH <topico>/availability` -> `DISCONNECT`)."
           }
+        },
+        {
+          "name": "Testar Tomada SmartLife / Tuya (/api/config/test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"what\": \"tuya\",\n  \"values\": {\n    \"TUYA_REGION\": \"us\",\n    \"TUYA_CLIENT_ID\": \"\",\n    \"TUYA_SECRET\": \"\",\n    \"TUYA_DEVICE_ID\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "test"]
+            },
+            "description": "Testa a autenticação HMAC-SHA256 e lê o estado atual (`on`, `watts`, `volts`, `currentMa`, `kwhTotal`) da tomada inteligente SmartLife / Tuya."
+          }
         }
       ]
     },

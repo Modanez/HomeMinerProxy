@@ -13,4 +13,5 @@ Este diretório reúne os **Registros de Decisão de Arquitetura (ADRs)** do **H
 | [ADR-0005](0005-python-pillow-for-cube-and-lottery-ticket.pt-BR.md) | Python + Pillow para o placar do cubo GeekMagic e o bilhete de loteria no Telegram | Aceita |
 | [ADR-0006](0006-weekly-championship-and-achievements.pt-BR.md) | Campeonato semanal por sorte relativa e conquistas persistentes da fazenda | Aceita |
 | [ADR-0007](0007-mqtt-and-home-assistant-discovery.pt-BR.md) | Cliente MQTT 3.1.1 nativo e Home Assistant Auto-Discovery | Aceita |
+| [ADR-0008](0008-smartlife-tuya-smart-plug.pt-BR.md) | Integração direta com tomada inteligente SmartLife / Tuya OpenAPI v1.0 | Aceita |
 

@@ -28,6 +28,7 @@ flowchart TB
         PoolAPIs["📊 Pool REST APIs\n(public-pool, ckpool, nerdminers, OCEAN)"]
         BitcoinAPIs["₿ Bitcoin & Market APIs\n(mempool.space, CoinGecko, Binance)"]
         TelegramAPI["✈️ Telegram Bot API\n(api.telegram.org)"]
+        TuyaAPI["🔌 SmartLife / Tuya OpenAPI v1.0\n(openapi.tuyaus.com / tuyaeu.com)"]
     end
 
     Miners <-->|"Stratum V1 over TCP\n(ports 3333–3335, 3337–3339)"| HMP
@@ -35,6 +36,7 @@ flowchart TB
     HMP -->|"HTTPS GET (JSON)"| PoolAPIs
     HMP -->|"HTTPS GET (blocks, diff, wallet, price)"| BitcoinAPIs
     HMP <-->|"HTTPS Long Polling & Alerts\n(sendMessage / sendPhoto)"| TelegramAPI
+    HMP <-->|"HTTPS HMAC-SHA256\n(live Watts/Volts & switch)"| TuyaAPI
     HMP -->|"HTTP POST JPEG (/doUpload)"| Cube
     HMP -->|"Serial 9600 baud (R/P/S/T/0/1/2)"| Siren
     User <-->|"HTTP (port 3000)\nDashboard & /config"| HMP
@@ -55,6 +57,7 @@ flowchart TB
 | **Arduino USB Siren** | USB Serial (`9600 8N1`) | Plays melodies and drives status LEDs (green/yellow/red) based on single-byte commands. |
 | **Android KWGT Widget** | HTTP JSON (`:3000/api/widget`) | Polls pre-formatted farm metrics on the home Wi-Fi or VPN. |
 | **Home Assistant / MQTT Broker** | MQTT 3.1.1 (`:1883` / `:8883`) | Receives Home Assistant Auto-Discovery entities (`homeassistant/.../config`), farm state (`<prefix>/state`), per-worker state (`<prefix>/worker/*`), and instant events (`<prefix>/event`). |
+| **SmartLife / Tuya OpenAPI v1.0** | HTTPS JSON (`HMAC-SHA256`) | Reads live Watts, Volts, current (mA), and switch state from a SmartLife / Tuya smart plug every 30s, and switches or power-cycles the plug via `/plug` or the automatic watchdog. |
 
 ---
 
@@ -149,16 +152,19 @@ flowchart TB
         SettingsMod["Settings UI & Overlay\n(src/settings.js)"]
         TelegramMod["Telegram Bot & Alert Diff\n(src/telegram.js)"]
         MqttMod["MQTT 3.1.1 & HA Auto-Discovery\n(src/mqtt.js)"]
+        TuyaMod["SmartLife / Tuya OpenAPI Client\n(src/tuya.js)"]
         AlarmMod["USB Siren Controller\n(alarm / alarmStatus)"]
     end
 
     Collectors --> StateEngine
+    Collectors --> TuyaMod
     StateEngine --> LuckMod
     StateEngine --> AlarmMod
     HTTPServer --> StateEngine
     HTTPServer --> I18nMod
     HTTPServer --> SettingsMod
     TelegramMod --> StateEngine
+    TelegramMod --> TuyaMod
     MqttMod --> StateEngine
     MqttMod --> TelegramMod
 ```
@@ -166,9 +172,10 @@ flowchart TB
 - **[`src/painel.js`](../../src/painel.js)**: Core orchestrator, background polling loops (`every`), state aggregation (`workersView`, `snapshot`), Arduino serial controller (`alarm`), and embedded SPA HTML/CSS/JS.
 - **[`src/luck.js`](../../src/luck.js)**: Statistical model (`luckOf`, `theoreticalShare`), weekly championship engine (`weekKey`, `weeklyStandings`), and farm achievements engine (`ACHIEVEMENTS`, `evaluateAchievements`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Language negotiation (`?lang` > `lang` cookie > `LANGUAGE` env > `Accept-Language` > `'en'`) and deterministic PT -> EN page translation (`localizePage`).
-- **[`src/settings.js`](../../src/settings.js)**: Renders `/config`, validates fields (`clean`, including per-worker `WATTS` and `EXPECTED` hashrate maps and MQTT settings), enforces SHA-256 timing-safe `SETTINGS_PIN` verification with brute-force lockout (`checkPin`), persists `settings.json`, exports/restores full farm JSON backups (`exportBackup`, `restoreBackup`), and tests Cube/Telegram/MQTT connectivity.
-- **[`src/telegram.js`](../../src/telegram.js)**: Long-polling client (`getUpdates`), state diffing engine (`digest`, `diffEvents`), command handlers (`/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/ticket`, `/help`), and child-process bridge to `src/ticket.py`.
+- **[`src/settings.js`](../../src/settings.js)**: Renders `/config`, validates fields (`clean`, including per-worker `WATTS` and `EXPECTED` hashrate maps, MQTT, and Tuya settings), enforces SHA-256 timing-safe `SETTINGS_PIN` verification with brute-force lockout (`checkPin`), persists `settings.json`, exports/restores full farm JSON backups (`exportBackup`, `restoreBackup`), and tests Cube/Telegram/MQTT/Tuya connectivity.
+- **[`src/telegram.js`](../../src/telegram.js)**: Long-polling client (`getUpdates`), state diffing engine (`digest`, `diffEvents`), command handlers (`/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/plug`, `/ticket`, `/help`), and child-process bridge to `src/ticket.py`.
 - **[`src/mqtt.js`](../../src/mqtt.js)**: Zero-dependency MQTT 3.1.1 client over `net`/`tls` (`connectPacket`, `publishPacket`, `testBroker`, `start`), Home Assistant Auto-Discovery publisher (`discoveryConfigs`), state publisher (`statePayload`), and real-time event publisher reusing `digest`/`diffEvents`.
+- **[`src/tuya.js`](../../src/tuya.js)**: Zero-dependency Tuya OpenAPI v1.0 client (`signRequest`, `parseStatus`, `createClient`, `testPlug`) for reading live power telemetry (Watts, Volts, mA, on/off) and switching or power-cycling a SmartLife smart plug.
 
 ---
 

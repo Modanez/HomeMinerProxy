@@ -421,6 +421,25 @@
             },
             "description": "Tests connectivity and authentication with the MQTT 3.1.1 broker at `MQTT_URL` (`CONNECT` -> `CONNACK` -> `PUBLISH <topic>/availability` -> `DISCONNECT`)."
           }
+        },
+        {
+          "name": "Test SmartLife / Tuya Smart Plug (/api/config/test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"what\": \"tuya\",\n  \"values\": {\n    \"TUYA_REGION\": \"us\",\n    \"TUYA_CLIENT_ID\": \"\",\n    \"TUYA_SECRET\": \"\",\n    \"TUYA_DEVICE_ID\": \"\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "test"]
+            },
+            "description": "Tests HMAC-SHA256 authentication and reads live telemetry (`on`, `watts`, `volts`, `currentMa`, `kwhTotal`) from the SmartLife / Tuya smart plug."
+          }
         }
       ]
     },

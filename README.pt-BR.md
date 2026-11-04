@@ -259,11 +259,23 @@ O bot avisa:
 - **Conquistas:** avisa quando a fazenda desbloqueia um marco novo (ex.: primeiro share de dificuldade 1.000, 100 mil shares, uma semana sem parar ou o troféu vovô).
 - **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`), com a imagem do bilhete de loteria do dia (e o anúncio do campeão da semana no domingo).
 
-Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
+Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/tomada` (`ligar`/`desligar`/`reiniciar`), `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
 
 ## Cubo GeekMagic (opcional)
 
 Preencha `CUBE_IP` em `/etc/mineracao.env` e rode o `install.sh` de novo. O placar é atualizado a cada 5 minutos. Um recorde novo aparece na hora, com a tela "NOVO RECORDE!". O cubo precisa estar no firmware original da GeekMagic, que tem o modo álbum de fotos.
+
+## Tomada Inteligente — SmartLife / Tuya (opcional)
+
+Se o seu minerador (ou um ventilador enquanto o Bitaxe não chega) estiver ligado numa tomada inteligente Wi-Fi **SmartLife / Tuya** com medidor de consumo, você pode conectá-la direto pela tela de configurações (`/config`) ou no `/etc/mineracao.env`:
+
+1. Crie uma conta gratuita em [iot.tuya.com](https://iot.tuya.com) -> **Cloud** -> **Development** -> **Create Cloud Project** (Data Center: **Western America** para o Brasil/Américas).
+2. Em **Link Tuya App Account**, escaneie o QR Code pelo app **SmartLife** (*Eu -> ícone de scanner no topo direito*) e ative a API **IoT Core** em Service API.
+3. Cole `TUYA_CLIENT_ID`, `TUYA_SECRET` e `TUYA_DEVICE_ID` na tela `/config` e clique em **Testar tomada**.
+4. Escolha `TUYA_WORKER`:
+   - **Só monitorar (não somar nos mineradores)**: exibe os Watts, Volts e estado (ligada/desligada) no card de Energia sem somar na conta dos mineradores (ideal enquanto a tomada está no ventilador).
+   - **Worker específico (ex.: `bitaxe`) ou Fazenda inteira (`*`)**: substitui a estimativa fixa de `WATTS` pelo consumo real medido ao vivo pela tomada.
+5. Controle pelo Telegram (`/tomada`, `/tomada ligar`, `/tomada desligar`, `/tomada reiniciar`) ou defina `TUYA_WATCHDOG_MIN` (ex.: `30`) para reiniciar a tomada sozinho se o minerador ficar 30 minutos sem enviar shares.
 
 ## Home Assistant / MQTT (opcional)
 

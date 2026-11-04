@@ -132,6 +132,8 @@ const EN = [
   ["(h.worker || 'Máquina') + ' · saúde'", "(h.worker || 'Machine') + ' · health'"],
   ["set('enC', money(e.costMonth) + '/mês');", "set('enC', money(e.costMonth) + '/month');"],
   ["' kWh/mês · '", "' kWh/month · '"],
+  ["const pState = p.on === false ? 'desligada' : 'ligada';", "const pState = p.on === false ? 'off' : 'on';"],
+  ["set('enP', '🔌 Tomada' + pName + ': ' + pState + pWatts + pVolts);", "set('enP', '🔌 Plug' + pName + ': ' + pState + pWatts + pVolts);"],
   ["'por uma chance de 1 em ' + fmtBig(od.perYear) + ' por ano 😄'", "'for a 1 in ' + fmtBig(od.perYear) + ' chance per year 😄'"],
 
   // ---------- narrador

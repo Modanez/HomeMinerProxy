@@ -259,11 +259,23 @@ The bot sends:
 - **Achievements:** real-time alerts when the farm unlocks a new milestone (e.g. first 1k difficulty share, 100k shares, 7 days nonstop, or the underdog trophy).
 - **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`), with today's lottery ticket image attached (and the weekly champion announced on Sundays).
 
-Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
+Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/plug` (`on`/`off`/`reboot`), `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
 
 ## GeekMagic cube (optional)
 
 Set `CUBE_IP` in `/etc/mineracao.env` and run `install.sh` again. The scoreboard refreshes every 5 minutes, and a new record shows up right away on a "NEW RECORD!" screen. The cube must run the original GeekMagic firmware, which has the photo album mode.
+
+## Smart Plug — SmartLife / Tuya (optional)
+
+If your miner (or a fan while you wait for your Bitaxe) is plugged into a **SmartLife / Tuya** Wi-Fi smart plug with energy monitoring, you can connect it directly on the Settings screen (`/config`) or in `/etc/mineracao.env`:
+
+1. Create a free account at [iot.tuya.com](https://iot.tuya.com) -> **Cloud** -> **Development** -> **Create Cloud Project** (Data Center: **Western America** for Brazil/Americas).
+2. Under **Link Tuya App Account**, scan the QR code with your **SmartLife** app (*Me -> top-right scan icon*) and authorize **IoT Core** in Service API.
+3. Paste `TUYA_CLIENT_ID`, `TUYA_SECRET`, and `TUYA_DEVICE_ID` on `/config` and click **Test plug**.
+4. Choose `TUYA_WORKER`:
+   - **Monitor only**: displays live Watts, Volts, and on/off state on the History/Power card without adding the plug's watts to the miners' power bill (great when monitoring a fan or other device).
+   - **Specific worker (e.g. `bitaxe`) or Whole farm (`*`)**: replaces the static `WATTS` estimate with the real live measurement from the smart plug.
+5. Control it from Telegram (`/plug`, `/plug on`, `/plug off`, `/plug reboot`) or set `TUYA_WATCHDOG_MIN` (e.g. `30`) to automatically power-cycle the plug if the miner goes 30 minutes without shares.
 
 ## Home Assistant / MQTT (optional)
 
