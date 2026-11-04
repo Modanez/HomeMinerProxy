@@ -20,6 +20,7 @@ flowchart TB
         Cube["🟦 Cubo GeekMagic SmallTV\n(Tela HTTP 240×240)"]
         Siren["🚨 Sirene USB Arduino\n(Serial /dev/ttyACM0)"]
         KWGT["📱 Widget KWGT Android\n(Leitor HTTP JSON)"]
+        MQTT["🏠 Home Assistant / Broker MQTT\n(Mosquitto TCP/TLS 1883/8883)"]
     end
 
     subgraph External["Serviços Externos na Internet"]
@@ -38,6 +39,7 @@ flowchart TB
     HMP -->|"Serial 9600 baud (R/P/S/T/0/1/2)"| Siren
     User <-->|"HTTP (porta 3000)\nPainel e /config"| HMP
     KWGT -->|"HTTP GET /api/widget"| HMP
+    HMP -->|"MQTT 3.1.1 (Auto-Discovery,\nstate, worker/* e event)"| MQTT
 ```
 
 ### Atores e Sistemas Externos
@@ -52,6 +54,7 @@ flowchart TB
 | **Cubo GeekMagic SmallTV** | HTTP (`:80`) | Display de mesa 240×240 atualizado a cada 5 minutos (ou na hora quando sai novo recorde da fazenda) via upload JPEG. |
 | **Sirene USB Arduino** | Serial USB (`9600 8N1`) | Toca melodias e controla os LEDs de estado (verde/amarelo/vermelho) a partir de comandos de 1 byte. |
 | **Widget KWGT Android** | HTTP JSON (`:3000/api/widget`) | Lê as métricas resumidas e já formatadas pela rede Wi-Fi de casa ou VPN. |
+| **Home Assistant / Broker MQTT** | MQTT 3.1.1 (`:1883` / `:8883`) | Recebe as entidades de Auto-Discovery (`homeassistant/.../config`), o estado da fazenda (`<prefixo>/state`), o estado de cada worker (`<prefixo>/worker/*`) e os eventos instantâneos (`<prefixo>/event`). |
 
 ---
 
@@ -145,6 +148,7 @@ flowchart TB
         I18nMod["Motor de Internacionalização\n(src/i18n.js)"]
         SettingsMod["Tela e Overlay de Configurações\n(src/settings.js)"]
         TelegramMod["Bot do Telegram e Diff de Alertas\n(src/telegram.js)"]
+        MqttMod["Cliente MQTT 3.1.1 e HA Auto-Discovery\n(src/mqtt.js)"]
         AlarmMod["Controlador da Sirene USB\n(alarm / alarmStatus)"]
     end
 
@@ -155,13 +159,16 @@ flowchart TB
     HTTPServer --> I18nMod
     HTTPServer --> SettingsMod
     TelegramMod --> StateEngine
+    MqttMod --> StateEngine
+    MqttMod --> TelegramMod
 ```
 
 - **[`src/painel.js`](../../src/painel.js)**: Orquestrador principal, loops de coleta (`every`), agregação de estado (`workersView`, `snapshot`), controle serial do Arduino (`alarm`) e SPA HTML/CSS/JS embutida.
 - **[`src/luck.js`](../../src/luck.js)**: Modelo estatístico (`luckOf`, `theoreticalShare`), motor do campeonato semanal (`weekKey`, `weeklyStandings`) e motor de conquistas da fazenda (`ACHIEVEMENTS`, `evaluateAchievements`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Seleção de idioma (`?lang` > cookie `lang` > variável `LANGUAGE` > `Accept-Language` > `'en'`) e tradução determinística PT -> EN da página (`localizePage`).
-- **[`src/settings.js`](../../src/settings.js)**: Renderiza `/config`, valida os campos (`clean`, incluindo mapas por worker de `WATTS` e `EXPECTED`), verifica o `SETTINGS_PIN` em tempo constante via SHA-256 com bloqueio contra força bruta (`checkPin`), grava `settings.json`, exporta/restaura backups completos da fazenda (`exportBackup`, `restoreBackup`) e testa a comunicação com o Cubo e o Telegram.
+- **[`src/settings.js`](../../src/settings.js)**: Renderiza `/config`, valida os campos (`clean`, incluindo mapas por worker de `WATTS` e `EXPECTED` e configurações MQTT), verifica o `SETTINGS_PIN` em tempo constante via SHA-256 com bloqueio contra força bruta (`checkPin`), grava `settings.json`, exporta/restaura backups completos da fazenda (`exportBackup`, `restoreBackup`) e testa a comunicação com o Cubo, o Telegram e o broker MQTT.
 - **[`src/telegram.js`](../../src/telegram.js)**: Cliente de *long polling* (`getUpdates`), motor de detecção de eventos (`digest`, `diffEvents`), tratamento de comandos (`/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/bilhete`, `/ajuda`) e integração via subprocesso com `src/ticket.py`.
+- **[`src/mqtt.js`](../../src/mqtt.js)**: Cliente MQTT 3.1.1 sem dependências sobre `net`/`tls` (`connectPacket`, `publishPacket`, `testBroker`, `start`), gerador de Home Assistant Auto-Discovery (`discoveryConfigs`), publicador de estado (`statePayload`) e publicador de eventos instantâneos reaproveitando `digest`/`diffEvents`.
 
 ---
 

@@ -300,7 +300,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"values\": {\n    \"BTC_ADDRESS\": \"{{btcAddress}}\",\n    \"LANGUAGE\": \"pt-BR\",\n    \"CURRENCY\": \"BRL\",\n    \"POWER_PRICE_KWH\": \"0.90\",\n    \"LOCAL_WORKER\": \"\",\n    \"ALARM_IGNORE\": [],\n    \"WATTS\": {\n      \"bitaxe\": 20,\n      \"nerdminer\": 1\n    },\n    \"EXPECTED\": {\n      \"bitaxe\": \"1.2T\",\n      \"nerdminer\": \"350k\"\n    },\n    \"CUBE_IP\": \"{{cubeIp}}\",\n    \"TELEGRAM_BOT_TOKEN\": \"\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\",\n    \"TELEGRAM_DAILY\": \"21\",\n    \"TELEGRAM_PERSONAL\": false,\n    \"TELEGRAM_PANEL_URL\": \"\"\n  }\n}"
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"values\": {\n    \"BTC_ADDRESS\": \"{{btcAddress}}\",\n    \"LANGUAGE\": \"pt-BR\",\n    \"CURRENCY\": \"BRL\",\n    \"POWER_PRICE_KWH\": \"0.90\",\n    \"LOCAL_WORKER\": \"\",\n    \"ALARM_IGNORE\": [],\n    \"WATTS\": {\n      \"bitaxe\": 20,\n      \"nerdminer\": 1\n    },\n    \"EXPECTED\": {\n      \"bitaxe\": \"1.2T\",\n      \"nerdminer\": \"350k\"\n    },\n    \"CUBE_IP\": \"{{cubeIp}}\",\n    \"TELEGRAM_BOT_TOKEN\": \"\",\n    \"TELEGRAM_CHAT_ID\": \"{{telegramChatId}}\",\n    \"TELEGRAM_DAILY\": \"21\",\n    \"TELEGRAM_PERSONAL\": false,\n    \"TELEGRAM_PANEL_URL\": \"\",\n    \"MQTT_URL\": \"mqtt://homeassistant.local:1883\",\n    \"MQTT_USER\": \"\",\n    \"MQTT_PASS\": \"\",\n    \"MQTT_TOPIC\": \"homeminerproxy\"\n  }\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/config",
@@ -401,6 +401,25 @@
               "path": ["api", "config", "test"]
             },
             "description": "Sends a test message to `TELEGRAM_CHAT_ID` using `TELEGRAM_BOT_TOKEN` (or the token already configured on the server if left empty)."
+          }
+        },
+        {
+          "name": "Test MQTT Broker (/api/config/test)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"pin\": \"{{settingsPin}}\",\n  \"what\": \"mqtt\",\n  \"values\": {\n    \"MQTT_URL\": \"mqtt://homeassistant.local:1883\",\n    \"MQTT_USER\": \"\",\n    \"MQTT_PASS\": \"\",\n    \"MQTT_TOPIC\": \"homeminerproxy\"\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/config/test",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "config", "test"]
+            },
+            "description": "Tests connectivity and authentication with the MQTT 3.1.1 broker at `MQTT_URL` (`CONNECT` -> `CONNACK` -> `PUBLISH <topic>/availability` -> `DISCONNECT`)."
           }
         }
       ]

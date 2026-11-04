@@ -22,3 +22,4 @@ A home solo mining farm often mixes miners spanning 7 orders of magnitude in has
 ## Consequences
 - **Positive:** Every miner on the farm — regardless of hashrate — can win the weekly trophy, and milestones keep solo mining engaging day after day.
 - **Negative:** Adds one small JSON file (`achievements.json`) to `DATA_DIR` and two additional fields (`week`, `lastWeek`) to `proxy-stats.json`.
+

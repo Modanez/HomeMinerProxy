@@ -12,4 +12,5 @@ This directory contains the **Architecture Decision Records (ADRs)** for **HomeM
 | [ADR-0004](0004-bilingual-pt-source-with-i18n-table.md) | Portuguese-first HTML source with deterministic translation table (`src/i18n.js`) | Accepted |
 | [ADR-0005](0005-python-pillow-for-cube-and-lottery-ticket.md) | Python + Pillow for GeekMagic Cube scoreboard and Telegram lottery ticket images | Accepted |
 | [ADR-0006](0006-weekly-championship-and-achievements.md) | Weekly championship by relative luck and persistent farm achievements | Accepted |
+| [ADR-0007](0007-mqtt-and-home-assistant-discovery.md) | Native MQTT 3.1.1 client and Home Assistant Auto-Discovery | Accepted |
 

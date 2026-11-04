@@ -54,6 +54,15 @@ test('validação dos campos', () => {
   assert.ok(st.clean(field('TELEGRAM_DAILY'), '24').error);
   assert.deepStrictEqual(st.clean(field('TELEGRAM_PERSONAL'), true), { value: '1' });
   assert.ok(st.clean(field('TELEGRAM_PANEL_URL'), 'javascript:alert(1)').error);
+  // MQTT / Home Assistant
+  assert.deepStrictEqual(st.clean(field('MQTT_URL'), 'mqtt://homeassistant.local:1883'), { value: 'mqtt://homeassistant.local:1883' });
+  assert.deepStrictEqual(st.clean(field('MQTT_URL'), '192.168.0.10'), { value: '192.168.0.10' });
+  assert.ok(st.clean(field('MQTT_URL'), 'http://bad').error);
+  assert.deepStrictEqual(st.clean(field('MQTT_USER'), 'mosquitto'), { value: 'mosquitto' });
+  assert.ok(st.clean(field('MQTT_USER'), 'bad\nuser').error);
+  assert.deepStrictEqual(st.clean(field('MQTT_PASS'), 'QualquerSenha!123'), { value: 'QualquerSenha!123' });
+  assert.deepStrictEqual(st.clean(field('MQTT_TOPIC'), '/fazenda/miner/'), { value: 'fazenda/miner' });
+  assert.ok(st.clean(field('MQTT_TOPIC'), 'bad#topic').error);
 });
 
 test('só o que mudou vai para o settings.json, por cima do .env', () => {

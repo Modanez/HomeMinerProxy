@@ -1946,6 +1946,7 @@ http.createServer((req, res) => {
   every(tickProxy, PROXY_MS);
   every(async () => { alarmOpen(); alarmStatus(); }, 60e3);
   startTelegram();
+  startMqtt();
 });
 
 // ---------------------------------------------------------------- bot do Telegram (opcional)
@@ -1965,5 +1966,22 @@ function startTelegram() {
     panelUrl: (process.env.TELEGRAM_PANEL_URL || '').trim() || null,
     stateFile: file('telegram.json'),
     api: process.env.TELEGRAM_API,
+  });
+}
+
+// ---------------------------------------------------------------- Home Assistant / MQTT (opcional)
+function startMqtt() {
+  const url = (process.env.MQTT_URL || '').trim();
+  if (!url) return;
+  require('./mqtt').start({
+    url,
+    user: (process.env.MQTT_USER || '').trim(),
+    pass: process.env.MQTT_PASS || '',
+    topic: (process.env.MQTT_TOPIC || '').trim() || 'homeminerproxy',
+    lang: LANGUAGE || 'en',
+    currency: CURRENCY,
+    snapshot: () => snapshot(true),
+    ignore: ALARM_IGNORE,
+    personal: process.env.TELEGRAM_PERSONAL === '1',
   });
 }

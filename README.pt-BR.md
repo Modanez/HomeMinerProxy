@@ -265,6 +265,14 @@ Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquis
 
 Preencha `CUBE_IP` em `/etc/mineracao.env` e rode o `install.sh` de novo. O placar é atualizado a cada 5 minutos. Um recorde novo aparece na hora, com a tela "NOVO RECORDE!". O cubo precisa estar no firmware original da GeekMagic, que tem o modo álbum de fotos.
 
+## Home Assistant / MQTT (opcional)
+
+Defina `MQTT_URL` (ex.: `mqtt://homeassistant.local:1883` ou `mqtts://host:8883`), `MQTT_USER`, `MQTT_PASS` e `MQTT_TOPIC` (padrão: `homeminerproxy`) em `/etc/mineracao.env` ou direto pela tela de configurações (`/config`).
+
+- **Auto-Discovery sem YAML:** publica 11 sensores (`hashrate`, `best_difficulty`, `best_worker`, `workers_active`, `workers_stopped`, `shares_today`, `power_watts`, `energy_kwh_month`, `cost_month`, `weekly_leader`, `achievements_unlocked`) e 1 sensor binário (`pool_failover`) em `homeassistant/.../config`, criando sozinho o dispositivo **Fazenda de Mineração** no Home Assistant (já com classes de potência, energia e custo para o Painel de Energia do HA).
+- **Estado e tópicos por worker:** publica `<prefixo>/state` e `<prefixo>/worker/<nome>` (JSON retido), além de `<prefixo>/availability` (`online` / `offline` com *Last Will & Testament*).
+- **Eventos instantâneos (`<prefixo>/event`):** publica eventos JSON em tempo real (`farm_record`, `personal_record`, `worker_offline`, `worker_online`, `pool_failover`, `pool_recovered`, `wallet_received`, `block_found`, `achievement_unlocked`) para acionar tomadas inteligentes, fitas WLED/Hue, relógios AWTRIX ou caixas de som da casa.
+
 ## Desenvolvimento
 
 ```bash

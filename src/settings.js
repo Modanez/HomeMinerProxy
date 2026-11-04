@@ -8,6 +8,7 @@ const path = require('path');
 const http = require('http');
 const https = require('https');
 const crypto = require('crypto');
+const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
 
 const FIELDS = [
   { key: 'BTC_ADDRESS', group: 'farm', type: 'address', required: true },
@@ -25,6 +26,10 @@ const FIELDS = [
   { key: 'TELEGRAM_DAILY', group: 'telegram', type: 'hour', unset: '21' },
   { key: 'TELEGRAM_PERSONAL', group: 'telegram', type: 'bool' },
   { key: 'TELEGRAM_PANEL_URL', group: 'telegram', type: 'url' },
+  { key: 'MQTT_URL', group: 'mqtt', type: 'mqtturl' },
+  { key: 'MQTT_USER', group: 'mqtt', type: 'mqttuser' },
+  { key: 'MQTT_PASS', group: 'mqtt', type: 'secret' },
+  { key: 'MQTT_TOPIC', group: 'mqtt', type: 'mqtttopic' },
 ];
 const KEYS = FIELDS.map((f) => f.key);
 
@@ -146,6 +151,9 @@ function clean(field, raw) {
       return v === '' || (HOST_RE.test(v) && (!numeric || IPV4_RE.test(v))) ? { value: v } : { error: 'host' };
     }
     case 'secret':
+      if (field.key === 'MQTT_PASS') {
+        return v.length <= 256 && !/[\r\n\0]/.test(v) ? { value: v } : { error: 'option' };
+      }
       v = normToken(v);
       return v === '' || TOKEN_RE.test(v) ? { value: v } : { error: 'token' };
     case 'chatids': {
@@ -158,6 +166,15 @@ function clean(field, raw) {
       return { value: v };
     case 'url':
       return v === '' || (/^https?:\/\/[^\s<>"']{1,300}$/.test(v)) ? { value: v } : { error: 'url' };
+    case 'mqtturl':
+      return v === '' || parseBroker(v) ? { value: v } : { error: 'mqtturl' };
+    case 'mqttuser':
+      return v.length <= 128 && !/[\r\n\0]/.test(v) ? { value: v } : { error: 'name' };
+    case 'mqtttopic': {
+      if (v === '') return { value: '' };
+      const t = cleanTopic(v);
+      return t ? { value: t } : { error: 'mqtttopic' };
+    }
     default:
       return { error: 'option' };
   }
@@ -187,7 +204,7 @@ function merge(dataDir, form, env = process.env) {
     if (!(f.key in form)) continue;
     if (f.type === 'secret') {
       if (form[f.key + '_clear']) { set(f, ''); continue; }
-      if (String(form[f.key] || '').trim() === '') continue;   // vazio = manter o token atual
+      if (typeof form[f.key] !== 'string' || form[f.key].trim() === '') continue;   // vazio = manter o valor atual
     }
     const r = clean(f, form[f.key]);
     if (r.error) { errors[f.key] = r.error; continue; }
@@ -387,7 +404,7 @@ function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
 const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
-    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', backup: 'Backup e restauração' },
+    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', backup: 'Backup e restauração' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
@@ -403,23 +420,28 @@ const T = {
     TELEGRAM_DAILY: ['Resumo diário', 'Hora do resumo (0 a 23). Vazio desliga.'],
     TELEGRAM_PERSONAL: ['Avisar recordes pessoais', 'Além do recorde da fazenda, avisa o recorde de cada worker (pode falar bastante no começo).'],
     TELEGRAM_PANEL_URL: ['Link do painel', 'Aparece no /status. Ex.: http://odroid:3000 (Tailscale).'],
+    MQTT_URL: ['Broker MQTT', 'URL do broker (ex.: mqtt://homeassistant.local:1883 ou mqtts://host:8883). Vazio desliga.'],
+    MQTT_USER: ['Usuário MQTT', 'Usuário configurado no broker (Mosquitto / Home Assistant). Opcional se o broker aceitar conexão anônima.'],
+    MQTT_PASS: ['Senha MQTT', 'Senha do usuário MQTT.'],
+    MQTT_TOPIC: ['Prefixo do tópico', 'Padrão: homeminerproxy. Publica homeassistant/sensor/homeminerproxy/... (Auto-Discovery) e <prefixo>/state + <prefixo>/event.'],
     auto: 'Automático', none: 'Nenhum', yes: 'Sim',
     addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWattsPlaceholder: 'W (ex.: 20)', addHrPlaceholder: 'Hashrate (ex.: 1.2)', addWorkerBtn: '+ Adicionar worker',
-    tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o token',
+    tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
     backupOk: 'Backup baixado.', restored: 'Backup restaurado! Reiniciando o painel…',
     pin: 'PIN', pinHelp: 'O SETTINGS_PIN que está em /etc/mineracao.env (o instalador cria e mostra no final).',
     noPin: 'Para salvar por aqui, defina SETTINGS_PIN em /etc/mineracao.env e reinicie o painel. Rode o install.sh de novo que ele cria um PIN para você.',
-    save: 'Salvar e reiniciar', testCube: 'Testar cubo', testTg: 'Mandar mensagem de teste',
+    save: 'Salvar e reiniciar', testCube: 'Testar cubo', testTg: 'Mandar mensagem de teste', testMqtt: 'Testar MQTT',
     saved: 'Salvo! Reiniciando o painel…', back2: 'Pronto. Voltando ao painel…', nothing: 'Nada mudou.',
     cubeOk: 'O cubo respondeu.', cubeFail: 'O cubo não respondeu nesse IP.',
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
-    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', backup: 'Backup and restore' },
+    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', backup: 'Backup and restore' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
@@ -435,19 +457,24 @@ const T = {
     TELEGRAM_DAILY: ['Daily summary', 'Hour of the summary (0 to 23). Empty turns it off.'],
     TELEGRAM_PERSONAL: ['Alert personal records', 'Besides the farm record, alert each worker\'s record (chatty at first).'],
     TELEGRAM_PANEL_URL: ['Dashboard link', 'Shown in /status. E.g. http://odroid:3000 (Tailscale).'],
+    MQTT_URL: ['MQTT broker', 'Broker URL (e.g. mqtt://homeassistant.local:1883 or mqtts://host:8883). Empty turns it off.'],
+    MQTT_USER: ['MQTT username', 'Username configured on the broker (Mosquitto / Home Assistant). Optional if anonymous access is allowed.'],
+    MQTT_PASS: ['MQTT password', 'Password for the MQTT user.'],
+    MQTT_TOPIC: ['Topic prefix', 'Default: homeminerproxy. Publishes homeassistant/sensor/homeminerproxy/... (Auto-Discovery) and <prefix>/state + <prefix>/event.'],
     auto: 'Automatic', none: 'None', yes: 'Yes',
     addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWattsPlaceholder: 'W (e.g. 20)', addHrPlaceholder: 'Hashrate (e.g. 1.2)', addWorkerBtn: '+ Add worker',
-    tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove the token',
+    tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
     backupOk: 'Backup downloaded.', restored: 'Backup restored! Restarting the dashboard…',
     pin: 'PIN', pinHelp: 'The SETTINGS_PIN in /etc/mineracao.env (the installer creates it and shows it at the end).',
     noPin: 'To save from here, set SETTINGS_PIN in /etc/mineracao.env and restart the dashboard. Running install.sh again creates a PIN for you.',
-    save: 'Save and restart', testCube: 'Test cube', testTg: 'Send test message',
+    save: 'Save and restart', testCube: 'Test cube', testTg: 'Send test message', testMqtt: 'Test MQTT',
     saved: 'Saved! Restarting the dashboard…', back2: 'Done. Going back to the dashboard…', nothing: 'Nothing changed.',
     cubeOk: 'The cube answered.', cubeFail: 'The cube did not answer at that IP.',
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -479,21 +506,22 @@ function page(lang, hasPin) {
       input = `<div class="pw"><input type="password" name="${f.key}" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="ghost eye" data-eye="${f.key}">👁</button></div><div class="hint" id="${f.key}_state"></div>` +
         `<label class="inline" id="${f.key}_clearbox" hidden><input type="checkbox" name="${f.key}_clear"> ${S.tokenClear}</label>`;
     } else {
-      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : '';
+      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
       input = `<input name="${f.key}"${extra} autocomplete="off" spellcheck="false">`;
     }
     const test = f.key === 'CUBE_IP' ? ` <button type="button" class="ghost" data-test="cube">${S.testCube}</button>`
-      : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>` : '';
+      : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>`
+      : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>` : '';
     return `<div class="f" data-key="${f.key}"><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };
-  const fieldGroups = ['farm', 'miners', 'cube', 'telegram'].map((g) => `<fieldset><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt'].map((g) => `<fieldset><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
   const backupGroup = `<fieldset><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
     `<div class="bbar"><button type="button" class="ghost" data-backup="export">${htmlEsc(S.backupDown)}</button>` +
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
     `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div></fieldset>`;
   const msgs = {
     saved: S.saved, back2: S.back2, nothing: S.nothing, cubeOk: S.cubeOk, cubeFail: S.cubeFail,
-    tgOk: S.tgOk, tgFail: S.tgFail('%s'), tokenSet: S.tokenSet('%s'),
+    tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'), tokenSet: S.tokenSet('%s'),
     backupOk: S.backupOk, restored: S.restored, err: S.err,
   };
   return `<!doctype html>
@@ -754,6 +782,7 @@ for (const t of form.querySelectorAll('[data-test]')) t.addEventListener('click'
     showErrors(r.errors || {});
     if (r.error) say(M.err[r.error] || r.error, false);
     else if (t.dataset.test === 'cube') say(r.ok ? M.cubeOk : M.cubeFail, r.ok);
+    else if (t.dataset.test === 'mqtt') say(r.ok ? M.mqttOk : M.mqttFail.replace('%s', M.err[r.detail] || r.detail || ''), r.ok);
     else say(r.ok ? M.tgOk : M.tgFail.replace('%s', M.err[r.detail] || r.detail || ''), r.ok);
   } finally { t.disabled = false; }
 });
@@ -832,6 +861,16 @@ function handle(req, res, ctx) {
         const token = String(form.TELEGRAM_BOT_TOKEN || '').trim() || process.env.TELEGRAM_BOT_TOKEN || '';
         const r = await testTelegram(token, ids.value, S.tgTest, ctx.telegramApi);
         return json(200, { ok: r.ok, detail: /chat not found|bot can't initiate|blocked by the user/i.test(r.error || '') ? 'nochat' : r.error });
+      }
+      if (j.what === 'mqtt') {
+        const u = clean(FIELDS.find((f) => f.key === 'MQTT_URL'), form.MQTT_URL);
+        if (u.error || !u.value) return json(400, { error: 'fix', errors: { MQTT_URL: 'mqtturl' } });
+        const tp = clean(FIELDS.find((f) => f.key === 'MQTT_TOPIC'), form.MQTT_TOPIC);
+        if (tp.error) return json(400, { error: 'fix', errors: { MQTT_TOPIC: 'mqtttopic' } });
+        const user = String(form.MQTT_USER == null ? (process.env.MQTT_USER || '') : form.MQTT_USER).trim();
+        const pass = form.MQTT_PASS_clear ? '' : (String(form.MQTT_PASS || '').trim() || process.env.MQTT_PASS || '');
+        const r = await testBroker(u.value, user, pass, tp.value || process.env.MQTT_TOPIC || 'homeminerproxy');
+        return json(200, { ok: r.ok, detail: r.error === 'auth' ? 'mqttauth' : r.error });
       }
       return json(400, { error: 'option' });
     }

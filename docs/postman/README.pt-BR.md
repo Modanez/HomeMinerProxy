@@ -36,7 +36,8 @@ Este diretório contém as **coleções Postman v2.1** e o arquivo de ambiente c
 - `POST /api/config` — Valida e grava as alterações em `DATA_DIR/settings.json` (exige `pin`) e reinicia o painel quando houver mudança.
 - `POST /api/config/test` (`what: "cube"`) — Testa se o cubo GeekMagic SmallTV responde em `CUBE_IP`.
 - `POST /api/config/test` (`what: "telegram"`) — Envia uma mensagem de teste no Telegram usando o token informado (ou já salvo) e `TELEGRAM_CHAT_ID`.
-- `POST /api/config/backup` — Exporta um backup completo em JSON (`version: 1`) com `settings`, `workers`, `records`, `history`, `proxyStats`, `telegram` e `cubo` (exige `pin`).
+- `POST /api/config/test` (`what: "mqtt"`) — Testa a conexão TCP/TLS e a autenticação com o broker MQTT 3.1.1 (`MQTT_URL`, `MQTT_USER`, `MQTT_PASS`, `MQTT_TOPIC`).
+- `POST /api/config/backup` — Exporta um backup completo em JSON (`version: 1`) com `settings`, `workers`, `records`, `history`, `achievements`, `proxyStats`, `telegram` e `cubo` (exige `pin`).
 - `POST /api/config/restore` — Valida e restaura um arquivo de backup em `DATA_DIR` (exige `pin`) e reinicia o painel.
 
 ### 4. API Interna do Proxy Stratum (`127.0.0.1:3336`)

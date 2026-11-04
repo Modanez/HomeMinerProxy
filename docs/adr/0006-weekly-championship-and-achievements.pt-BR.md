@@ -22,3 +22,4 @@ Uma fazenda de mineração solo caseira costuma misturar mineradores com até 7 
 ## Consequências
 - **Positivas:** Qualquer minerador da fazenda — independentemente do hashrate — pode ganhar o troféu da semana, e as conquistas tornam a mineração solo divertida no dia a dia.
 - **Negativas:** Acrescenta um pequeno arquivo JSON (`achievements.json`) ao `DATA_DIR` e dois campos (`week`, `lastWeek`) ao `proxy-stats.json`.
+

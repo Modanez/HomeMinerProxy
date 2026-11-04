@@ -265,6 +265,14 @@ Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achieve
 
 Set `CUBE_IP` in `/etc/mineracao.env` and run `install.sh` again. The scoreboard refreshes every 5 minutes, and a new record shows up right away on a "NEW RECORD!" screen. The cube must run the original GeekMagic firmware, which has the photo album mode.
 
+## Home Assistant / MQTT (optional)
+
+Set `MQTT_URL` (e.g. `mqtt://homeassistant.local:1883` or `mqtts://host:8883`), `MQTT_USER`, `MQTT_PASS`, and `MQTT_TOPIC` (default: `homeminerproxy`) in `/etc/mineracao.env` or on the Settings screen (`/config`).
+
+- **Zero-YAML Auto-Discovery:** publishes 11 sensors (`hashrate`, `best_difficulty`, `best_worker`, `workers_active`, `workers_stopped`, `shares_today`, `power_watts`, `energy_kwh_month`, `cost_month`, `weekly_leader`, `achievements_unlocked`) and 1 `pool_failover` binary sensor under `homeassistant/.../config`, automatically creating the **Mining Farm** device in Home Assistant (including power/energy/monetary classes for the Home Assistant Energy Dashboard).
+- **State & per-worker topics:** publishes `<prefix>/state` and `<prefix>/worker/<name>` (retained JSON), plus `<prefix>/availability` (`online` / `offline` with Last Will & Testament).
+- **Instant events (`<prefix>/event`):** publishes non-retained JSON events (`farm_record`, `personal_record`, `worker_offline`, `worker_online`, `pool_failover`, `pool_recovered`, `wallet_received`, `block_found`, `achievement_unlocked`) to trigger smart plugs, WLED/Hue lights, AWTRIX desk clocks, or voice assistants.
+
 ## Development
 
 ```bash

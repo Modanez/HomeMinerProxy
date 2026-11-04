@@ -36,7 +36,8 @@ This directory contains the **Postman v2.1 collections** and environment file co
 - `POST /api/config` — Validates and saves settings to `DATA_DIR/settings.json` (requires `pin`) and restarts the dashboard when values change.
 - `POST /api/config/test` (`what: "cube"`) — Tests HTTP reachability of the GeekMagic SmallTV cube (`CUBE_IP`).
 - `POST /api/config/test` (`what: "telegram"`) — Sends a test message through the Telegram Bot API using the provided or stored token and `TELEGRAM_CHAT_ID`.
-- `POST /api/config/backup` — Exports a full JSON backup (`version: 1`) containing `settings`, `workers`, `records`, `history`, `proxyStats`, `telegram`, and `cubo` (requires `pin`).
+- `POST /api/config/test` (`what: "mqtt"`) — Tests TCP/TLS connection and authentication with the MQTT 3.1.1 broker (`MQTT_URL`, `MQTT_USER`, `MQTT_PASS`, `MQTT_TOPIC`).
+- `POST /api/config/backup` — Exports a full JSON backup (`version: 1`) containing `settings`, `workers`, `records`, `history`, `achievements`, `proxyStats`, `telegram`, and `cubo` (requires `pin`).
 - `POST /api/config/restore` — Validates and restores a JSON backup to `DATA_DIR` (requires `pin`) and restarts the dashboard.
 
 ### 4. Stratum Proxy Internal API (`127.0.0.1:3336`)
