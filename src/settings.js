@@ -692,7 +692,7 @@ function page(lang, hasPin, theme) {
   .addw .addw-u { width:78px; padding:7px 4px; font-size:13px; }
   .addw button { margin:0; white-space:nowrap; }
   .plist { display:flex; flex-direction:column; gap:8px; margin-top:4px; }
-  .prow { display:grid; grid-template-columns:58px minmax(110px,1fr) minmax(150px,1.4fr) minmax(150px,1.2fr) 74px auto auto; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
+  .prow { display:grid; grid-template-columns:58px minmax(90px,0.9fr) minmax(200px,1.8fr) minmax(130px,1.1fr) 74px auto auto; gap:6px; align-items:center; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:7px 9px; }
   .prow input, .prow select { padding:6px 8px; font-size:13px; }
   .prow .p-id { font-family:ui-monospace, Menlo, monospace; font-size:12px; }
   .prow .p-wd { text-align:right; }
@@ -702,7 +702,13 @@ function page(lang, hasPin, theme) {
   .addp #new_plug_name { flex:1; min-width:130px; padding:7px 9px; font-size:14px; }
   .addp #new_plug_id { flex:1.4; min-width:170px; padding:7px 9px; font-size:13px; font-family:ui-monospace, Menlo, monospace; }
   .addp #new_plug_worker { flex:1.1; min-width:150px; padding:7px 8px; font-size:13px; }
-  @media (max-width:640px) { .prow { grid-template-columns:1fr 1fr; } }
+  @media (max-width:640px) {
+    /* celular: tipo + apelido / Device ID ou IP inteiro / worker + watchdog / testar + remover */
+    .prow { grid-template-columns:64px 1fr 1fr 48px; grid-template-areas:"type name name name" "id id id id" "worker worker wd wd" "test test test del"; }
+    .prow > :nth-child(1) { grid-area:type; } .prow > :nth-child(2) { grid-area:name; } .prow > :nth-child(3) { grid-area:id; }
+    .prow > :nth-child(4) { grid-area:worker; } .prow > :nth-child(5) { grid-area:wd; } .prow > :nth-child(6) { grid-area:test; } .prow > :nth-child(7) { grid-area:del; }
+    .prow .p-type { align-self:stretch; display:flex; align-items:center; justify-content:center; }
+  }
   .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:8px; }
   button { background:var(--gold); color:var(--on-gold); border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
