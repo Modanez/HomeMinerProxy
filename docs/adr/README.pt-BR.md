@@ -11,4 +11,5 @@ Este diretório reúne os **Registros de Decisão de Arquitetura (ADRs)** do **H
 | [ADR-0003](0003-flat-json-persistence-and-settings-overlay.pt-BR.md) | Persistência em arquivos JSON e overlay `settings.json` protegido por PIN | Aceita |
 | [ADR-0004](0004-bilingual-pt-source-with-i18n-table.pt-BR.md) | Código-fonte HTML em português com tabela determinística de tradução (`src/i18n.js`) | Aceita |
 | [ADR-0005](0005-python-pillow-for-cube-and-lottery-ticket.pt-BR.md) | Python + Pillow para o placar do cubo GeekMagic e o bilhete de loteria no Telegram | Aceita |
+| [ADR-0006](0006-weekly-championship-and-achievements.pt-BR.md) | Campeonato semanal por sorte relativa e conquistas persistentes da fazenda | Aceita |
 

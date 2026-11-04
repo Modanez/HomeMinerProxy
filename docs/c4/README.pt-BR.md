@@ -103,7 +103,7 @@ flowchart TB
 | **`mineracao-painel`** | Node.js (>=16, sem deps) | [`src/painel.js`](../../src/painel.js) | Serve a interface web bilíngue (`/`, `/config`) e APIs JSON (`/api/mining`, `/api/widget`, `/api/alarm`, `/api/config`), consulta o proxy local e APIs externas, aciona a sirene no Arduino e executa o bot do Telegram. |
 | **`mineracao-cubo`** | Python 3 + Pillow | [`src/cubo.py`](../../src/cubo.py) | Consulta `/api/mining` a cada minuto, desenha o placar JPEG 240×240 a cada 5 minutos (ou a tela de comemoração por 10 minutos assim que sai novo recorde da fazenda) e faz o upload para o cubo GeekMagic. |
 | **`ticket.py`** | Python 3 + Pillow | [`src/ticket.py`](../../src/ticket.py) | Chamado sob demanda pelo bot do Telegram (`src/telegram.js`) para renderizar o PNG 1080×1350 do bilhete de loteria do dia a partir do JSON de `/api/mining`. |
-| **Armazenamento JSON (`DATA_DIR`)** | Sistema de arquivos | `/var/lib/mineracao` ou `/data` | Guarda `settings.json` (overlay da tela `/config`), `proxy-stats.json`, `workers.json`, `records.json`, `history.json`, `diffhist.json`, `telegram.json` e `cubo-state.json`. |
+| **Armazenamento JSON (`DATA_DIR`)** | Sistema de arquivos | `/var/lib/mineracao` ou `/data` | Guarda `settings.json` (overlay da tela `/config`), `proxy-stats.json`, `workers.json`, `records.json`, `history.json`, `achievements.json`, `diffhist.json`, `telegram.json` e `cubo-state.json`. |
 
 ---
 
@@ -158,10 +158,10 @@ flowchart TB
 ```
 
 - **[`src/painel.js`](../../src/painel.js)**: Orquestrador principal, loops de coleta (`every`), agregação de estado (`workersView`, `snapshot`), controle serial do Arduino (`alarm`) e SPA HTML/CSS/JS embutida.
-- **[`src/luck.js`](../../src/luck.js)**: Modelo estatístico (`luckOf`, `theoreticalShare`) que compara o melhor share de cada worker com a mediana esperada para o trabalho realizado (`W / ln 2`) e calcula a curva teórica do histograma (`2^-(k+1)`).
+- **[`src/luck.js`](../../src/luck.js)**: Modelo estatístico (`luckOf`, `theoreticalShare`), motor do campeonato semanal (`weekKey`, `weeklyStandings`) e motor de conquistas da fazenda (`ACHIEVEMENTS`, `evaluateAchievements`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Seleção de idioma (`?lang` > cookie `lang` > variável `LANGUAGE` > `Accept-Language` > `'en'`) e tradução determinística PT -> EN da página (`localizePage`).
 - **[`src/settings.js`](../../src/settings.js)**: Renderiza `/config`, valida os campos (`clean`, incluindo mapas por worker de `WATTS` e `EXPECTED`), verifica o `SETTINGS_PIN` em tempo constante via SHA-256 com bloqueio contra força bruta (`checkPin`), grava `settings.json`, exporta/restaura backups completos da fazenda (`exportBackup`, `restoreBackup`) e testa a comunicação com o Cubo e o Telegram.
-- **[`src/telegram.js`](../../src/telegram.js)**: Cliente de *long polling* (`getUpdates`), motor de detecção de eventos (`digest`, `diffEvents`), tratamento de comandos (`/status`, `/workers`, `/sorte`, `/recordes`, `/bilhete`, `/ajuda`) e integração via subprocesso com `src/ticket.py`.
+- **[`src/telegram.js`](../../src/telegram.js)**: Cliente de *long polling* (`getUpdates`), motor de detecção de eventos (`digest`, `diffEvents`), tratamento de comandos (`/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/bilhete`, `/ajuda`) e integração via subprocesso com `src/ticket.py`.
 
 ---
 

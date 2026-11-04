@@ -151,11 +151,13 @@
                 "exec": [
                   "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
-                  "pm.test('Contém farm, hall, energy e luck', () => {",
+                  "pm.test('Contém farm, hall, energy, luck, championship e achievements', () => {",
                   "  pm.expect(j).to.have.property('farm');",
                   "  pm.expect(j).to.have.property('hall');",
                   "  pm.expect(j).to.have.property('energy');",
                   "  pm.expect(j).to.have.property('luck');",
+                  "  pm.expect(j).to.have.property('championship');",
+                  "  pm.expect(j).to.have.property('achievements');",
                   "});"
                 ]
               }
@@ -417,12 +419,13 @@
                 "exec": [
                   "pm.test('Status 200 OK', () => pm.response.to.have.status(200));",
                   "const j = pm.response.json();",
-                  "pm.test('Contém routes, workers, recent, totals e hist', () => {",
+                  "pm.test('Contém routes, workers, recent, totals, hist e week', () => {",
                   "  pm.expect(j).to.have.property('routes');",
                   "  pm.expect(j).to.have.property('workers');",
                   "  pm.expect(j).to.have.property('recent');",
                   "  pm.expect(j).to.have.property('totals');",
                   "  pm.expect(j).to.have.property('hist');",
+                  "  pm.expect(j).to.have.property('week');",
                   "});"
                 ]
               }

@@ -4,12 +4,14 @@
 
 ### English
 - **Daily ticket on Telegram:** the 21:00 summary now comes with today's lottery-ticket image, and `/ticket` sends it any time. Rendered on the server by `ticket.py` (Pillow); without Pillow the summary stays text only.
-- **Settings screen — per-worker watts/hashrate & backup:** `/config` now edits `WATTS` and `EXPECTED` per worker (with a button to add expected workers before their first share) and lets you download or restore a single-file JSON backup of settings, records, history and workers.
+- **Weekly championship & farm achievements:** weekly leaderboard ranked by relative luck (so slow ESP32/CPU miners can beat an ASIC) with a `🏆` badge on the leader, Sunday winner announcement in Telegram, `/championship` (`/campeonato`) and `/achievements` (`/conquistas`) commands, and 10 persistent farm achievements (`achievements.json`) with real-time Telegram alerts.
+- **Settings screen — per-worker watts/hashrate & backup:** `/config` now edits `WATTS` and `EXPECTED` per worker (with immediate discovery when a miner connects to the proxy and a bar to pre-register worker name + watts + expected hashrate) and lets you download or restore a single-file JSON backup of settings, records, history, achievements and workers.
 - **Architecture & API docs:** C4 Model diagrams (`docs/c4`), Architecture Decision Records (`docs/adr`) and Postman v2.1 collections + environment (`docs/postman`), all in English and Brazilian Portuguese.
 
 ### Português
 - **Bilhete do dia no Telegram:** o resumo das 21h agora vem com a imagem do bilhete de loteria do dia, e o `/bilhete` manda a qualquer hora. Gerado no servidor pelo `ticket.py` (Pillow); sem Pillow, o resumo continua só em texto.
-- **Tela de configurações — watts/hashrate por worker e backup:** `/config` agora edita o `WATTS` e o `EXPECTED` de cada worker (com botão para adicionar workers antes do primeiro share) e permite baixar ou restaurar um backup completo (configurações, recordes, histórico e workers) num arquivo JSON único.
+- **Campeonato semanal e conquistas da fazenda:** ranking da semana ordenado por sorte relativa (permitindo que o vovô devkit/ESP32 vença um ASIC), troféu `🏆` no líder, anúncio do campeão no resumo de domingo, comandos `/campeonato` e `/conquistas` no Telegram e 10 conquistas persistentes (`achievements.json`) com aviso em tempo real no bot.
+- **Tela de configurações — watts/hashrate por worker e backup:** `/config` agora edita o `WATTS` e o `EXPECTED` de cada worker (com detecção imediata ao conectar no proxy e barra para cadastrar nome + watts + hashrate esperado de uma vez) e permite baixar ou restaurar um backup completo (configurações, recordes, histórico, conquistas e workers) num arquivo JSON único.
 - **Documentação de arquitetura e APIs:** diagramas C4 Model (`docs/c4`), Registros de Decisão de Arquitetura (`docs/adr`) e coleções + ambiente Postman v2.1 (`docs/postman`), tudo em inglês e português.
 
 ## v0.2.0 — 2026-11-03

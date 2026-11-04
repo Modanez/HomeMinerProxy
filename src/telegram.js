@@ -40,12 +40,19 @@ const STRINGS = {
     luckRow: (w, f, p) => `${w}: <b>${f}×</b> · melhor que ${p}% das fazendas iguais`,
     recordsTitle: '<b>Hall da fama</b>',
     recordsEmpty: 'Nenhum recorde ainda.',
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
+    achievement: (icon, title, desc, w) => `${icon} <b>Nova conquista!</b>\n<b>${title}</b>${w ? ' · ' + w : ''}\n${desc}`,
+    champTitle: '🏆 <b>Campeonato da semana</b> (por sorte relativa)',
+    champEmpty: 'Nenhum share na semana ainda.',
+    champRow: (m, w, f, d, sh) => `${m} <b>${w}</b> · ${f ? f + '× · ' : ''}${d}${sh ? ' (' + sh + ' shares)' : ''}`,
+    champLast: (w, d) => `Campeão da semana passada: 🏆 <b>${w}</b> (${d})`,
+    sundayWinner: (w, f, d) => `\n🏆 <b>Campeão da semana:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
+    achTitle: (u, t) => `🎖️ <b>Conquistas da fazenda</b> (${u}/${t})`,
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
     ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
     noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -77,17 +84,24 @@ const STRINGS = {
     luckRow: (w, f, p) => `${w}: <b>${f}×</b> · better than ${p}% of identical farms`,
     recordsTitle: '<b>Hall of fame</b>',
     recordsEmpty: 'No records yet.',
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/ticket · today\'s lottery ticket\n/help · this list',
+    achievement: (icon, title, desc, w) => `${icon} <b>New achievement!</b>\n<b>${title}</b>${w ? ' · ' + w : ''}\n${desc}`,
+    champTitle: '🏆 <b>Weekly championship</b> (by relative luck)',
+    champEmpty: 'No shares this week yet.',
+    champRow: (m, w, f, d, sh) => `${m} <b>${w}</b> · ${f ? f + '× · ' : ''}${d}${sh ? ' (' + sh + ' shares)' : ''}`,
+    champLast: (w, d) => `Last week's champion: 🏆 <b>${w}</b> (${d})`,
+    sundayWinner: (w, f, d) => `\n🏆 <b>Champion of the week:</b> ${w} (${f ? f + '× · ' : ''}${d})`,
+    achTitle: (u, t) => `🎖️ <b>Farm achievements</b> (${u}/${t})`,
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/ticket · today\'s lottery ticket\n/help · this list',
     ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
     noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
 };
-const ALIASES = { sorte: 'luck', recordes: 'records', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
+const ALIASES = { sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
 
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -128,6 +142,7 @@ function digest(snap) {
     workers: (f.workers || []).map((w) => ({ name: w.name, state: w.state, inactive: !!w.inactive, best: Number(w.bestDifficulty) || 0, lastSeen: w.lastSeen })),
     failover: ((snap.proxy || {}).failover || []).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
     sats: (snap.wallet || {}).okAt ? (snap.wallet || {}).sats : null,
+    achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
   };
 }
 
@@ -161,6 +176,13 @@ function diffEvents(prev, cur, opts = {}) {
     out.push(got >= 1e8
       ? { type: 'block', text: T.block(fm.num(got / 1e8, 8)) }
       : { type: 'money', text: T.money(fm.num(got, 0)) });
+  }
+  const prevAch = new Set((prev.achievements || []).map((a) => a.id));
+  for (const a of cur.achievements || []) {
+    if (!prevAch.has(a.id)) {
+      const pair = (opts.lang === 'pt' ? a.pt : a.en) || a.pt || [a.id, ''];
+      out.push({ type: 'achievement', text: T.achievement(a.icon || '🎖️', escHtml(pair[0]), escHtml(pair[1]), a.worker ? escHtml(a.worker) : '') });
+    }
   }
   return out;
 }
@@ -216,10 +238,42 @@ function recordsText(snap, opts = {}) {
     `${medal[i]} <b>${fm.diff(r.value)}</b> · ${escHtml(r.worker)} · ${new Date(r.at).toLocaleDateString(T.loc)}`)].join('\n');
 }
 
+function championshipText(snap, opts = {}) {
+  const fm = formatter(opts.lang), T = fm.T;
+  const ch = snap.championship || {}, st = ch.standings || [];
+  const medal = ['🏆', '🥈', '🥉', '4.', '5.'];
+  const lines = [T.champTitle];
+  if (!st.length) lines.push(T.champEmpty);
+  else {
+    for (const [i, w] of st.slice(0, 5).entries()) {
+      lines.push(T.champRow(medal[i] || `${i + 1}.`, escHtml(w.name), w.factor != null ? fm.num(w.factor, 2) : null, fm.diff(w.best), w.shares ? fm.num(w.shares, 0) : null));
+    }
+  }
+  const lw = ch.lastWeek && ch.lastWeek.winner;
+  if (lw) lines.push('\n' + T.champLast(escHtml(lw.name), fm.diff(lw.best)));
+  return lines.join('\n');
+}
+
+function achievementsText(snap, opts = {}) {
+  const fm = formatter(opts.lang), T = fm.T;
+  const ach = snap.achievements || {}, list = ach.list || [];
+  const isPt = opts.lang === 'pt';
+  const lines = [T.achTitle(ach.unlocked || 0, ach.total || list.length)];
+  for (const a of list) {
+    const pair = (isPt ? a.pt : a.en) || a.pt || [a.id, ''];
+    const ico = a.unlocked ? a.icon : '🔒';
+    lines.push(`${ico} <b>${escHtml(pair[0])}</b>${a.unlocked && a.worker ? ' (' + escHtml(a.worker) + ')' : ''} — ${escHtml(pair[1])}`);
+  }
+  return lines.join('\n');
+}
+
 function dailyText(snap, opts = {}) {
-  const T = formatter(opts.lang).T;
-  const date = new Date(opts.now || Date.now()).toLocaleDateString(T.loc);
-  return T.dailyTitle(date) + '\n\n' + statusText(snap, opts);
+  const fm = formatter(opts.lang), T = fm.T;
+  const d = new Date(opts.now || Date.now());
+  const date = d.toLocaleDateString(T.loc);
+  const ld = (snap.championship || {}).leader;
+  const sun = d.getDay() === 0 && ld ? T.sundayWinner(escHtml(ld.name), ld.factor != null ? fm.num(ld.factor, 2) : null, fm.diff(ld.best)) : '';
+  return T.dailyTitle(date) + '\n\n' + statusText(snap, opts) + sun;
 }
 
 // Melhor hash de hoje (o bilhete só sai com um share de hoje e o hash do último bloco)
@@ -349,8 +403,10 @@ function start(opts) {
       : cmd === 'workers' ? workersText(snap, o)
         : cmd === 'luck' ? luckText(snap, o)
           : cmd === 'records' ? recordsText(snap, o)
-            : cmd === 'start' ? T.hello + T.help
-              : T.help;
+            : cmd === 'championship' ? championshipText(snap, o)
+              : cmd === 'achievements' ? achievementsText(snap, o)
+                : cmd === 'start' ? T.hello + T.help
+                  : T.help;
     await send(id, text);
   }
 
@@ -408,4 +464,4 @@ function start(opts) {
   };
 }
 
-module.exports = { start, todayBest, ticketImage, digest, diffEvents, statusText, workersText, luckText, recordsText, dailyText, parseCommand, formatter, STRINGS };
+module.exports = { start, todayBest, ticketImage, digest, diffEvents, statusText, workersText, luckText, recordsText, championshipText, achievementsText, dailyText, parseCommand, formatter, STRINGS };

@@ -20,12 +20,30 @@ const snap = (o = {}) => ({
     tip: { height: 974200, hash: '00000000000000000000' + 'ab'.repeat(22), hashDiff: 6.08e14, target: 1.484e14 },
     dayBestHash: { worker: 'odroid', diff: 5.22, hash: '00000000' + 'cd'.repeat(28), at: Date.parse('2026-11-02T15:00:00Z'), date: o.dayDate || '2026-11-02' },
   },
+  championship: o.championship || {
+    key: '2026-11-02',
+    leader: { name: 'vovo', factor: 2.69, best: 38.76, shares: 42 },
+    standings: [{ name: 'vovo', factor: 2.69, best: 38.76, shares: 42 }, { name: 'odroid', factor: 1.1, best: 100, shares: 500 }],
+    lastWeek: { key: '2026-10-26', winner: { name: 'odroid', factor: 1.8, best: 95 } },
+  },
+  achievements: o.achievements || {
+    unlocked: 1,
+    total: 2,
+    list: [
+      { id: 'first_share', icon: '⛏️', pt: ['Primeira faísca', 'Primeiro share aceito'], en: ['First spark', 'First accepted share'], unlocked: true, worker: 'odroid' },
+      { id: 'diff_1k', icon: '🎯', pt: ['Clube dos 1.000', 'Acima de 1.000'], en: ['1,000 club', 'Over 1,000'], unlocked: false, worker: null },
+    ],
+  },
 });
 
 test('comandos em português e inglês, com ou sem @bot', () => {
   assert.strictEqual(tg.parseCommand('/sorte'), 'luck');
   assert.strictEqual(tg.parseCommand('/luck@FazendaBot'), 'luck');
   assert.strictEqual(tg.parseCommand('/RECORDES'), 'records');
+  assert.strictEqual(tg.parseCommand('/campeonato'), 'championship');
+  assert.strictEqual(tg.parseCommand('/championship'), 'championship');
+  assert.strictEqual(tg.parseCommand('/conquistas'), 'achievements');
+  assert.strictEqual(tg.parseCommand('/achievements'), 'achievements');
   assert.strictEqual(tg.parseCommand('/ajuda'), 'help');
   assert.strictEqual(tg.parseCommand('/bilhete'), 'ticket');
   assert.strictEqual(tg.parseCommand('/ticket'), 'ticket');
@@ -99,7 +117,27 @@ test('textos dos comandos', () => {
   assert.match(tg.workersText(s, { lang: 'pt' }), /🟢 <b>odroid<\/b> · 1 MH\/s · 100 · 3 h/);
   assert.match(tg.luckText(s, { lang: 'pt' }), /vovo: <b>2,69×<\/b> · melhor que 77%/);
   assert.match(tg.recordsText(s, { lang: 'en' }), /🥇 <b>100<\/b> · odroid/);
+  assert.match(tg.championshipText(s, { lang: 'pt' }), /🏆 <b>vovo<\/b> · 2,69× · 38,76 \(42 shares\)/);
+  assert.match(tg.championshipText(s, { lang: 'en' }), /Last week's champion: 🏆 <b>odroid<\/b>/);
+  assert.match(tg.achievementsText(s, { lang: 'pt' }), /⛏️ <b>Primeira faísca<\/b> \(odroid\)/);
+  assert.match(tg.achievementsText(s, { lang: 'en' }), /🔒 <b>1,000 club<\/b>/);
   assert.match(tg.dailyText(s, { lang: 'pt', now: Date.parse('2026-11-02T23:00:00Z') }), /Resumo do dia/);
+  // domingo anuncia o campeão da semana no resumo diário
+  assert.match(tg.dailyText(s, { lang: 'pt', now: new Date(2026, 10, 8, 21, 0, 0).getTime() }), /Campeão da semana:.*vovo/);
+  // nova conquista gera aviso
+  const d1 = tg.digest(s);
+  const d2 = tg.digest(snap({
+    achievements: {
+      unlocked: 2, total: 2,
+      list: [
+        { id: 'first_share', icon: '⛏️', pt: ['Primeira faísca', 'Primeiro share aceito'], en: ['First spark', 'First accepted share'], unlocked: true, worker: 'odroid' },
+        { id: 'diff_1k', icon: '🎯', pt: ['Clube dos 1.000', 'Acima de 1.000'], en: ['1,000 club', 'Over 1,000'], unlocked: true, worker: 'vovo' },
+      ],
+    },
+  }));
+  const achEv = tg.diffEvents(d1, d2, { lang: 'pt' });
+  assert.deepStrictEqual(achEv.map((e) => e.type), ['achievement']);
+  assert.match(achEv[0].text, /Nova conquista!.*<b>Clube dos 1\.000<\/b> · vovo/s);
   const fm = tg.formatter('pt');
   assert.strictEqual(fm.diff(148.4e12), '148,4 tri');
   assert.strictEqual(tg.formatter('en').diff(148.4e12), '148.4T');
@@ -147,7 +185,7 @@ test('bot responde só ao chat configurado e manda os avisos', async (t) => {
 
   await waitFor(() => api.calls.some((c) => c.method === 'setMyCommands'));
   const cmds = api.calls.find((c) => c.method === 'setMyCommands').body.commands.map((c) => c.command);
-  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'bilhete', 'ajuda']);
+  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'bilhete', 'ajuda']);
 
   api.push(999, '/status');   // estranho: ignorado
   api.push(42, '/status');

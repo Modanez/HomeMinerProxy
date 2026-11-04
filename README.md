@@ -54,7 +54,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   - **Bitcoin network:** latest block, difficulty adjustment, halving, and the prize at stake.
   - **History:** charts, hall of fame, and power cost.
   - **Almost a block:** your best hash vs. the latest block hash, leading zeros side by side. The 🎟️ button turns today's best hash into a lottery-ticket image ("NOT A WINNER", until the day it is) to share or save.
-  - **Luck:** each worker's best share compared with what its work should statistically produce (1× is normal, 2× is twice as lucky), plus a histogram of all share difficulties against the theoretical curve. A big gap from the curve can point to a miner or pool problem.
+  - **Luck:** each worker's best share compared with what its work should statistically produce (1× is normal, 2× is twice as lucky), a histogram of all share difficulties against the theoretical curve, the **Weekly Championship** (ranked by relative luck so an ESP32/devkit can beat an ASIC), and **Farm Achievements**.
 
   For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden.
 - **Optional extras:**
@@ -256,9 +256,10 @@ The bot sends:
 - **Worker stopped / back:** when a worker goes red on the dashboard, and when it returns.
 - **Pool failover:** when a port moves to its backup pool, and when it moves back.
 - **Money in the wallet:** any payment to your address. A solo block shows up as 🎉 **WE FOUND A BLOCK!**
-- **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`), with today's lottery ticket image attached.
+- **Achievements:** real-time alerts when the farm unlocks a new milestone (e.g. first 1k difficulty share, 100k shares, 7 days nonstop, or the underdog trophy).
+- **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`), with today's lottery ticket image attached (and the weekly champion announced on Sundays).
 
-Commands: `/status`, `/workers`, `/luck`, `/records`, `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
+Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
 
 ## GeekMagic cube (optional)
 

@@ -158,8 +158,8 @@ test('PIN: certo, errado e bloqueio depois de 5 erros', () => {
 
 test('página nos dois idiomas, sem PIN só leitura, script válido', () => {
   const pt = st.page('pt', true), en = st.page('en', true);
-  assert.match(pt, /Configurações[\s\S]*Consumo por worker[\s\S]*Backup e restauração[\s\S]*Salvar e reiniciar/);
-  assert.match(en, /Settings[\s\S]*Power per worker[\s\S]*Backup and restore[\s\S]*Save and restart/);
+  assert.match(pt, /Configurações[\s\S]*Consumo por worker[\s\S]*new_worker_watts[\s\S]*new_worker_hr[\s\S]*Backup e restauração[\s\S]*Salvar e reiniciar/);
+  assert.match(en, /Settings[\s\S]*Power per worker[\s\S]*new_worker_watts[\s\S]*new_worker_hr[\s\S]*Backup and restore[\s\S]*Save and restart/);
   assert.doesNotMatch(st.page('pt', false), /id="save"/);
   assert.match(st.page('pt', false), /SETTINGS_PIN/);
   for (const html of [pt, en]) {

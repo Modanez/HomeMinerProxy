@@ -147,6 +147,7 @@ const EN = [
   ["out.push('O ' + wk.name + ' trabalha em silêncio. A pool nem sabe que ele existe.');", "out.push(wk.name + ' works in silence. The pool doesn\\'t even know it exists.');"],
   ["'O Odroid é de 2016 e segue minerando. Respeita o vovô.'", "'The Odroid is from 2016 and still mining. Respect your elders.'"],
   ["' lidera o hall da fama com ' + nf(hall[0].value, 2) + '. Os outros que lutem.'", "' leads the hall of fame with ' + nf(hall[0].value, 2) + '. The others can try harder.'"],
+  ["if (j.championship && j.championship.leader) out.push('🏆 ' + j.championship.leader.name + ' lidera o campeonato da semana. Quem vai buscar?');", "if (j.championship && j.championship.leader) out.push('🏆 ' + j.championship.leader.name + ' leads the weekly championship. Who will catch up?');"],
   ["out.push('Em ' + mesAno(tm.from * 1000) + ' a gente seria milionário. Erramos de década.');", "out.push('In ' + mesAno(tm.from * 1000) + ' we would be millionaires. Wrong decade.');"],
   ["(h.worker || 'O servidor') + ' a ' + nf(h.tempC) + ' °C. O cooler merece um aumento.'", "(h.worker || 'The server') + ' at ' + nf(h.tempC) + ' °C. The cooler deserves a raise.'"],
   ["(h.worker || 'O servidor') + ' a ' + nf(h.tempC) + ' °C. Alguém traz um ventilador?'", "(h.worker || 'The server') + ' at ' + nf(h.tempC) + ' °C. Someone bring a fan?'"],
@@ -185,6 +186,12 @@ const EN = [
   ['<span class="sub lk-p">melhor que \' + pct + \'% das fazendas iguais</span>', '<span class="sub lk-p">luckier than \' + pct + \'% of identical farms</span>'],
   ['os shares aparecem aqui conforme chegam pelo proxy', 'shares show up here as they arrive through the proxy'],
   ['dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria', 'share difficulty ÷ pool target · bars: real shares · dashed: theory'],
+  ['<div class="label">🏆 Campeonato da semana</div>', '<div class="label">🏆 Weekly championship</div>'],
+  ['<div class="lead" id="chLead">Ranking da semana por sorte relativa (melhor share ÷ esperado), do vovô ao ASIC.</div>', '<div class="lead" id="chLead">Weekly ranking by relative luck (best share ÷ expected), from grandpa to ASIC.</div>'],
+  ['<div class="label">🎖️ Conquistas <span id="achCnt" class="sub"></span></div>', '<div class="label">🎖️ Achievements <span id="achCnt" class="sub"></span></div>'],
+  ["sp2.textContent = 'nenhum share na semana ainda';", "sp2.textContent = 'no shares this week yet';"],
+  ["const cMedals = ['🏆', '🥈', '🥉', '4º', '5º'];", "const cMedals = ['🏆', '🥈', '🥉', '4th', '5th'];"],
+  ["set('chLast', lw ? 'Campeão da semana passada: 🏆 ' + lw.name + ' (' + (lw.factor != null ? nf(lw.factor, 2) + '× · ' : '') + diffTxt(lw.best) + ')' : '');", "set('chLast', lw ? 'Last week\\'s champion: 🏆 ' + lw.name + ' (' + (lw.factor != null ? nf(lw.factor, 2) + '× · ' : '') + diffTxt(lw.best) + ')' : '');"],
 
   // ---------- bilhete do dia
   ['<a class="ticket-btn" id="ticketBtn" href="#">🎟️ Bilhete do dia</a>', '<a class="ticket-btn" id="ticketBtn" href="#">🎟️ Today\'s ticket</a>'],

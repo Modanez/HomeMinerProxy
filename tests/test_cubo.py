@@ -43,6 +43,7 @@ class TestCubo(unittest.TestCase):
         self.assertEqual(cubo.hashrate(13.1e6), '13,1 MH/s')
         self.assertEqual(cubo.big(78.5e9), '78,5 bi')
 
+    @unittest.skipIf(cubo is None or cubo.Image is None, 'Pillow não instalado')
     def test_telas_240x240(self):
         j = self.sample()
         for lang in ('pt', 'en'):
@@ -53,6 +54,7 @@ class TestCubo(unittest.TestCase):
                 self.assertEqual(data[:2], b'\xff\xd8')
                 self.assertLess(len(data), 400 * 1024)
 
+    @unittest.skipIf(cubo is None or cubo.Image is None, 'Pillow não instalado')
     def test_recorde_novo_so_depois_da_primeira_leitura(self):
         enviados = []
         cubo.upload = lambda data: enviados.append(data)

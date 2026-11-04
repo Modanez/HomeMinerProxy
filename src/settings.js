@@ -211,6 +211,7 @@ const BACKUP_FILES = {
   workers: 'workers.json',
   records: 'records.json',
   history: 'history.json',
+  achievements: 'achievements.json',
   proxyStats: 'proxy-stats.json',
   telegram: 'telegram.json',
   cubo: 'cubo-state.json',
@@ -288,6 +289,18 @@ function validateBackupData(raw) {
       hist.push({ t: Math.round(t), hr: Math.round(hr) });
     }
     out.history = hist;
+  }
+  if ('achievements' in d && d.achievements != null) {
+    if (!isPlainObj(d.achievements)) return { error: 'backup' };
+    const ach = {};
+    for (const [k, v] of Object.entries(d.achievements)) {
+      if (!/^[a-z0-9_]{1,40}$/.test(k) || !isPlainObj(v)) return { error: 'backup' };
+      ach[k] = {
+        unlockedAt: typeof v.unlockedAt === 'string' ? v.unlockedAt.slice(0, 40) : new Date().toISOString(),
+        worker: typeof v.worker === 'string' && NAME_RE.test(v.worker) ? v.worker : null,
+      };
+    }
+    out.achievements = ach;
   }
   if ('proxyStats' in d && d.proxyStats != null) {
     const ps = d.proxyStats;
@@ -386,7 +399,7 @@ const T = {
     TELEGRAM_PERSONAL: ['Avisar recordes pessoais', 'Além do recorde da fazenda, avisa o recorde de cada worker (pode falar bastante no começo).'],
     TELEGRAM_PANEL_URL: ['Link do painel', 'Aparece no /status. Ex.: http://odroid:3000 (Tailscale).'],
     auto: 'Automático', none: 'Nenhum', yes: 'Sim',
-    addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWorkerBtn: '+ Adicionar worker',
+    addWorkerPlaceholder: 'Nome do worker (ex.: bitaxe)', addWattsPlaceholder: 'W (ex.: 20)', addHrPlaceholder: 'Hashrate (ex.: 1.2)', addWorkerBtn: '+ Adicionar worker',
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o token',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
@@ -417,7 +430,7 @@ const T = {
     TELEGRAM_PERSONAL: ['Alert personal records', 'Besides the farm record, alert each worker\'s record (chatty at first).'],
     TELEGRAM_PANEL_URL: ['Dashboard link', 'Shown in /status. E.g. http://odroid:3000 (Tailscale).'],
     auto: 'Automatic', none: 'None', yes: 'Yes',
-    addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWorkerBtn: '+ Add worker',
+    addWorkerPlaceholder: 'Worker name (e.g. bitaxe)', addWattsPlaceholder: 'W (e.g. 20)', addHrPlaceholder: 'Hashrate (e.g. 1.2)', addWorkerBtn: '+ Add worker',
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove the token',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
@@ -448,8 +461,12 @@ function page(lang, hasPin) {
     } else if (f.type === 'watts') {
       input = `<div class="wmap" data-map="WATTS"></div>`;
     } else if (f.type === 'expected') {
-      input = `<div class="wmap" data-map="EXPECTED"></div>` +
-        `<div class="addw"><input type="text" id="new_worker" placeholder="${htmlEsc(S.addWorkerPlaceholder)}" autocomplete="off" spellcheck="false"><button type="button" class="ghost" id="add_worker_btn">${htmlEsc(S.addWorkerBtn)}</button></div>`;
+      input = `<div class="wmap wmap-exp" data-map="EXPECTED"></div>` +
+        `<div class="addw"><input type="text" id="new_worker" placeholder="${htmlEsc(S.addWorkerPlaceholder)}" autocomplete="off" spellcheck="false">` +
+        `<input type="text" id="new_worker_watts" class="addw-w" inputmode="decimal" placeholder="${htmlEsc(S.addWattsPlaceholder)}" autocomplete="off">` +
+        `<input type="text" id="new_worker_hr" class="addw-hr" inputmode="decimal" placeholder="${htmlEsc(S.addHrPlaceholder)}" autocomplete="off">` +
+        `<select id="new_worker_unit" class="addw-u"><option value="">H/s</option><option value="k">kH/s</option><option value="M">MH/s</option><option value="G">GH/s</option><option value="T" selected>TH/s</option><option value="P">PH/s</option></select>` +
+        `<button type="button" class="ghost" id="add_worker_btn">${htmlEsc(S.addWorkerBtn)}</button></div>`;
     } else if (f.type === 'bool') {
       input = `<label class="inline"><input type="checkbox" name="${f.key}"> ${S.yes}</label>`;
     } else if (f.type === 'secret') {
@@ -490,12 +507,18 @@ function page(lang, hasPin) {
   .hint { color:var(--dim); font-size:12px; margin-top:5px; line-height:1.4; } .ferr { color:var(--warn); font-size:12px; margin-top:3px; }
   .checks { display:flex; flex-wrap:wrap; gap:6px 14px; } .inline { display:inline-flex; align-items:center; gap:6px; font-size:14px; margin-top:6px; cursor:pointer; }
   .wmap { display:grid; grid-template-columns:repeat(auto-fill, minmax(220px, 1fr)); gap:8px; margin-top:4px; }
-  .wrow { display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 8px; }
-  .wrow span { font-size:13px; font-family:ui-monospace, Menlo, monospace; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .wmap-exp { grid-template-columns:repeat(auto-fill, minmax(310px, 1fr)); }
+  .wrow { display:flex; align-items:center; gap:6px; background:var(--bg); border:1px solid var(--line); border-radius:8px; padding:6px 10px; }
+  .wrow span { font-size:13px; font-family:ui-monospace, Menlo, monospace; flex:1; min-width:85px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .wrow input { width:84px; padding:5px 7px; font-size:14px; text-align:right; }
   .wrow select { width:78px; padding:5px 4px; font-size:13px; }
   .wrow em { font-style:normal; color:var(--dim); font-size:12px; }
-  .addw { display:flex; gap:8px; margin-top:8px; align-items:center; } .addw input { flex:1; padding:7px 9px; font-size:14px; } .addw button { margin:0; white-space:nowrap; }
+  .addw { display:flex; gap:6px; margin-top:10px; align-items:center; flex-wrap:wrap; }
+  .addw #new_worker { flex:2; min-width:160px; padding:7px 9px; font-size:14px; }
+  .addw .addw-w { width:92px; padding:7px 8px; font-size:14px; text-align:right; }
+  .addw .addw-hr { width:125px; padding:7px 8px; font-size:14px; text-align:right; }
+  .addw .addw-u { width:78px; padding:7px 4px; font-size:13px; }
+  .addw button { margin:0; white-space:nowrap; }
   .bbar { display:flex; gap:10px; flex-wrap:wrap; margin-top:6px; }
   button { background:var(--gold); color:#111; border:0; border-radius:8px; padding:10px 16px; font-size:15px; font-weight:600; cursor:pointer; }
   button.ghost { background:transparent; color:var(--gold); border:1px solid var(--gold); padding:6px 10px; font-size:13px; font-weight:500; margin-top:8px; }
@@ -619,7 +642,8 @@ function renderWorkerControls() {
 }
 
 fetch('/api/config').then((r) => r.json()).then((c) => {
-  const extra = new Set([...(c.workers || []), ...Object.keys((c.values && c.values.WATTS) || {}), ...Object.keys((c.values && c.values.EXPECTED) || {})]);
+  const exp = (c.values && c.values.EXPECTED) || {};
+  const extra = new Set([...(c.workers || []), ...Object.keys(exp).filter((k) => exp[k] > 0)]);
   workers = [...extra].sort((a, b) => a.localeCompare(b));
   stateValues.ALARM_IGNORE = (c.values && c.values.ALARM_IGNORE) || [];
   stateValues.WATTS = Object.assign({}, (c.values && c.values.WATTS) || {});
@@ -636,16 +660,27 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
 });
 
 const addBtn = document.getElementById('add_worker_btn'), addInp = document.getElementById('new_worker');
+const addWInp = document.getElementById('new_worker_watts'), addHrInp = document.getElementById('new_worker_hr'), addUInp = document.getElementById('new_worker_unit');
 if (addBtn && addInp) {
   const addW = () => {
     const n = addInp.value.trim();
     if (!n) return;
     if (!/^[\\w.\\-]{1,64}$/.test(n)) { say(M.err.name, false); return; }
-    if (!workers.includes(n)) { workers.push(n); workers.sort((a, b) => a.localeCompare(b)); renderWorkerControls(); }
+    const wVal = addWInp ? addWInp.value.trim() : '';
+    const hrVal = addHrInp ? addHrInp.value.trim() : '';
+    const uVal = addUInp ? addUInp.value : 'T';
+    if (wVal !== '') stateValues.WATTS[n] = wVal;
+    if (hrVal !== '') stateValues.EXPECTED[n] = hrVal === '0' ? '0' : hrVal + uVal;
+    if (!workers.includes(n)) { workers.push(n); workers.sort((a, b) => a.localeCompare(b)); }
+    renderWorkerControls();
     addInp.value = '';
+    if (addWInp) addWInp.value = '';
+    if (addHrInp) addHrInp.value = '';
   };
   addBtn.addEventListener('click', addW);
-  addInp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addW(); } });
+  for (const x of [addInp, addWInp, addHrInp].filter(Boolean)) {
+    x.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addW(); } });
+  }
 }
 
 function values() {

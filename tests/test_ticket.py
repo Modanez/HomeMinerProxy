@@ -3,7 +3,10 @@ import io, json, os, subprocess, sys, unittest
 
 SRC = os.path.join(os.path.dirname(__file__), '..', 'src')
 sys.path.insert(0, SRC)
-import ticket  # noqa: E402
+try:
+    import ticket  # noqa: E402
+except ImportError:
+    ticket = None
 
 SNAP = {'nearBlock': {
     'tip': {'height': 974200, 'hash': '0' * 20 + 'ab' * 22, 'hashDiff': 6.08e14, 'target': 1.484e14},
@@ -11,6 +14,7 @@ SNAP = {'nearBlock': {
 }}
 
 
+@unittest.skipIf(ticket is None, 'Pillow não instalado')
 class TicketTest(unittest.TestCase):
     def test_render_both_languages(self):
         for lang in ('pt', 'en'):

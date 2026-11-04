@@ -54,7 +54,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
   - **Rede Bitcoin:** último bloco, ajuste de dificuldade, halving e prêmio em jogo.
   - **Histórico:** gráficos, hall da fama e consumo de energia.
   - **Quase bloco:** nosso melhor hash × hash do último bloco, com os zeros lado a lado. O botão 🎟️ transforma o melhor hash do dia num bilhete de loteria ("NÃO PREMIADO", até o dia em que for) para compartilhar ou salvar.
-  - **Sorte:** o melhor share de cada worker comparado com o que o trabalho dele deveria render pela estatística (1× é o normal, 2× é o dobro de sorte), e um histograma das dificuldades de todos os shares contra a curva teórica. Uma diferença grande da curva pode indicar problema no minerador ou na pool.
+  - **Sorte:** o melhor share de cada worker comparado com o que o trabalho dele deveria render pela estatística (1× é o normal, 2× é o dobro de sorte), um histograma das dificuldades de todos os shares contra a curva teórica, o **Campeonato da semana** (ordenado por sorte relativa para o vovô devkit disputar de igual para igual com um ASIC) e as **Conquistas da fazenda**.
 
   Para uma tela ligada ao servidor, use `?kiosk`: as telas alternam sozinhas e o cursor some.
 - **Extras opcionais:**
@@ -256,9 +256,10 @@ O bot avisa:
 - **Worker parado / de volta:** quando um worker fica vermelho no painel, e quando ele volta.
 - **Failover de pool:** quando uma porta vai para a pool reserva, e quando volta para a principal.
 - **Dinheiro na carteira:** qualquer pagamento para o seu endereço. Um bloco solo chega como 🎉 **ACHAMOS UM BLOCO!**
-- **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`), com a imagem do bilhete de loteria do dia.
+- **Conquistas:** avisa quando a fazenda desbloqueia um marco novo (ex.: primeiro share de dificuldade 1.000, 100 mil shares, uma semana sem parar ou o troféu vovô).
+- **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`), com a imagem do bilhete de loteria do dia (e o anúncio do campeão da semana no domingo).
 
-Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
+Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
 
 ## Cubo GeekMagic (opcional)
 

@@ -8,7 +8,7 @@ const fs = require('fs');
 const path = require('path');
 const os = require('os');
 const { pickLang, localizePage, LOCALES, WIDGET } = require('./i18n');
-const { luckOf, theoreticalShare } = require('./luck');
+const { luckOf, theoreticalShare, weeklyStandings, evaluateAchievements } = require('./luck');
 const settings = require('./settings');
 // Valores salvos na tela de configurações (DATA_DIR/settings.json) valem por cima do .env
 settings.applyOverlay(process.env.DATA_DIR || __dirname);
@@ -146,6 +146,8 @@ if (!Array.isArray(records)) {
 
 let history = loadJson('history.json', []);
 if (!Array.isArray(history)) history = [];
+let achievements = loadJson('achievements.json', {});
+if (!achievements || typeof achievements !== 'object' || Array.isArray(achievements)) achievements = {};
 
 function addRecord(worker, value) {
   alarm(value > topRecord() ? 'R' : 'P');
@@ -546,7 +548,7 @@ async function tickProxy() {
     if (proxy.accepted !== null && accepted > proxy.accepted) alarm('S');
     // recordes pessoais/da fazenda entram na hora, com a dificuldade calculada pelo proxy
     const byPool = {};
-    for (const w of ws) if (w.lastShareAt) (byPool[w.pool] = byPool[w.pool] || []).push({
+    for (const w of ws) if (w.lastShareAt || w.online > 0) (byPool[w.pool] = byPool[w.pool] || []).push({
       name: w.name,
       // proxy confiável > medição da pool > nominal (descarta estimativa antiga do proxy com poucos shares)
       ...(() => {
@@ -557,7 +559,7 @@ async function tickProxy() {
         return { hashRate: EXPECTED[w.name] || prev.hashRate || 0, hrBy: 'nominal' };
       })(),
       bestDifficulty: w.bestEver,
-      lastSeen: new Date(w.lastShareAt).toISOString(),
+      lastSeen: w.lastShareAt ? new Date(w.lastShareAt).toISOString() : null,
     });
     for (const [label, list] of Object.entries(byPool)) rememberWorkers(list, label);
     proxy = {
@@ -573,6 +575,8 @@ async function tickProxy() {
       })),
       bestHash: s.bestHash || null,
       dayBestHash: s.dayBestHash || null,
+      week: s.week || null,
+      lastWeek: s.lastWeek || null,
     };
     alarmStatus();
   } catch (e) {
@@ -679,6 +683,34 @@ function snapshot() {
       hist: proxy.hist,
       theory: proxy.hist ? proxy.hist.map((_, k) => theoreticalShare(k)) : null,
     } : null,
+    ...(() => {
+      const luckWorkers = proxyUp() ? Object.values(proxy.workers).filter((w) => w.luck && w.luck.work > 0)
+        .map((w) => ({ name: w.name, since: w.luck.since, ...luckOf(w.luck.work, w.luck.best) }))
+        .sort((a, b) => b.factor - a.factor) : [];
+      const champ = weeklyStandings(proxyUp() ? proxy.week : null, records);
+      const prevChamp = proxyUp() && proxy.lastWeek ? weeklyStandings(proxy.lastWeek, records) : null;
+      const championship = { ...champ, lastWeek: prevChamp && prevChamp.leader ? { key: prevChamp.key, winner: prevChamp.leader } : null };
+      const proxyTotalShares = proxyUp() ? Object.values(proxy.workers).reduce((s, w) => s + (w.accepted || 0), 0) : 0;
+      const poolTotalShares = Number((client.accounting || {}).totalAcceptedShares) || Number((client.accounting || {}).acceptedSharesLastDay) || 0;
+      const topRec = [...records].sort((a, b) => b.value - a.value)[0];
+      const ach = evaluateAchievements({
+        best,
+        bestWorker: topRec ? topRec.worker : null,
+        totalShares: Math.max(proxyTotalShares, poolTotalShares),
+        workers: view,
+        proxyWorkers: proxyUp() ? Object.values(proxy.workers) : [],
+        luckWorkers,
+        championship,
+      }, achievements);
+      if (ach.newlyUnlocked.length) {
+        achievements = ach.map;
+        saveJson('achievements.json', achievements);
+      }
+      return {
+        championship,
+        achievements: { unlocked: ach.unlockedCount, total: ach.totalCount, list: ach.list },
+      };
+    })(),
     hall: [...records].sort((a, b) => b.value - a.value).slice(0, 5),
     recordSteps,
     recentRecords: [...records]
@@ -795,7 +827,15 @@ const PAGE = `<!doctype html>
   .lk-hi { color:var(--ok); font-weight:700; } .lk-lo { color:var(--warn); font-weight:700; }
   .lk-p { font-size:11px; white-space:nowrap; }
   .hist-axis { font-size:11px; text-align:right; margin-top:2px; }
-  .luck-duo .lead, body.kiosk .luck-duo .lead { font-size:13px; color:var(--dim); margin:4px 0 6px; }
+  .luck-duo .lead, .champ-duo .lead, body.kiosk .luck-duo .lead { font-size:13px; color:var(--dim); margin:4px 0 6px; }
+  .champ-duo { margin-top:12px; }
+  .ach-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:8px; margin-top:8px; }
+  .ach { display:flex; align-items:flex-start; gap:8px; padding:8px 10px; border:1px solid var(--line); border-radius:8px; opacity:.45; }
+  .ach.on { opacity:1; border-color:rgba(242,169,0,.45); background:rgba(242,169,0,.06); }
+  .ach-i { font-size:18px; line-height:1.2; }
+  .ach-t { font-size:13px; font-weight:600; color:var(--txt); }
+  .ach.on .ach-t { color:var(--gold); }
+  .ach-d { font-size:11px; color:var(--dim); line-height:1.3; margin-top:2px; }
   .hist-card .chart { height:240px; }
   body.kiosk .luck-duo { flex:1; min-height:0; }
   body.kiosk .hist-card { display:flex; flex-direction:column; }
@@ -1006,6 +1046,18 @@ const PAGE = `<!doctype html>
       <div class="chart" id="lkHist"></div>
       <div class="sub hist-axis">dificuldade do share ÷ alvo da pool · barras: shares reais · tracejado: teoria</div>
       <div class="sub" id="lkHistS">Cada faixa tem metade dos shares da anterior, como a matemática prevê. É a prova de que a loteria é justa.</div>
+    </div>
+  </div>
+  <div class="duo champ-duo">
+    <div class="card hall">
+      <div class="label">🏆 Campeonato da semana</div>
+      <div class="lead" id="chLead">Ranking da semana por sorte relativa (melhor share ÷ esperado), do vovô ao ASIC.</div>
+      <ol id="chRows"></ol>
+      <div class="sub" id="chLast"></div>
+    </div>
+    <div class="card">
+      <div class="label">🎖️ Conquistas <span id="achCnt" class="sub"></span></div>
+      <div class="ach-grid" id="achGrid"></div>
     </div>
   </div>
 </section>
@@ -1232,7 +1284,8 @@ function renderFarm(j) {
     }
     const seen = w.state === 'unknown' ? 'não listado' : ago(w.lastSeen);
     const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + '</span>' : '';
-    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + pool + temp +
+    const trophy = j.championship && j.championship.leader && j.championship.leader.name === w.name ? ' 🏆' : '';
+    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + temp +
       '</td><td' + dim + '>' + hr + '</td><td>' + best +
       '</td><td' + dim + '>' + seen + '</td></tr>';
   }).join('') : '<tr><td colspan="4" class="sub">nenhum worker enviou shares ainda</td></tr>';
@@ -1396,7 +1449,69 @@ function ruler(j, t, best) {
 }
 
 // ------------------------------------------------ tela 5: sorte
+function renderGamification(j) {
+  const ch = j.championship || {}, st = ch.standings || [];
+  const ol = $('chRows');
+  if (ol) {
+    ol.replaceChildren();
+    if (!st.length) {
+      const li = document.createElement('li');
+      const sp1 = document.createElement('span');
+      const sp2 = document.createElement('span');
+      sp2.className = 'sub';
+      sp2.textContent = 'nenhum share na semana ainda';
+      li.append(sp1, sp2);
+      ol.appendChild(li);
+    } else {
+      const cMedals = ['🏆', '🥈', '🥉', '4º', '5º'];
+      st.slice(0, 5).forEach((w, i) => {
+        const li = document.createElement('li');
+        const pos = document.createElement('span');
+        pos.className = 'pos' + (i === 0 ? ' first' : '');
+        pos.textContent = cMedals[i];
+        const val = document.createElement('span');
+        val.className = 'val';
+        val.textContent = w.factor != null ? nf(w.factor, w.factor < 10 ? 2 : 0) + '×' : diffTxt(w.best);
+        const who = document.createElement('span');
+        who.className = 'who';
+        who.textContent = w.name + ' · ' + diffTxt(w.best) + (w.shares ? ' (' + nf(w.shares) + ' shares)' : '');
+        li.append(pos, val, who);
+        ol.appendChild(li);
+      });
+    }
+  }
+  const lw = ch.lastWeek && ch.lastWeek.winner;
+  set('chLast', lw ? 'Campeão da semana passada: 🏆 ' + lw.name + ' (' + (lw.factor != null ? nf(lw.factor, 2) + '× · ' : '') + diffTxt(lw.best) + ')' : '');
+
+  const ach = j.achievements || {}, list = ach.list || [];
+  set('achCnt', list.length ? '(' + (ach.unlocked || 0) + '/' + (ach.total || list.length) + ')' : '');
+  const grid = $('achGrid');
+  if (grid) {
+    grid.replaceChildren();
+    const isEn = LOC !== 'pt-BR';
+    for (const a of list) {
+      const box = document.createElement('div');
+      box.className = 'ach' + (a.unlocked ? ' on' : '');
+      const pair = (isEn ? a.en : a.pt) || a.pt || ['', ''];
+      const ico = document.createElement('span');
+      ico.className = 'ach-i';
+      ico.textContent = a.unlocked ? a.icon : '🔒';
+      const txt = document.createElement('div');
+      const t = document.createElement('div');
+      t.className = 'ach-t';
+      t.textContent = pair[0] + (a.unlocked && a.worker ? ' · ' + a.worker : '');
+      const d = document.createElement('div');
+      d.className = 'ach-d';
+      d.textContent = pair[1];
+      txt.append(t, d);
+      box.append(ico, txt);
+      grid.appendChild(box);
+    }
+  }
+}
+
 function renderLuck(j) {
+  renderGamification(j);
   const L = j.luck;
   if (!L) { $('lkHist').innerHTML = '<div class="empty">os shares aparecem aqui conforme chegam pelo proxy</div>'; return; }
   const ws = L.workers || [];
@@ -1596,6 +1711,7 @@ function narrate(j) {
   }
   const hall = j.hall || [];
   if (hall[0] && hall[0].worker !== '—') out.push(hall[0].worker + ' lidera o hall da fama com ' + nf(hall[0].value, 2) + '. Os outros que lutem.');
+  if (j.championship && j.championship.leader) out.push('🏆 ' + j.championship.leader.name + ' lidera o campeonato da semana. Quem vai buscar?');
   const tm = j.timeMachine;
   if (tm && !tm.now) out.push('Em ' + mesAno(tm.from * 1000) + ' a gente seria milionário. Erramos de década.');
   if (h.tempC != null) {
@@ -1785,7 +1901,7 @@ http.createServer((req, res) => {
   if (settings.handle(req, res, {
     dataDir: process.env.DATA_DIR || __dirname,
     lang: pickLang(req, LANGUAGE),
-    workers: () => [...new Set([...Object.keys(known), ...Object.keys(EXPECTED).filter((k) => EXPECTED[k] > 0), ...Object.keys(WATTS)])].sort((a, b) => a.localeCompare(b)),
+    workers: () => [...new Set([...Object.keys(known), ...Object.keys(proxy.workers || {}), ...Object.keys(EXPECTED).filter((k) => EXPECTED[k] > 0)])].sort((a, b) => a.localeCompare(b)),
     onSaved: () => { console.log('configuração salva pela tela; reiniciando'); process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
   })) return;

@@ -38,9 +38,12 @@ const log = (...a) => console.log(new Date().toISOString(), ...a);
 // ---------------------------------------------------------------- estatísticas
 // workers[nome] = { name, pool, accepted, rejected, lastShareAt, lastShareDiff, bestEver, bestSession,
 //                   connectedSince, online, window: [[ts, dificuldadeAlvo], ...] }
+const { weekKey } = require('./luck');
 let workers = {};
 let recent = [];
 let today = { date: dayKey(), accepted: 0 };   // shares aceitos hoje, somando todas as pools
+let week = { key: weekKey(), workers: {} };     // campeonato semanal: { shares, work, best, bestAt } por worker
+let lastWeek = null;                            // semana anterior fechada (para exibir o campeão da semana passada)
 let bestHash = null;                            // melhor hash que já passou pelo proxy: { worker, diff, hash, at }
 // Histograma da sorte: shares aceitos por faixa k = floor(log2(dificuldade atingida / alvo)).
 // A matemática prevê metade dos shares na faixa 0, um quarto na 1, um oitavo na 2…
@@ -58,11 +61,20 @@ function noteBestHash(worker, p) {
   if (!dayBestHash || dayBestHash.date !== dayKey() || p.diff > dayBestHash.diff) dayBestHash = { ...e, date: dayKey() };
 }
 function dayKey() { return new Date().toLocaleDateString('sv'); }
+function rollWeek() {
+  const k = weekKey();
+  if (week.key !== k) {
+    if (week.workers && Object.keys(week.workers).length) lastWeek = week;
+    week = { key: k, workers: {} };
+  }
+}
 try {
   const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
   workers = saved.workers || {};
   recent = Array.isArray(saved.recent) ? saved.recent : [];
   if (saved.today && saved.today.date === dayKey()) today = saved.today;
+  if (saved.lastWeek && saved.lastWeek.workers) lastWeek = saved.lastWeek;
+  if (saved.week && saved.week.workers) { week = saved.week; rollWeek(); }
   bestHash = saved.bestHash || null;
   dayBestHash = saved.dayBestHash || null;
   if (Array.isArray(saved.hist) && saved.hist.length === HIST_BUCKETS) hist = saved.hist;
@@ -81,7 +93,7 @@ function worker(name, pool) {
 function saveStats() {
   const out = {};
   for (const [k, w] of Object.entries(workers)) { const { window, ...rest } = w; out[k] = rest; }
-  try { fs.writeFileSync(STATS_FILE, JSON.stringify({ savedAt: Date.now(), workers: out, recent, today, bestHash, dayBestHash, hist })); } catch (_) { /* segue */ }
+  try { fs.writeFileSync(STATS_FILE, JSON.stringify({ savedAt: Date.now(), workers: out, recent, today, week, lastWeek, bestHash, dayBestHash, hist })); } catch (_) { /* segue */ }
 }
 setInterval(saveStats, 60e3).unref();
 
@@ -250,11 +262,16 @@ function session(down, route) {
             if (p.diff > w.bestSession) w.bestSession = p.diff;
             if (p.diff > w.bestEver) w.bestEver = p.diff;
             if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
-            // medidor de sorte: trabalho feito (soma dos alvos, em unidades de dificuldade 1) e melhor share no mesmo período
+            // medidor de sorte e campeonato semanal
             if (p.diff > 0 && p.target > 0) {
               if (!w.luck) w.luck = { since: p.at, work: 0, best: 0 };
               w.luck.work += p.target;
               if (p.diff > w.luck.best) w.luck.best = p.diff;
+              rollWeek();
+              const ww = week.workers[w.name] || (week.workers[w.name] = { shares: 0, work: 0, best: 0, bestAt: null });
+              ww.shares++;
+              ww.work += p.target;
+              if (p.diff > ww.best) { ww.best = p.diff; ww.bestAt = p.at; }
               const k = bucket(p.diff, p.target);
               if (k >= 0) { hist[k]++; (w.hist || (w.hist = new Array(HIST_BUCKETS).fill(0)))[k]++; }
             }
@@ -301,10 +318,11 @@ http.createServer((req, res) => {
   });
   res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
   if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
+  rollWeek();
   const lastHour = Object.values(workers).reduce((n, w) => n + w.window.length, 0);   // hashrate() já podou a janela de 1 h
   const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
   const routes = ROUTES.map((r) => ({ ...r, upstreams: upstreamsOf(r).map((u) => ({ ...u, down: isDown(u), since: (health[hkey(u)] || {}).since || null, error: (health[hkey(u)] || {}).error || null })) }));
-  res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals: { today: today.accepted, lastHour }, bestHash, dayBestHash: dayBest, hist }));
+  res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals: { today: today.accepted, lastHour }, week, lastWeek, bestHash, dayBestHash: dayBest, hist }));
 }).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
 
 process.on('SIGTERM', () => { saveStats(); process.exit(0); });

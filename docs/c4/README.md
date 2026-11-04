@@ -103,7 +103,7 @@ flowchart TB
 | **`mineracao-painel`** | Node.js (>=16, zero deps) | [`src/painel.js`](../../src/painel.js) | Serves the bilingual web UI (`/`, `/config`) and JSON APIs (`/api/mining`, `/api/widget`, `/api/alarm`, `/api/config`), polls local proxy and external APIs, drives the Arduino siren, and runs the Telegram bot. |
 | **`mineracao-cubo`** | Python 3 + Pillow | [`src/cubo.py`](../../src/cubo.py) | Polls `/api/mining` every minute, renders a 240×240 scoreboard JPEG every 5 minutes (or a 10-minute celebration screen immediately upon a new farm record), and uploads it to the GeekMagic cube. |
 | **`ticket.py`** | Python 3 + Pillow | [`src/ticket.py`](../../src/ticket.py) | Spawned on-demand by the Telegram bot (`src/telegram.js`) to render the 1080×1350 daily lottery ticket PNG from the `/api/mining` snapshot. |
-| **JSON Data Store (`DATA_DIR`)** | Filesystem | `/var/lib/mineracao` or `/data` | Stores `settings.json` (UI config overlay), `proxy-stats.json`, `workers.json`, `records.json`, `history.json`, `diffhist.json`, `telegram.json`, and `cubo-state.json`. |
+| **JSON Data Store (`DATA_DIR`)** | Filesystem | `/var/lib/mineracao` or `/data` | Stores `settings.json` (UI config overlay), `proxy-stats.json`, `workers.json`, `records.json`, `history.json`, `achievements.json`, `diffhist.json`, `telegram.json`, and `cubo-state.json`. |
 
 ---
 
@@ -158,10 +158,10 @@ flowchart TB
 ```
 
 - **[`src/painel.js`](../../src/painel.js)**: Core orchestrator, background polling loops (`every`), state aggregation (`workersView`, `snapshot`), Arduino serial controller (`alarm`), and embedded SPA HTML/CSS/JS.
-- **[`src/luck.js`](../../src/luck.js)**: Statistical model (`luckOf`, `theoreticalShare`) comparing a worker's best share against the median expected best share (`W / ln 2`) and computing the theoretical power-of-two histogram (`2^-(k+1)`).
+- **[`src/luck.js`](../../src/luck.js)**: Statistical model (`luckOf`, `theoreticalShare`), weekly championship engine (`weekKey`, `weeklyStandings`), and farm achievements engine (`ACHIEVEMENTS`, `evaluateAchievements`).
 - **[`src/i18n.js`](../../src/i18n.js)**: Language negotiation (`?lang` > `lang` cookie > `LANGUAGE` env > `Accept-Language` > `'en'`) and deterministic PT -> EN page translation (`localizePage`).
 - **[`src/settings.js`](../../src/settings.js)**: Renders `/config`, validates fields (`clean`, including per-worker `WATTS` and `EXPECTED` hashrate maps), enforces SHA-256 timing-safe `SETTINGS_PIN` verification with brute-force lockout (`checkPin`), persists `settings.json`, exports/restores full farm JSON backups (`exportBackup`, `restoreBackup`), and tests Cube/Telegram connectivity.
-- **[`src/telegram.js`](../../src/telegram.js)**: Long-polling client (`getUpdates`), state diffing engine (`digest`, `diffEvents`), command handlers (`/status`, `/workers`, `/luck`, `/records`, `/ticket`, `/help`), and child-process bridge to `src/ticket.py`.
+- **[`src/telegram.js`](../../src/telegram.js)**: Long-polling client (`getUpdates`), state diffing engine (`digest`, `diffEvents`), command handlers (`/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/ticket`, `/help`), and child-process bridge to `src/ticket.py`.
 
 ---
 
