@@ -596,7 +596,7 @@ function parseMinerdLog(out) {
 
 function tickLocal(runner = null) {
   return new Promise((resolve) => {
-    const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '--since', '-3 hours', '-o', 'cat', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
+    const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '-u', 'mineracao-minerador', '--since', '-3 hours', '-o', 'cat', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
     fn((err, out) => {
       if (err || !out) { local.running = false; return resolve(); }
       const p = parseMinerdLog(out);
@@ -2247,6 +2247,11 @@ function start(port = PORT, host = '0.0.0.0') {
       everyTimer(tickProxy, PROXY_MS);
       if (tuyaClient) everyTimer(tickTuya, 30e3);
       everyTimer(async () => { alarmOpen(); alarmStatus(); }, 60e3);
+      // minerador local opcional (imagens prontas): liga/desliga o serviço conforme a opção LOCAL_MINER
+      require('./localminer').sync({
+        enabled: process.env.LOCAL_MINER === '1', address: ADDRESS, worker: process.env.LOCAL_WORKER,
+        threads: process.env.MINER_THREADS, appDir: process.env.DATA_DIR || __dirname,
+      }).then((w) => { if (w) LOCAL_WORKER = w; }).catch(() => {});
       const tgBot = startTelegram();
       const mqttClient = startMqtt();
       resolve({

@@ -18,6 +18,7 @@ OUT=$(realpath -m "${2:?output .img.xz}")
 HERE=$(cd "$(dirname "$0")/.." && pwd)
 GROW_MB=${GROW_MB:-1536}
 REPO_URL=${REPO_URL:-https://github.com/Modanez/HomeMinerProxy.git}
+CPUMINER_REF=${CPUMINER_REF:-v2.5.1}   # minerador local opcional (opção "Minerar também com este aparelho")
 
 case "$BOARD" in
   rpi)                    URL=https://downloads.raspberrypi.com/raspios_lite_arm64_latest ;;
@@ -100,10 +101,27 @@ git -C "$ROOT/opt/HomeMinerProxy" remote set-url origin "$REPO_URL" 2>/dev/null 
 git -C "$ROOT/opt/HomeMinerProxy" checkout -q -B main
 git -C "$ROOT/opt/HomeMinerProxy" branch -q --set-upstream-to=origin/main main 2>/dev/null || true
 
+step "Baixando o cpuminer / fetching cpuminer (pooler, $CPUMINER_REF)"
+rm -rf "$ROOT/usr/src/cpuminer"
+git clone -q --depth 1 --branch "$CPUMINER_REF" https://github.com/pooler/cpuminer.git "$ROOT/usr/src/cpuminer"
+
 step "Instalando dentro da imagem (qemu, demora) / installing inside the image (qemu, slow)"
 chroot "$ROOT" /usr/bin/env -i HOME=/root PATH=/usr/sbin:/usr/bin:/sbin:/bin DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 /bin/bash -euo pipefail -c '
   apt-get update
   apt-get install -y --no-install-recommends nodejs python3 python3-pil fonts-dejavu-core git avahi-daemon ca-certificates curl
+  # cpuminer (minerd): compila e tira as ferramentas de compilação, mantendo só a libcurl de execução
+  BUILD="build-essential automake autoconf pkg-config libcurl4-openssl-dev"
+  apt-get install -y --no-install-recommends $BUILD
+  cd /usr/src/cpuminer
+  ./autogen.sh >/dev/null
+  ./configure CFLAGS="-O3" >/dev/null
+  make -j"$(nproc)" >/dev/null
+  install -m 755 minerd /usr/local/bin/minerd
+  cd /
+  apt-mark manual $(dpkg-query -W -f "\${Package}\n" "libcurl4*" | grep -v -- -dev) >/dev/null
+  apt-get purge -y $BUILD >/dev/null
+  apt-get autoremove -y --purge >/dev/null
+  rm -rf /usr/src/cpuminer
   git config --system --add safe.directory /opt/HomeMinerProxy
   cd /opt/HomeMinerProxy
   HOMEMINER_UNATTENDED=1 HOMEMINER_IMAGE=1 bash install.sh </dev/null
@@ -144,6 +162,9 @@ grep -q '^BTC_ADDRESS=$' "$ROOT/etc/mineracao.env" || fail "BTC_ADDRESS deveria 
 [ ! -e "$ROOT/opt/mineracao/pin.json" ] && [ ! -e "$ROOT/opt/mineracao/settings.json" ] || fail "sobra de configuração / leftover config"
 chroot "$ROOT" node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 16 ? 0 : 1)" || fail "node >= 16"
 chroot "$ROOT" python3 -c "import PIL" || fail "python3-pil"
+chroot "$ROOT" /usr/local/bin/minerd --help 2>&1 | grep -q 'sha256d' || fail "minerd"
+[ -f "$ROOT/etc/systemd/system/mineracao-minerador.service" ] || fail "mineracao-minerador.service"
+[ ! -e "$ROOT/etc/systemd/system/multi-user.target.wants/mineracao-minerador.service" ] || fail "o minerador local tem que vir desligado / local miner must ship disabled"
 [ "$(cat "$ROOT/etc/hostname")" = homeminer ] || fail hostname
 ! grep -qiE 'extraheader|authorization|token|password' "$ROOT/opt/HomeMinerProxy/.git/config" || fail "credencial no .git/config / credential in .git/config"
 git -C "$ROOT/opt/HomeMinerProxy" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || echo "    aviso: sem upstream (o botão Atualizar usa a origin/main depois do primeiro fetch)"

@@ -88,7 +88,7 @@ No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange
 1. Download `homeminer-<board>.img.xz` from the [latest release](https://github.com/Modanez/HomeMinerProxy/releases/latest).
 2. Flash it to an SD card (8 GB or more; a "High Endurance" card lasts longer) with [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ("Use custom") or [balenaEtcher](https://etcher.balena.io/).
 3. Put the card in the board, **plug in the network cable** and power it on. The first boot takes a few minutes (it expands the card).
-4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN and the power price.
+4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN, **whether the board should also mine** (the images ship cpuminer; pick the number of cores and the worker name) and the power price. Mining can be turned on or off later in ⚙️ Settings → Miners.
 5. Point your miners to `homeminer.local` (or the IP), ports as shown at the end of the wizard. Give the board a fixed IP in your router.
 
 Updates come from ⚙️ Settings → 💾 Backup → **Update now**. For security, SSH is off on the Orange Pi and Odroid images (to turn it on: monitor and keyboard, log in as `root`, password `1234`, choose a new one, then `systemctl enable --now ssh`). On the Raspberry Pi image SSH is off as usual; you can turn it on in Raspberry Pi Imager's settings when flashing.
