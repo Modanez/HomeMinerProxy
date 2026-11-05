@@ -5,11 +5,13 @@
 ### English
 - **Wi-Fi on the Orange Pi and Odroid images:** they now ship NetworkManager handling only the Wi-Fi (the cable keeps the image's own setup), so 🌐 Network → Wi-Fi works with a USB or onboard adapter. The cable shows as connected even when NetworkManager does not manage it.
 - **Docker:** new `minerador` profile (`docker compose --profile minerador up -d`) with cpuminer pointed at the proxy, and the 🌐 Network tab now explains how to set up Tailscale, Wi-Fi and SSH on the host instead of disappearing.
+- **Pools and ports guide** in ⚙️ Settings → Miners: every proxy port with its pool, backup, live status and ping, who it is for, and how to point a Bitaxe, a NerdMiner or cpuminer (server address and user filled in).
 - **Smart plugs:** the "new plug" row is laid out in two lines (four on phones), so the placeholders and options are no longer cut off.
 
 ### Português
 - **Wi-Fi nas imagens do Orange Pi e do Odroid:** agora vêm com o NetworkManager cuidando só do Wi-Fi (o cabo continua com a configuração da imagem), então 🌐 Rede → Wi-Fi funciona com adaptador USB ou da placa. O cabo aparece como conectado mesmo sem o NetworkManager cuidar dele.
 - **Docker:** novo perfil `minerador` (`docker compose --profile minerador up -d`) com o cpuminer apontado para o proxy, e a aba 🌐 Rede passa a explicar como configurar Tailscale, Wi-Fi e SSH no host em vez de sumir.
+- **Guia "Pools e portas"** em ⚙️ Configurações → Mineradores: cada porta do proxy com a pool, a reserva, o status e o ping ao vivo, para quem serve, e como apontar um Bitaxe, um NerdMiner ou o cpuminer (com o endereço do servidor e o usuário preenchidos).
 - **Tomadas:** a linha de "nova tomada" ficou em duas linhas (quatro no celular), e os textos e opções não ficam mais cortados.
 
 ## v0.4.0 — 2026-11-05

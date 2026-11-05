@@ -4,6 +4,15 @@
 // sozinho para aplicar (systemd e Docker sobem ele de novo). O cubo percebe a mudança e reinicia também.
 
 const fs = require('fs');
+// portas de fábrica do proxy (src/proxy.js), para o guia quando o proxy não responde
+const DEFAULT_ROUTES = [
+  { listen: 3333, label: 'public-pool', host: 'public-pool.io', backups: ['ckpool solo'] },
+  { listen: 3334, label: 'ckpool solo', host: 'solo.ckpool.org', backups: ['ckpool solo EU'] },
+  { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: ['public-pool'] },
+  { listen: 3337, label: 'OCEAN', host: 'mine.ocean.xyz', backups: [] },
+  { listen: 3338, label: 'atlaspool', host: 'solo.atlaspool.io', backups: ['ckpool solo'] },
+  { listen: 3339, label: 'ckpool solo EU', host: 'eusolo.ckpool.org', backups: ['ckpool solo'] },
+];
 const path = require('path');
 const http = require('http');
 const https = require('https');
@@ -474,6 +483,15 @@ const T = {
     title: 'Configurações', back: '← Voltar ao painel',
     groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', net: 'Rede', backup: 'Backup e restauração' },
     tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
+    pools: { title: 'Pools e portas', help: 'Cada porta do proxy leva a uma pool. Aponte cada minerador para a porta que combina com ele; se a pool cair, o proxy passa para a reserva sozinho.',
+      factory: 'O proxy não respondeu: estas são as portas de fábrica.', backup: 'reserva', down: 'fora do ar · usando', ms: 'ms',
+      use: { nerd: 'NerdMiner e ESP32: aceita os shares minúsculos deles', pub: 'cpuminer (PC, celular, Raspberry): sem taxa, dificuldade mínima 1', atlas: 'Bitaxe e ASICs: servidor em São Paulo, menor ping no Brasil (taxa 1,5%; não serve para ESP32)',
+        ck: 'Bitaxe e ASICs: a pool solo mais conhecida (taxa 2%)', ckeu: 'Bitaxe e ASICs na Europa (taxa 2%)', ocean: 'Não é solo: a recompensa é dividida entre todos (pagamentos pequenos e regulares)', other: 'Pool configurada no PROXY_ROUTES' },
+      howTitle: 'Como apontar os mineradores', server: 'Servidor', user: 'Usuário', userHint: 'seu endereço + ponto + um nome para o minerador', pass: 'Senha',
+      bitaxe: 'Bitaxe (AxeOS → Pool)', bitaxeHow: 'Stratum URL: %h · Porta: %p · Usuário: %u · Senha: x. Em "Fallback", coloque solo.ckpool.org porta 3333 com o mesmo usuário.',
+      nerd: 'NerdMiner / ESP32', nerdHow: 'Pool: %h · Porta: %p · Endereço: o seu endereço de bitcoin',
+      cpu: 'cpuminer', cpuHow: 'minerd -a sha256d -o stratum+tcp://%h:%p -u %u -p x',
+      noAddr: 'SEU_ENDERECO' },
     net: { pinFirst: 'Digite o PIN no fim da página e toque em "Ver estado".', refresh: '↻ Ver estado', none: 'Nada para configurar aqui neste aparelho (sem Wi-Fi gerenciável e sem Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'Sem adaptador Wi-Fi neste aparelho.', wifiOn: (s, ip) => `Conectado em ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi desconectado.', wired: 'O cabo de rede está conectado.',
       scan: 'Procurar redes', pass: 'Senha do Wi-Fi', connect: 'Conectar', forget: 'Esquecer esta rede', scanning: 'Procurando redes…', connecting: 'Conectando… (até 45 s)', wifiOk: 'Conectado ao Wi-Fi! Pode tirar o cabo; o painel continua em http://homeminer.local:3000.',
@@ -549,6 +567,15 @@ const T = {
     title: 'Settings', back: '← Back to the dashboard',
     groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', net: 'Network', backup: 'Backup and restore' },
     tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
+    pools: { title: 'Pools and ports', help: 'Each proxy port leads to a pool. Point each miner at the port that suits it; if the pool goes down, the proxy switches to the backup on its own.',
+      factory: 'The proxy did not answer: these are the factory ports.', backup: 'backup', down: 'down · using', ms: 'ms',
+      use: { nerd: 'NerdMiner and ESP32: accepts their tiny shares', pub: 'cpuminer (PC, phone, Raspberry): no fee, minimum difficulty 1', atlas: 'Bitaxe and ASICs: server in São Paulo, lowest ping in Brazil (1.5% fee; not for ESP32)',
+        ck: 'Bitaxe and ASICs: the best-known solo pool (2% fee)', ckeu: 'Bitaxe and ASICs in Europe (2% fee)', ocean: 'Not solo: the reward is split among everyone (small, regular payouts)', other: 'Pool set in PROXY_ROUTES' },
+      howTitle: 'How to point your miners', server: 'Server', user: 'User', userHint: 'your address + dot + a name for the miner', pass: 'Password',
+      bitaxe: 'Bitaxe (AxeOS → Pool)', bitaxeHow: 'Stratum URL: %h · Port: %p · User: %u · Password: x. Under "Fallback", set solo.ckpool.org port 3333 with the same user.',
+      nerd: 'NerdMiner / ESP32', nerdHow: 'Pool: %h · Port: %p · Address: your bitcoin address',
+      cpu: 'cpuminer', cpuHow: 'minerd -a sha256d -o stratum+tcp://%h:%p -u %u -p x',
+      noAddr: 'YOUR_ADDRESS' },
     net: { pinFirst: 'Type the PIN at the bottom of the page and tap "Show status".', refresh: '↻ Show status', none: 'Nothing to set up here on this device (no managed Wi-Fi and no Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'No Wi-Fi adapter on this device.', wifiOn: (s, ip) => `Connected to ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi not connected.', wired: 'The network cable is connected.',
       scan: 'Find networks', pass: 'Wi-Fi password', connect: 'Connect', forget: 'Forget this network', scanning: 'Searching for networks…', connecting: 'Connecting… (up to 45 s)', wifiOk: 'Connected to Wi-Fi! You can unplug the cable; the dashboard stays at http://homeminer.local:3000.',
@@ -682,7 +709,13 @@ function page(lang, hasPin, theme) {
   const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'net', 'backup'];
   const tabBar = `<nav class="tabs" id="tabs">` + tabOrder.map((g, i) =>
     `<button type="button" class="tab${i === 0 ? ' active' : ''}" data-tab="${g}"><span>${S.tabs[g]}</span><i class="tdot"></i></button>`).join('') + `</nav>`;
-  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => `<fieldset class="tab-pane${g === 'farm' ? ' active' : ''}" data-pane="${g}"><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const P = S.pools;
+  const poolsGroup = `<fieldset class="tab-pane" data-pane="miners"><legend>${htmlEsc(P.title)}</legend>` +
+    `<div class="f"><div class="hint">${htmlEsc(P.help)}</div><div class="hint" id="pools_factory" hidden>${htmlEsc(P.factory)}</div><div id="pools_list" class="pools"></div></div>` +
+    `<div class="f"><label>${htmlEsc(P.howTitle)}</label><div class="hint">${htmlEsc(P.server)}: <code id="pools_hosts">–</code></div>` +
+    `<div class="hint">${htmlEsc(P.user)}: <code id="pools_user">–</code> <span class="muted">(${htmlEsc(P.userHint)})</span> · ${htmlEsc(P.pass)}: <code>x</code></div>` +
+    `<div class="how"><b>${htmlEsc(P.bitaxe)}</b><div class="hint" id="how_bitaxe"></div><b>${htmlEsc(P.nerd)}</b><div class="hint" id="how_nerd"></div><b>${htmlEsc(P.cpu)}</b><div class="hint"><code id="how_cpu"></code></div></div></div></fieldset>`;
+  const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => (g === 'miners' ? poolsGroup : '') + `<fieldset class="tab-pane${g === 'farm' ? ' active' : ''}" data-pane="${g}"><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
   const N = S.net;
   const netGroup = `<fieldset class="tab-pane" data-pane="net"><legend>${S.groups.net}</legend>` +
     `<div class="f"><div class="hint" id="net_msg">${htmlEsc(N.pinFirst)}</div><div class="bbar"><button type="button" class="ghost" id="net_refresh">${htmlEsc(N.refresh)}</button></div></div>` +
@@ -711,6 +744,7 @@ function page(lang, hasPin, theme) {
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
     net: { ...N, wifiOn: N.wifiOn('%s', '%i') },
+    pools: P,
     verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updFail: S.updFail, updSlow: S.updSlow, updWhy: S.updWhy,
   };
   return `<!doctype html>
@@ -807,6 +841,17 @@ function page(lang, hasPin, theme) {
   [hidden] { display:none !important; }
   a.tslink { display:inline-block; color:var(--gold); border:1px solid var(--gold); border-radius:8px; padding:6px 10px; font-size:13px; font-weight:600; margin-top:8px; text-decoration:none; }
   #wifi_ssid { width:100%; }
+  .pools { margin-top:10px; display:grid; gap:6px; }
+  .pool { border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+  .pool .ph { display:flex; gap:8px; align-items:baseline; flex-wrap:wrap; }
+  .pool .port { font-family:ui-monospace, Menlo, monospace; font-weight:700; color:var(--gold); font-size:15px; }
+  .pool .pname { font-weight:600; }
+  .pool .pst { margin-left:auto; font-size:12px; }
+  .pool .pst.bad { color:var(--warn); }
+  .pools .muted, .f .muted { color:var(--dim); font-size:12px; }
+  .how { display:grid; gap:4px; margin-top:8px; }
+  .how b { font-size:13px; margin-top:6px; }
+  .how code, #pools_hosts, #pools_user { word-break:break-all; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
 </style></head><body data-theme="${activeTheme}">
@@ -1250,6 +1295,36 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     say(M.updSlow, false);
   } finally { updBtn.disabled = false; }
 });
+// Guia "Pools e portas" (aba Mineradores)
+(() => {
+  const P = M.pools, $ = (id) => document.getElementById(id);
+  const useOf = (host) => /nerdminers/.test(host) ? P.use.nerd : /public-pool/.test(host) ? P.use.pub : /atlaspool/.test(host) ? P.use.atlas
+    : /eusolo\\.ckpool/.test(host) ? P.use.ckeu : /ckpool/.test(host) ? P.use.ck : /ocean/.test(host) ? P.use.ocean : P.use.other;
+  const txt = (tag, cls, t) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = t; return e; };
+  fetch('/api/config/pools').then((r) => r.json()).then((d) => {
+    $('pools_factory').hidden = d.live;
+    const list = $('pools_list');
+    for (const r of d.routes) {
+      const row = document.createElement('div'); row.className = 'pool';
+      const h = document.createElement('div'); h.className = 'ph';
+      h.append(txt('span', 'port', String(r.listen)), txt('span', 'pname', r.label));
+      if (r.backups && r.backups.length) h.append(txt('span', 'muted', P.backup + ': ' + r.backups.join(', ')));
+      if (d.live) h.append(r.down ? txt('span', 'pst bad', '⚠️ ' + P.down + ' ' + (r.active || '–')) : txt('span', 'pst muted', '✓' + (r.pingMs != null ? ' ' + Math.round(r.pingMs) + ' ' + P.ms : '')));
+      row.append(h, txt('div', 'hint', useOf(r.host || '')));
+      list.appendChild(row);
+    }
+    const host = (d.hosts || []).find((x) => /^\\d+\\.\\d+\\.\\d+\\.\\d+$/.test(x)) || (d.hosts || [])[0] || location.hostname;
+    $('pools_hosts').textContent = (d.hosts && d.hosts.length ? d.hosts : [location.hostname]).join('  ·  ');
+    const user = (d.address || P.noAddr) + '.bitaxe1';
+    $('pools_user').textContent = user;
+    const portOf = (re, dflt) => (d.routes.find((r) => re.test(r.host || '')) || {}).listen || dflt;
+    const asic = portOf(/atlaspool/, portOf(/ckpool/, 3334)), nerd = portOf(/nerdminers/, 3335), cpu = portOf(/public-pool/, 3333);
+    const fill = (t, p, u) => t.replace('%h', host).replace('%p', p).replace('%u', u);
+    $('how_bitaxe').textContent = fill(P.bitaxeHow, asic, user);
+    $('how_nerd').textContent = fill(P.nerdHow, nerd, '');
+    $('how_cpu').textContent = fill(P.cpuHow, cpu, (d.address || P.noAddr) + '.pc');
+  }).catch(() => {});
+})();
 // Aba Rede: Wi-Fi e Tailscale (estado e ações só com o PIN)
 (() => {
   const $ = (id) => document.getElementById(id);
@@ -1454,6 +1529,12 @@ function handle(req, res, ctx) {
   if (url === '/api/config' && req.method === 'GET') {
     const lm = require('./localminer');
     json(200, { values: current(), workers: ctx.workers(), pin: !!pinEnv, localMiner: { available: lm.available(), cores: lm.cores(), defaultThreads: lm.defaultThreads() } });
+    return true;
+  }
+  if (url === '/api/config/pools' && req.method === 'GET') {
+    // guia "Pools e portas": as portas do proxy (ao vivo) ou as de fábrica, e onde apontar os mineradores
+    const p = (ctx.pools && ctx.pools()) || {};
+    json(200, { live: !!p.routes, routes: p.routes || DEFAULT_ROUTES, hosts: p.hosts || [], address: p.address || null });
     return true;
   }
   if (url === '/api/config/net' && req.method === 'GET') {

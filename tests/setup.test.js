@@ -173,3 +173,16 @@ test('relógio atrasado: o painel abre, avisa e só começa a coletar depois', a
   const after = await waitFor(async () => { const j = JSON.parse((await req(port, 'GET', '/api/mining')).body); return !j.clock.waiting && j.clock; }, 15000);
   assert.deepStrictEqual(after, { waiting: false, suspect: true });
 });
+
+test('guia "Pools e portas": portas de fábrica quando o proxy não responde, com servidor e endereço', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pools-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const d = JSON.parse((await waitFor(() => req(port, 'GET', '/api/config/pools'))).body);
+  assert.strictEqual(d.live, false);
+  assert.deepStrictEqual(d.routes.map((r) => [r.listen, r.label]), [[3333, 'public-pool'], [3334, 'ckpool solo'], [3335, 'nerdminers'], [3337, 'OCEAN'], [3338, 'atlaspool'], [3339, 'ckpool solo EU']]);
+  assert.strictEqual(d.address, ADDR);
+  assert.ok(d.hosts[0].endsWith('.local'));
+  assert.match((await req(port, 'GET', '/config')).body, /id="pools_list"/);
+});
