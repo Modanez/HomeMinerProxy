@@ -139,3 +139,23 @@ test('sem systemd nem repositório, o botão explica em vez de atualizar', async
   const r = await req(port, 'POST', '/api/config/update', { pin: '424242' });
   assert.strictEqual(r.status, 409);
 });
+
+test('aba Rede: GET só diz o que existe; estado e ações só com o PIN', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'net-'));
+  const ts = path.join(dir, 'tailscale'), sc = path.join(dir, 'systemctl');
+  fs.writeFileSync(ts, '#!/bin/sh\n[ "$1" = status ] && echo \'{"BackendState":"NeedsLogin","AuthURL":"https://login.tailscale.com/a/xyz","Self":{}}\'\nexit 0\n', { mode: 0o755 });
+  fs.writeFileSync(sc, '#!/bin/sh\nexit 0\n', { mode: 0o755 });
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', NMCLI_PATH: path.join(dir, 'sem-nmcli'), TAILSCALE_PATH: ts, NET_SYSTEMCTL: sc });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const caps = JSON.parse((await waitFor(() => req(port, 'GET', '/api/config/net'))).body);
+  assert.deepStrictEqual(caps, { wifi: false, wifiReason: null, tailscale: true });
+  assert.doesNotMatch(JSON.stringify(caps), /login\.tailscale/);
+  assert.match((await req(port, 'GET', '/config')).body, /data-tab="net"/);
+  assert.strictEqual((await req(port, 'POST', '/api/config/net', { pin: '1', action: 'status' })).status, 403);
+  const st = JSON.parse((await req(port, 'POST', '/api/config/net', { pin: '424242', action: 'status' })).body);
+  assert.strictEqual(st.tailscale.state, 'login');
+  assert.strictEqual(st.tailscale.authUrl, 'https://login.tailscale.com/a/xyz');
+  assert.strictEqual(st.wifi.available, false);
+  assert.strictEqual((await req(port, 'POST', '/api/config/net', { pin: '424242', action: 'rm -rf' })).status, 400);
+});

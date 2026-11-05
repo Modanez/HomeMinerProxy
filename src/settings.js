@@ -471,8 +471,15 @@ function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
 const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
-    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', backup: 'Backup e restauração' },
-    tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', backup: '💾 Backup' },
+    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', net: 'Rede', backup: 'Backup e restauração' },
+    tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
+    net: { pinFirst: 'Digite o PIN no fim da página e toque em "Ver estado".', refresh: '↻ Ver estado', none: 'Nada para configurar aqui neste aparelho (sem Wi-Fi gerenciável e sem Tailscale).',
+      wifi: 'Wi-Fi', wifiNone: 'Sem adaptador Wi-Fi neste aparelho.', wifiOn: (s, ip) => `Conectado em ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi desconectado.', wired: 'O cabo de rede está conectado.',
+      scan: 'Procurar redes', pass: 'Senha do Wi-Fi', connect: 'Conectar', forget: 'Esquecer esta rede', scanning: 'Procurando redes…', connecting: 'Conectando… (até 45 s)', wifiOk: 'Conectado ao Wi-Fi! Pode tirar o cabo; o painel continua em http://homeminer.local:3000.',
+      wifiHint: 'Ao trocar de rede com o painel aberto pelo próprio Wi-Fi, a página pode perder a conexão por alguns segundos.',
+      ts: 'Acesso de fora de casa (Tailscale)', tsHint: 'Abre o painel de qualquer lugar pela sua conta do Tailscale, sem abrir portas no roteador. Grátis para uso pessoal.',
+      tsOff: 'Desligado.', tsLogin: 'Falta autorizar: abra o link, entre na sua conta do Tailscale e aprove este aparelho. Depois toque em "Ver estado".', tsOn: 'Conectado como %n · %i. No celular com o app do Tailscale ligado: http://%h:3000',
+      tsConnect: 'Conectar ao Tailscale', tsOpen: 'Abrir o link de autorização', tsDisconnect: 'Desconectar', tsWait: 'Iniciando o Tailscale…' },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     THEME: ['Tema visual (Material Design)', 'Escolha um dos 3 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
     themes: [
@@ -526,12 +533,19 @@ const T = {
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
     mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
     tuyaOk: (s) => `Tomada respondeu: ${s}`, tuyaFail: (e) => `Falha na tomada: ${e}`,
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', threads: 'Use de 1 a 256 núcleos', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', sonoffoffline: 'O Sonoff não respondeu nesse IP (confira o IP e se o modo LAN/DIY está ligado)', sonofflan: 'O Sonoff recusou: o modo LAN/DIY está desligado', sonoffid: 'O Sonoff não reconheceu esse Device ID', sonoffformat: 'Resposta inesperada do Sonoff', selfplug: 'Essa tomada alimenta o próprio servidor', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', threads: 'Use de 1 a 256 núcleos', ssid: 'Escolha uma rede', wifipass: 'A senha do Wi-Fi tem de 8 a 63 caracteres', wifiauth: 'Senha do Wi-Fi errada', wifinotfound: 'Rede não encontrada', wificonnect: 'Não conectou ao Wi-Fi', wifiscan: 'Não consegui procurar redes', notailscale: 'Tailscale não instalado', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', sonoffoffline: 'O Sonoff não respondeu nesse IP (confira o IP e se o modo LAN/DIY está ligado)', sonofflan: 'O Sonoff recusou: o modo LAN/DIY está desligado', sonoffid: 'O Sonoff não reconheceu esse Device ID', sonoffformat: 'Resposta inesperada do Sonoff', selfplug: 'Essa tomada alimenta o próprio servidor', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
-    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', backup: 'Backup and restore' },
-    tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', backup: '💾 Backup' },
+    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', net: 'Network', backup: 'Backup and restore' },
+    tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
+    net: { pinFirst: 'Type the PIN at the bottom of the page and tap "Show status".', refresh: '↻ Show status', none: 'Nothing to set up here on this device (no managed Wi-Fi and no Tailscale).',
+      wifi: 'Wi-Fi', wifiNone: 'No Wi-Fi adapter on this device.', wifiOn: (s, ip) => `Connected to ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi not connected.', wired: 'The network cable is connected.',
+      scan: 'Find networks', pass: 'Wi-Fi password', connect: 'Connect', forget: 'Forget this network', scanning: 'Searching for networks…', connecting: 'Connecting… (up to 45 s)', wifiOk: 'Connected to Wi-Fi! You can unplug the cable; the dashboard stays at http://homeminer.local:3000.',
+      wifiHint: 'If you change networks while the dashboard is open over that same Wi-Fi, the page may lose the connection for a few seconds.',
+      ts: 'Access from outside home (Tailscale)', tsHint: 'Opens the dashboard from anywhere through your Tailscale account, without opening router ports. Free for personal use.',
+      tsOff: 'Off.', tsLogin: 'Not authorized yet: open the link, sign in to Tailscale and approve this device. Then tap "Show status".', tsOn: 'Connected as %n · %i. On a phone with the Tailscale app on: http://%h:3000',
+      tsConnect: 'Connect to Tailscale', tsOpen: 'Open the authorization link', tsDisconnect: 'Disconnect', tsWait: 'Starting Tailscale…' },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     THEME: ['Visual theme (Material Design)', 'Choose one of the 3 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
     themes: [
@@ -585,7 +599,7 @@ const T = {
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
     mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
     tuyaOk: (s) => `Plug answered: ${s}`, tuyaFail: (e) => `Plug failed: ${e}`,
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', threads: 'Use 1 to 256 cores', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', sonoffoffline: 'The Sonoff did not answer at that IP (check the IP and that LAN/DIY mode is on)', sonofflan: 'The Sonoff refused: LAN/DIY mode is off', sonoffid: 'The Sonoff did not recognize that Device ID', sonoffformat: 'Unexpected answer from the Sonoff', selfplug: 'This plug powers the server itself', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', threads: 'Use 1 to 256 cores', ssid: 'Pick a network', wifipass: 'The Wi-Fi password has 8 to 63 characters', wifiauth: 'Wrong Wi-Fi password', wifinotfound: 'Network not found', wificonnect: 'Could not connect to Wi-Fi', wifiscan: 'Could not search for networks', notailscale: 'Tailscale is not installed', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', sonoffoffline: 'The Sonoff did not answer at that IP (check the IP and that LAN/DIY mode is on)', sonofflan: 'The Sonoff refused: LAN/DIY mode is off', sonoffid: 'The Sonoff did not recognize that Device ID', sonoffformat: 'Unexpected answer from the Sonoff', selfplug: 'This plug powers the server itself', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -646,10 +660,20 @@ function page(lang, hasPin, theme) {
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };
-  const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'backup'];
+  const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'net', 'backup'];
   const tabBar = `<nav class="tabs" id="tabs">` + tabOrder.map((g, i) =>
     `<button type="button" class="tab${i === 0 ? ' active' : ''}" data-tab="${g}"><span>${S.tabs[g]}</span><i class="tdot"></i></button>`).join('') + `</nav>`;
   const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => `<fieldset class="tab-pane${g === 'farm' ? ' active' : ''}" data-pane="${g}"><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const N = S.net;
+  const netGroup = `<fieldset class="tab-pane" data-pane="net"><legend>${S.groups.net}</legend>` +
+    `<div class="f"><div class="hint" id="net_msg">${htmlEsc(N.pinFirst)}</div><div class="bbar"><button type="button" class="ghost" id="net_refresh">${htmlEsc(N.refresh)}</button></div></div>` +
+    `<div class="f" id="net_wifi" hidden><label>${htmlEsc(N.wifi)}</label><div class="hint" id="wifi_state">–</div>` +
+    `<div class="bbar"><button type="button" class="ghost" id="wifi_scan">${htmlEsc(N.scan)}</button><button type="button" class="ghost" id="wifi_forget" hidden>${htmlEsc(N.forget)}</button></div>` +
+    `<div id="wifi_form" hidden style="margin-top:10px"><select id="wifi_ssid"></select><div class="pw" style="margin-top:8px"><input type="password" id="wifi_pass" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="${htmlEsc(N.pass)}"><button type="button" class="ghost eye" data-eye="wifi_pass">👁</button></div>` +
+    `<div class="bbar"><button type="button" class="ghost" id="wifi_connect">${htmlEsc(N.connect)}</button></div></div><div class="hint">${htmlEsc(N.wifiHint)}</div></div>` +
+    `<div class="f" id="net_ts" hidden><label>${htmlEsc(N.ts)}</label><div class="hint">${htmlEsc(N.tsHint)}</div><div class="hint" id="ts_state">–</div>` +
+    `<div class="bbar"><button type="button" class="ghost" id="ts_connect">${htmlEsc(N.tsConnect)}</button><a class="ghost tslink" id="ts_link" target="_blank" rel="noopener noreferrer" hidden>${htmlEsc(N.tsOpen)}</a>` +
+    `<button type="button" class="ghost" id="ts_disconnect" hidden>${htmlEsc(N.tsDisconnect)}</button></div></div></fieldset>`;
   const backupGroup = `<fieldset class="tab-pane" data-pane="backup"><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
     `<div class="bbar"><button type="button" class="ghost" data-backup="export">${htmlEsc(S.backupDown)}</button>` +
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
@@ -663,6 +687,7 @@ function page(lang, hasPin, theme) {
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
+    net: { ...N, wifiOn: N.wifiOn('%s', '%i') },
     verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updFail: S.updFail, updSlow: S.updSlow, updWhy: S.updWhy,
   };
   return `<!doctype html>
@@ -749,6 +774,8 @@ function page(lang, hasPin, theme) {
   .bar { display:flex; gap:12px; align-items:flex-end; flex-wrap:wrap; } .bar .f { flex:1; min-width:160px; margin:0; }
   #msg { margin-top:10px; font-size:14px; min-height:20px; } #msg.ok { color:var(--ok); } #msg.bad { color:var(--warn); }
   [hidden] { display:none !important; }
+  a.tslink { display:inline-block; color:var(--gold); border:1px solid var(--gold); border-radius:8px; padding:6px 10px; font-size:13px; font-weight:600; margin-top:8px; text-decoration:none; }
+  #wifi_ssid { width:100%; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
 </style></head><body data-theme="${activeTheme}">
@@ -756,6 +783,7 @@ function page(lang, hasPin, theme) {
 <form id="form" autocomplete="off">
 ${tabBar}
 ${fieldGroups}
+${netGroup}
 ${backupGroup}
 <fieldset class="pin-card"><legend>${S.pin}</legend>
 ${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
@@ -1191,6 +1219,80 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     say(M.updSlow, false);
   } finally { updBtn.disabled = false; }
 });
+// Aba Rede: Wi-Fi e Tailscale (estado e ações só com o PIN)
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const N = M.net, msg = $('net_msg');
+  const err = (r) => M.err[r && r.error] || (r && r.error) || '?';
+  const netPost = (action, extra) => post('/api/config/net', { pin: pin(), action, ...(extra || {}) });
+  let wifiSsid = null;
+  fetch('/api/config/net').then((r) => r.json()).then((c) => {
+    $('net_wifi').hidden = !(c.wifi || c.wifiReason === 'noadapter');
+    $('net_ts').hidden = !c.tailscale;
+    if (c.wifiReason === 'noadapter') { $('wifi_state').textContent = N.wifiNone; $('wifi_scan').hidden = true; }
+    if (!c.wifi && c.wifiReason !== 'noadapter' && !c.tailscale) { msg.textContent = N.none; $('net_refresh').hidden = true; }
+    // esconde a aba se não há nada para mexer
+    if (!c.wifi && !c.tailscale) { const t = document.querySelector('[data-tab="net"]'); if (t && c.wifiReason !== 'noadapter') t.hidden = true; }
+  }).catch(() => {});
+  function showTs(t) {
+    if (!t || !t.available) return;
+    const link = $('ts_link');
+    link.hidden = !t.authUrl; if (t.authUrl) link.href = t.authUrl;
+    $('ts_connect').hidden = t.state === 'connected';
+    $('ts_disconnect').hidden = t.state === 'off';
+    const short = (t.name || '').split('.')[0];
+    $('ts_state').textContent = t.state === 'connected' ? N.tsOn.replace('%n', t.name || '?').replace('%i', (t.ips || [])[0] || '').replace('%h', short || 'homeminer')
+      : t.state === 'login' ? N.tsLogin : t.state === 'starting' ? N.tsWait : N.tsOff;
+  }
+  function showWifi(w) {
+    if (!w || !w.available) return;
+    wifiSsid = w.ssid;
+    $('wifi_state').textContent = (w.connected ? N.wifiOn.replace('%s', w.ssid).replace(' · IP %i', w.ip ? ' · IP ' + w.ip : '') : N.wifiOff) + (w.wired ? ' ' + N.wired : '');
+    $('wifi_forget').hidden = !w.connected;
+  }
+  async function refresh() {
+    const r = await netPost('status');
+    if (r.error) { say(err(r), false); return false; }
+    msg.textContent = ''; showWifi(r.wifi); showTs(r.tailscale); return true;
+  }
+  $('net_refresh').addEventListener('click', refresh);
+  $('wifi_scan').addEventListener('click', async () => {
+    const b = $('wifi_scan'); b.disabled = true; $('wifi_state').textContent = N.scanning;
+    try {
+      const r = await netPost('wifi-scan');
+      if (r.error) { say(err(r), false); return; }
+      const sel = $('wifi_ssid'); sel.textContent = '';
+      for (const n of r.networks) { const o = document.createElement('option'); o.value = n.ssid; o.textContent = n.ssid + ' · ' + n.signal + '%' + (n.secure ? ' 🔒' : '') + (n.inUse ? ' ✓' : ''); sel.appendChild(o); }
+      $('wifi_form').hidden = !r.networks.length;
+      await refresh();
+    } finally { b.disabled = false; }
+  });
+  $('wifi_connect').addEventListener('click', async () => {
+    const b = $('wifi_connect'); b.disabled = true; say(N.connecting, true);
+    try {
+      const r = await netPost('wifi-connect', { ssid: $('wifi_ssid').value, password: $('wifi_pass').value });
+      if (!r.ok) { say(err(r), false); return; }
+      $('wifi_pass').value = ''; $('wifi_form').hidden = true; say(N.wifiOk, true); await refresh();
+    } catch (_) { say(N.wifiHint, false); } finally { b.disabled = false; }
+  });
+  $('wifi_forget').addEventListener('click', async () => {
+    if (!wifiSsid) return;
+    const r = await netPost('wifi-forget');
+    if (!r.ok) say(err(r), false); else await refresh();
+  });
+  $('ts_connect').addEventListener('click', async () => {
+    const b = $('ts_connect'); b.disabled = true; $('ts_state').textContent = N.tsWait;
+    try {
+      const r = await netPost('ts-connect');
+      if (!r.ok) { say(err(r), false); return; }
+      msg.textContent = ''; showTs(r.status);
+    } finally { b.disabled = false; }
+  });
+  $('ts_disconnect').addEventListener('click', async () => {
+    const r = await netPost('ts-disconnect');
+    if (!r.ok) say(err(r), false); else await refresh();
+  });
+})();
 async function waitRestartAndGo(message) {
   say(message, true);
   await new Promise((res) => setTimeout(res, 2500));
@@ -1285,6 +1387,13 @@ function handle(req, res, ctx) {
     json(200, { values: current(), workers: ctx.workers(), pin: !!pinEnv, localMiner: { available: lm.available(), cores: lm.cores(), defaultThreads: lm.defaultThreads() } });
     return true;
   }
+  if (url === '/api/config/net' && req.method === 'GET') {
+    // só diz o que existe; estado, redes e o link do Tailscale ficam atrás do PIN (POST)
+    const net = require('./netctl');
+    Promise.all([net.wifiStatus(), net.tailscaleStatus()]).then(([w, t]) => json(200, { wifi: !!w.available, wifiReason: w.reason || null, tailscale: !!t.available }))
+      .catch(() => json(200, { wifi: false, tailscale: false }));
+    return true;
+  }
   if (url === '/api/config/version' && req.method === 'GET') {
     require('./update').status(ctx.appDir || __dirname).then((st) => {
       const { repo, ...pub } = st;   // a pasta do repositório não precisa sair do servidor
@@ -1306,6 +1415,17 @@ function handle(req, res, ctx) {
     const pin = checkPin(j.pin, pinEnv);
     if (pin !== 'ok') return json(pin === 'wrong' ? 403 : pin === 'locked' ? 429 : 409, { error: pin });
     const form = j.values && typeof j.values === 'object' ? j.values : {};
+    if (url === '/api/config/net') {
+      const net = require('./netctl');
+      const a = String(j.action || '');
+      if (a === 'status') { const [wifi, tailscale] = await Promise.all([net.wifiStatus(), net.tailscaleStatus({ withUrl: true })]); return json(200, { wifi, tailscale }); }
+      if (a === 'wifi-scan') return json(200, await net.wifiScan());
+      if (a === 'wifi-connect') return json(200, await net.wifiConnect(j.ssid, j.password));
+      if (a === 'wifi-forget') return json(200, await net.wifiForget());
+      if (a === 'ts-connect') return json(200, await net.tailscaleConnect());
+      if (a === 'ts-disconnect') return json(200, await net.tailscaleDisconnect());
+      return json(400, { error: 'option' });
+    }
     if (url === '/api/config/update') {
       const r = require('./update').runUpdate(ctx.appDir || __dirname);
       return json(r.ok ? 200 : 409, r.ok ? { ok: true, restart: true } : { error: r.error });

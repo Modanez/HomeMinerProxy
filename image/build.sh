@@ -106,7 +106,7 @@ rm -rf "$ROOT/usr/src/cpuminer"
 git clone -q --depth 1 --branch "$CPUMINER_REF" https://github.com/pooler/cpuminer.git "$ROOT/usr/src/cpuminer"
 
 step "Instalando dentro da imagem (qemu, demora) / installing inside the image (qemu, slow)"
-chroot "$ROOT" /usr/bin/env -i HOME=/root PATH=/usr/sbin:/usr/bin:/sbin:/bin DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 /bin/bash -euo pipefail -c '
+chroot "$ROOT" /usr/bin/env -i HOME=/root PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin DEBIAN_FRONTEND=noninteractive LANG=C.UTF-8 /bin/bash -euo pipefail -c '
   apt-get update
   apt-get install -y --no-install-recommends nodejs python3 python3-pil fonts-dejavu-core git avahi-daemon ca-certificates curl
   # cpuminer (minerd): compila e tira as ferramentas de compilação, mantendo só a libcurl de execução
@@ -122,6 +122,13 @@ chroot "$ROOT" /usr/bin/env -i HOME=/root PATH=/usr/sbin:/usr/bin:/sbin:/bin DEB
   apt-get purge -y $BUILD >/dev/null
   apt-get autoremove -y --purge >/dev/null
   rm -rf /usr/src/cpuminer
+  # Tailscale (acesso de fora de casa): instalado e desligado; liga pela aba 🌐 Rede
+  . /etc/os-release
+  curl -fsSL "https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.noarmor.gpg" -o /usr/share/keyrings/tailscale-archive-keyring.gpg
+  curl -fsSL "https://pkgs.tailscale.com/stable/debian/${VERSION_CODENAME}.tailscale-keyring.list" -o /etc/apt/sources.list.d/tailscale.list
+  apt-get update
+  apt-get install -y --no-install-recommends tailscale
+  systemctl disable tailscaled >/dev/null 2>&1 || true
   git config --system --add safe.directory /opt/HomeMinerProxy
   cd /opt/HomeMinerProxy
   HOMEMINER_UNATTENDED=1 HOMEMINER_IMAGE=1 bash install.sh </dev/null
@@ -164,6 +171,10 @@ chroot "$ROOT" node -e "process.exit(Number(process.versions.node.split('.')[0])
 chroot "$ROOT" python3 -c "import PIL" || fail "python3-pil"
 chroot "$ROOT" /usr/local/bin/minerd --help 2>&1 | grep -q 'sha256d' || fail "minerd"
 [ -f "$ROOT/etc/systemd/system/mineracao-minerador.service" ] || fail "mineracao-minerador.service"
+[ -x "$ROOT/usr/bin/tailscale" ] || fail "tailscale"
+[ -z "$(find "$ROOT/etc/systemd/system" -name tailscaled.service -path '*.wants/*' 2>/dev/null)" ] || fail "o tailscale tem que vir desligado / tailscale must ship disabled"
+[ -z "$(ls -A "$ROOT/var/lib/tailscale" 2>/dev/null)" ] || fail "estado do tailscale na imagem / tailscale state in the image"
+if [ -x "$ROOT/usr/bin/nmcli" ]; then echo "    NetworkManager: sim / yes (Wi-Fi pela aba Rede)"; else echo "    NetworkManager: não / no (Wi-Fi fica fora da aba Rede)"; fi
 [ ! -e "$ROOT/etc/systemd/system/multi-user.target.wants/mineracao-minerador.service" ] || fail "o minerador local tem que vir desligado / local miner must ship disabled"
 [ "$(cat "$ROOT/etc/hostname")" = homeminer ] || fail hostname
 ! grep -qiE 'extraheader|authorization|token|password' "$ROOT/opt/HomeMinerProxy/.git/config" || fail "credencial no .git/config / credential in .git/config"

@@ -91,6 +91,8 @@ No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange
 4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN, **whether the board should also mine** (the images ship cpuminer; pick the number of cores and the worker name) and the power price. Mining can be turned on or off later in ⚙️ Settings → Miners.
 5. Point your miners to `homeminer.local` (or the IP), ports as shown at the end of the wizard. Give the board a fixed IP in your router.
 
+**🌐 Network tab** (⚙️ Settings, PIN): **Wi-Fi** — find networks and connect, then unplug the cable (needs a Wi-Fi adapter and NetworkManager, which the Raspberry Pi image has); **Tailscale** — one tap to open the dashboard from outside home without opening router ports: tap *Connect to Tailscale*, open the authorization link, sign in to your (free) Tailscale account, approve the device. Then, on a phone with the Tailscale app on, open `http://homeminer:3000`. It ships installed and off; *Disconnect* logs out and turns it off again.
+
 Updates come from ⚙️ Settings → 💾 Backup → **Update now**. For security, SSH is off on the Orange Pi and Odroid images (to turn it on: monitor and keyboard, log in as `root`, password `1234`, choose a new one, then `systemctl enable --now ssh`). On the Raspberry Pi image SSH is off as usual; you can turn it on in Raspberry Pi Imager's settings when flashing.
 
 ## Install
