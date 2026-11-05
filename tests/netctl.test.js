@@ -141,3 +141,19 @@ test('SSH ligado por fora do painel: só acrescenta a chave, não mexe na config
   assert.ok(!fs.existsSync(env.SSHD_DROPIN));
   assert.ok(!calls().some((c) => /enable --now/.test(c)));
 });
+
+test('cabo fora do NetworkManager (imagens Armbian): vale o sinal do cabo', async (t) => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'net-um-'));
+  const nm = path.join(dir, 'nmcli');
+  fs.writeFileSync(nm, '#!/bin/sh\necho "end0:ethernet:unmanaged:--"\necho "wlx00e04c:wifi:disconnected:--"\n', { mode: 0o755 });
+  fs.mkdirSync(path.join(dir, 'sys', 'end0'), { recursive: true });
+  const carrier = path.join(dir, 'sys', 'end0', 'carrier');
+  fs.writeFileSync(carrier, '1\n');
+  Object.assign(process.env, { NMCLI_PATH: nm, NET_SYSFS: path.join(dir, 'sys') });
+  delete require.cache[require.resolve('../src/netctl')];
+  t.after(() => { delete process.env.NMCLI_PATH; delete process.env.NET_SYSFS; fs.rmSync(dir, { recursive: true, force: true }); });
+  const net = require('../src/netctl');
+  assert.deepStrictEqual(await net.wifiStatus(), { available: true, device: 'wlx00e04c', connected: false, ssid: null, ip: null, wired: true });
+  fs.writeFileSync(carrier, '0\n');
+  assert.strictEqual((await net.wifiStatus()).wired, false);
+});

@@ -91,7 +91,7 @@ Sem terminal. Cada release traz imagens para **Raspberry Pi 3/4/5**, **Orange Pi
 4. No celular ou no computador, abra **http://homeminer.local:3000**. Se o nome não abrir, use o IP que o roteador mostra para "homeminer". O assistente de primeira configuração pergunta o idioma, o seu endereço de bitcoin, um PIN de administração, **se a placa também vai minerar** (as imagens vêm com o cpuminer; escolha os núcleos e o nome do worker) e o preço da energia. Dá para ligar ou desligar a mineração depois em ⚙️ Configurações → Mineradores.
 5. Aponte os mineradores para `homeminer.local` (ou o IP), nas portas que aparecem no fim do assistente. Reserve um IP fixo para a placa no roteador.
 
-**Aba 🌐 Rede** (⚙️ Configurações, com PIN): **Wi-Fi** — procure as redes e conecte, depois tire o cabo (precisa de um adaptador Wi-Fi e do NetworkManager, que a imagem do Raspberry Pi tem); **Tailscale** — um toque para abrir o painel de fora de casa sem abrir portas no roteador: toque em *Conectar ao Tailscale*, abra o link de autorização, entre na sua conta do Tailscale (grátis) e aprove o aparelho. Depois, no celular com o app do Tailscale ligado, abra `http://homeminer:3000`. Vem instalado e desligado; *Desconectar* sai da conta e desliga de novo. **SSH** — cole a sua chave pública (`~/.ssh/id_ed25519.pub`) e ligue: só com chave, login por senha desligado, depois `ssh root@homeminer.local`. Se o SSH já estava ligado por fora do painel, a configuração dele não é mexida e dá só para acrescentar chaves.
+**Aba 🌐 Rede** (⚙️ Configurações, com PIN): **Wi-Fi** — procure as redes e conecte, depois tire o cabo (precisa de um adaptador Wi-Fi; nas imagens do Orange Pi e do Odroid o NetworkManager cuida só do Wi-Fi e o cabo continua com a configuração dele); **Tailscale** — um toque para abrir o painel de fora de casa sem abrir portas no roteador: toque em *Conectar ao Tailscale*, abra o link de autorização, entre na sua conta do Tailscale (grátis) e aprove o aparelho. Depois, no celular com o app do Tailscale ligado, abra `http://homeminer:3000`. Vem instalado e desligado; *Desconectar* sai da conta e desliga de novo. **SSH** — cole a sua chave pública (`~/.ssh/id_ed25519.pub`) e ligue: só com chave, login por senha desligado, depois `ssh root@homeminer.local`. Se o SSH já estava ligado por fora do painel, a configuração dele não é mexida e dá só para acrescentar chaves.
 
 As placas não têm bateria de relógio, então ligam com a hora errada até sincronizar pela internet. O painel mostra "Acertando o relógio…" e espera (até 10 minutos) antes de gravar qualquer coisa, para o histórico e os recordes ficarem com as datas certas.
 
@@ -129,7 +129,8 @@ O painel fica em `http://IP-DO-SERVIDOR:3000`, e as portas do proxy são as mesm
 - **Cubo GeekMagic:** preencha `CUBE_IP` e rode `docker compose --profile cubo up -d`.
 - **Tela de configurações:** defina `SETTINGS_PIN` no `mineracao.env` para poder salvar.
 - **Sirene do Arduino:** descomente as linhas `devices` do serviço `painel` no `compose.yaml`.
-- **cpuminer na mesma máquina (`LOCAL_WORKER`):** não funciona dentro do contêiner, porque essa função lê o journal do systemd da máquina. O worker continua aparecendo pelo proxy.
+- **Minerar com o mesmo computador:** `docker compose --profile minerador up -d` acrescenta um contêiner com o cpuminer apontado para o proxy. Ele aparece no painel como `LOCAL_WORKER` (padrão `docker`); os núcleos ficam em `MINER_THREADS` (padrão: todos menos um). O hashrate vem dos shares, como o de qualquer minerador.
+- **Aba 🌐 Rede:** Wi-Fi, SSH e Tailscale são do host, então no Docker a aba explica como configurar por lá (com o Tailscale no host, o painel abre de fora em `http://NOME-DO-HOST:3000`).
 
 ## Qual pool para cada minerador?
 

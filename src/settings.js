@@ -483,7 +483,12 @@ const T = {
       tsConnect: 'Conectar ao Tailscale', tsOpen: 'Abrir o link de autorização', tsDisconnect: 'Desconectar', tsWait: 'Iniciando o Tailscale…', tsDone: 'Tailscale conectado!',
       ssh: 'Acesso SSH (só com chave)', sshHint: 'Cole a sua chave pública (o conteúdo de ~/.ssh/id_ed25519.pub; para criar uma: ssh-keygen -t ed25519). O login por senha fica desligado. Depois: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… voce@computador', sshOn: 'Ligado.', sshOff: 'Desligado.', sshOutside: 'Ligado por fora do painel: a configuração dele não é alterada aqui, só dá para acrescentar chaves.', sshKeys: 'Chaves: ',
-      sshEnable: 'Ligar o SSH', sshAdd: 'Adicionar a chave', sshDisable: 'Desligar o SSH', sshDone: 'Pronto: SSH com a sua chave.' },
+      sshEnable: 'Ligar o SSH', sshAdd: 'Adicionar a chave', sshDisable: 'Desligar o SSH', sshDone: 'Pronto: SSH com a sua chave.',
+      dockerTitle: 'Rodando em Docker',
+      dockerHelp: ['O painel está num container, então rede, Wi-Fi e SSH são do computador onde o Docker roda (o host): configure por lá.',
+        '<b>Acesso de fora de casa:</b> instale o Tailscale no host (tailscale.com/download, no Windows é o app normal) e abra <code>http://NOME-DO-HOST:3000</code> pelo celular com o Tailscale ligado.',
+        '<b>Minerar também com este computador:</b> <code>docker compose --profile minerador up -d</code> (nome no painel: LOCAL_WORKER, padrão "docker"; núcleos: MINER_THREADS).',
+        '<b>Windows:</b> libere as portas 3000 e 3333–3339 no Firewall para a rede privada e desligue a suspensão do PC, senão os mineradores caem juntos.'] },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
     THEME: ['Tema visual (Material Design)', 'Escolha um dos 3 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
     themes: [
@@ -553,7 +558,12 @@ const T = {
       tsConnect: 'Connect to Tailscale', tsOpen: 'Open the authorization link', tsDisconnect: 'Disconnect', tsWait: 'Starting Tailscale…', tsDone: 'Tailscale connected!',
       ssh: 'SSH access (key only)', sshHint: 'Paste your public key (the content of ~/.ssh/id_ed25519.pub; to create one: ssh-keygen -t ed25519). Password login stays off. Then: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… you@computer', sshOn: 'On.', sshOff: 'Off.', sshOutside: 'Turned on outside the dashboard: its configuration is not changed here, you can only add keys.', sshKeys: 'Keys: ',
-      sshEnable: 'Turn SSH on', sshAdd: 'Add the key', sshDisable: 'Turn SSH off', sshDone: 'Done: SSH with your key.' },
+      sshEnable: 'Turn SSH on', sshAdd: 'Add the key', sshDisable: 'Turn SSH off', sshDone: 'Done: SSH with your key.',
+      dockerTitle: 'Running in Docker',
+      dockerHelp: ['The dashboard runs in a container, so network, Wi-Fi and SSH belong to the computer running Docker (the host): set them up there.',
+        '<b>Access from outside home:</b> install Tailscale on the host (tailscale.com/download, on Windows it is the regular app) and open <code>http://HOST-NAME:3000</code> on a phone with Tailscale on.',
+        '<b>Also mine with this computer:</b> <code>docker compose --profile minerador up -d</code> (name on the dashboard: LOCAL_WORKER, default "docker"; cores: MINER_THREADS).',
+        '<b>Windows:</b> allow ports 3000 and 3333–3339 in the Firewall for the private network and turn off sleep, or all miners drop together.'] },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
     THEME: ['Visual theme (Material Design)', 'Choose one of the 3 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
     themes: [
@@ -676,6 +686,7 @@ function page(lang, hasPin, theme) {
   const N = S.net;
   const netGroup = `<fieldset class="tab-pane" data-pane="net"><legend>${S.groups.net}</legend>` +
     `<div class="f"><div class="hint" id="net_msg">${htmlEsc(N.pinFirst)}</div><div class="bbar"><button type="button" class="ghost" id="net_refresh">${htmlEsc(N.refresh)}</button></div></div>` +
+    `<div class="f" id="net_docker" hidden><label>${htmlEsc(N.dockerTitle)}</label>${N.dockerHelp.map((l) => `<div class="hint">${l}</div>`).join('')}</div>` +
     `<div class="f" id="net_wifi" hidden><label>${htmlEsc(N.wifi)}</label><div class="hint" id="wifi_state">–</div>` +
     `<div class="bbar"><button type="button" class="ghost" id="wifi_scan">${htmlEsc(N.scan)}</button><button type="button" class="ghost" id="wifi_forget" hidden>${htmlEsc(N.forget)}</button></div>` +
     `<div id="wifi_form" hidden style="margin-top:10px"><select id="wifi_ssid"></select><div class="pw" style="margin-top:8px"><input type="password" id="wifi_pass" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="${htmlEsc(N.pass)}"><button type="button" class="ghost eye" data-eye="wifi_pass">👁</button></div>` +
@@ -767,10 +778,18 @@ function page(lang, hasPin, theme) {
   .prow .p-wd { text-align:right; }
   .prow button { margin:0; padding:6px 9px; font-size:12px; }
   .prow .p-type { font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:3px 5px; text-align:center; }
-  .addp #new_plug_type { flex:1; min-width:150px; padding:7px 8px; font-size:13px; }
-  .addp #new_plug_name { flex:1; min-width:130px; padding:7px 9px; font-size:14px; }
-  .addp #new_plug_id { flex:1.4; min-width:170px; padding:7px 9px; font-size:13px; font-family:ui-monospace, Menlo, monospace; }
-  .addp #new_plug_worker { flex:1.1; min-width:150px; padding:7px 8px; font-size:13px; }
+  /* nova tomada em duas linhas: tipo · apelido · Device ID ou IP / worker · watchdog · adicionar */
+  .addw.addp { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.4fr); gap:6px; }
+  .addp > * { min-width:0; width:100%; padding:7px 9px; font-size:13px; }
+  .addp #new_plug_name { font-size:14px; }
+  .addp #new_plug_id { font-family:ui-monospace, Menlo, monospace; }
+  .addp .addw-w { width:100%; text-align:left; }
+  .addp button { white-space:nowrap; margin:0; }
+  @media (max-width:640px) {
+    .addw.addp { grid-template-columns:minmax(0,1fr) minmax(0,1fr); grid-template-areas:"type name" "id id" "worker wd" "add add"; }
+    #new_plug_type { grid-area:type; } #new_plug_name { grid-area:name; } #new_plug_id { grid-area:id; }
+    #new_plug_worker { grid-area:worker; } #new_plug_wd { grid-area:wd; } #add_plug_btn { grid-area:add; }
+  }
   @media (max-width:640px) {
     /* celular: tipo + apelido / Device ID ou IP inteiro / worker + watchdog / testar + remover */
     .prow { grid-template-columns:64px 1fr 1fr 48px; grid-template-areas:"type name name name" "id id id id" "worker worker wd wd" "test test test del"; }
@@ -1244,9 +1263,10 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     if (c.tailscale) showTs({ available: true, state: c.tsState });   // só o estado; nome, IP e link vêm com o PIN
     $('net_ssh').hidden = !c.ssh;
     if (c.wifiReason === 'noadapter') { $('wifi_state').textContent = N.wifiNone; $('wifi_scan').hidden = true; }
-    if (!c.wifi && c.wifiReason !== 'noadapter' && !c.tailscale && !c.ssh) { msg.textContent = N.none; $('net_refresh').hidden = true; }
-    // esconde a aba se não há nada para mexer
-    if (!c.wifi && !c.tailscale && !c.ssh) { const t = document.querySelector('[data-tab="net"]'); if (t && c.wifiReason !== 'noadapter') t.hidden = true; }
+    if (c.docker) { $('net_docker').hidden = false; }
+    if (!c.wifi && c.wifiReason !== 'noadapter' && !c.tailscale && !c.ssh) { msg.textContent = c.docker ? '' : N.none; $('net_refresh').hidden = true; if (c.docker) msg.parentElement.hidden = true; }
+    // esconde a aba se não há nada para mexer (no Docker ela fica, com as instruções para o host)
+    if (!c.wifi && !c.tailscale && !c.ssh && !c.docker) { const t = document.querySelector('[data-tab="net"]'); if (t && c.wifiReason !== 'noadapter') t.hidden = true; }
   }).catch(() => {});
   function showTs(t) {
     if (!t || !t.available) return;
@@ -1439,7 +1459,7 @@ function handle(req, res, ctx) {
   if (url === '/api/config/net' && req.method === 'GET') {
     // só diz o que existe; estado, redes e o link do Tailscale ficam atrás do PIN (POST)
     const net = require('./netctl');
-    Promise.all([net.wifiStatus(), net.tailscaleStatus(), net.sshStatus()]).then(([w, t, h]) => json(200, { wifi: !!w.available, wifiReason: w.reason || null, tailscale: !!t.available, tsState: t.state || null, ssh: !!h.available }))
+    Promise.all([net.wifiStatus(), net.tailscaleStatus(), net.sshStatus()]).then(([w, t, h]) => json(200, { wifi: !!w.available, wifiReason: w.reason || null, tailscale: !!t.available, tsState: t.state || null, ssh: !!h.available, docker: fs.existsSync('/.dockerenv') || !!process.env.container }))
       .catch(() => json(200, { wifi: false, tailscale: false }));
     return true;
   }

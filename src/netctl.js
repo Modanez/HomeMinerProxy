@@ -47,7 +47,9 @@ async function wifiStatus() {
   const d = wifi[0];
   const connected = /^connected/.test(d.state) && d.connection && d.connection !== '--';
   const ip = connected ? ((os.networkInterfaces()[d.device] || []).find((a) => a.family === 'IPv4') || {}).address || null : null;
-  const wired = devs.some((x) => x.type === 'ethernet' && /^connected/.test(x.state));
+  // nas imagens Armbian o cabo fica fora do NetworkManager ("unmanaged"): aí vale o sinal do próprio cabo
+  const carrier = (dev) => { try { return fs.readFileSync(`${process.env.NET_SYSFS || '/sys/class/net'}/${dev}/carrier`, 'utf8').trim() === '1'; } catch (_) { return false; } };
+  const wired = devs.some((x) => x.type === 'ethernet' && (/^connected/.test(x.state) || (x.state === 'unmanaged' && carrier(x.device))));
   return { available: true, device: d.device, connected: !!connected, ssid: connected ? d.connection : null, ip, wired };
 }
 
