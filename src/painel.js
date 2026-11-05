@@ -786,6 +786,7 @@ function snapshot(internal = false) {
       failover: proxyUp() ? proxy.failover || [] : [],
       pingMs: proxyUp() && proxy.totals ? proxy.totals.pingMs : null,
       pingScore: proxyUp() && proxy.totals ? proxy.totals.pingScore : 'unknown',
+      pools: proxyUp() && proxy.totals && Array.isArray(proxy.totals.pools) ? proxy.totals.pools : [],
     } : null,
     error: pool.error,
     staleWarnMs: STALE_WARN_MS,
@@ -1471,7 +1472,11 @@ function renderFarm(j) {
   }).join('') : '<tr><td colspan="4" class="sub">nenhum worker enviou shares ainda</td></tr>';
 
   const pScoreMap = { great: 'ótimo', good: 'bom', poor: 'ruim' };
-  const pingTxt = (j.proxy && j.proxy.pingMs != null)
+  const pDot = (sc) => (sc === 'great' ? '🟢' : sc === 'good' ? '🟡' : sc === 'poor' ? '🔴' : '⚪');
+  const pools = (j.proxy && j.proxy.pools) || [];
+  const pingTxt = pools.length
+    ? ' · Ping: ' + pools.map((p) => p.label + ' ' + pDot(p.pingScore) + ' ' + (p.pingMs != null ? nf(p.pingMs) + ' ms' : '–')).join(' · ')
+    : (j.proxy && j.proxy.pingMs != null)
     ? ' · Ping da pool: ' + j.proxy.pingMs + ' ms (' + (j.proxy.pingScore === 'great' ? '🟢 ' : j.proxy.pingScore === 'good' ? '🟡 ' : '🔴 ') + (pScoreMap[j.proxy.pingScore] || '–') + ')'
     : '';
   set('netd', 'Dificuldade da rede: ' + fmtBig(D) + pingTxt);

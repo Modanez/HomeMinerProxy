@@ -239,7 +239,9 @@ function statusText(snap, opts = {}) {
   if (day && day.date === (opts.today || new Date().toLocaleDateString('sv'))) lines.push(T.dayBest(fm.diff(day.diff), escHtml(day.worker)));
   if (top) lines.push(T.farmRecord(fm.diff(top.value), escHtml(top.worker)));
   if (luck) lines.push(T.luckiest(escHtml(luck.name), fm.num(luck.factor, 2)));
-  if ((snap.proxy || {}).pingMs != null) lines.push(T.poolPing(snap.proxy.pingMs, snap.proxy.pingScore));
+  const pools = (snap.proxy || {}).pools || [];
+  if (pools.length) lines.push('⚡ Ping: ' + pools.map((p) => `${escHtml(p.label)} <b>${p.pingMs != null ? p.pingMs + ' ms' : '–'}</b> ${p.pingScore === 'great' ? '🟢' : p.pingScore === 'good' ? '🟡' : p.pingScore === 'poor' ? '🔴' : '⚪'}`).join(' · '));
+  else if ((snap.proxy || {}).pingMs != null) lines.push(T.poolPing(snap.proxy.pingMs, snap.proxy.pingScore));
   for (const r of (snap.proxy || {}).failover || []) lines.push(T.failoverNow(r.listen, escHtml(r.primary), escHtml(r.active)));
   if (stale.length) lines.push(T.stoppedNow(stale.map((w) => escHtml(w.name)).join(', ')));
   if (opts.panelUrl) lines.push(`\n<a href="${escHtml(opts.panelUrl)}">${T.panel}</a>`);

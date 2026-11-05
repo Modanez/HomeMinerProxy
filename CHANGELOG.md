@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Ping per pool:** the farm screen and the Telegram `/status` show the ping of each pool in use (e.g. `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) instead of one average. Backup pools only probed by the failover no longer count, and `/stats` has `totals.pools` with label, ports, sessions, ping and grade. The overall `pingMs` is now averaged only over pools in use.
+
+### Português
+- **Ping por pool:** a tela da fazenda e o `/status` do Telegram mostram o ping de cada pool em uso (ex.: `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) em vez de uma média só. As pools reserva só testadas pelo failover não contam mais, e o `/stats` ganhou `totals.pools` com nome, portas, sessões, ping e nota. O `pingMs` geral agora é a média só das pools em uso.
+
 ## v0.3.0 — 2026-11-04
 
 ### English

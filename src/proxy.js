@@ -247,6 +247,7 @@ function session(down, route) {
       c.setTimeout(0);
       c.setKeepAlive(true, 30e3);
       upReady = true;
+      s.upstream = u;   // pool em uso nesta sessão (para o ping separado por pool)
       markUp(u, tcpPing);
       s.pingMs = tcpPing;
       if (i > 0) { log(`[${route.label}] usando a reserva ${u.label}`); addEvent('failover', `port ${route.listen}: using backup ${u.label}`); }
@@ -439,7 +440,22 @@ function startServers() {
         };
       }),
     }));
-    const activePings = Object.values(health).map((h) => h.pingMs).filter((m) => typeof m === 'number' && m >= 0);
+    // Ping separado por pool em uso: a nerdminers (ESP32, centenas de shares, pool pequena) não pode
+    // puxar a média das outras, e as reservas só testadas pelo failover não contam.
+    const inUse = new Map();
+    for (const s of sessions) {
+      if (!s.upstream) continue;
+      const k = hkey(s.upstream);
+      const e = inUse.get(k) || { label: s.upstream.label, host: s.upstream.host, port: s.upstream.port, ports: new Set(), sessions: 0 };
+      e.ports.add(s.route.listen); e.sessions++;
+      inUse.set(k, e);
+    }
+    const pools = [...inUse.entries()].map(([k, e]) => {
+      const ms = (health[k] || {}).pingMs ?? null;
+      return { label: e.label, host: e.host, port: e.port, ports: [...e.ports].sort(), sessions: e.sessions, pingMs: ms, pingScore: pingScore(ms).score };
+    }).sort((a, b) => b.sessions - a.sessions || a.label.localeCompare(b.label));
+    const inUsePings = pools.map((p) => p.pingMs).filter((m) => typeof m === 'number' && m >= 0);
+    const activePings = inUsePings.length ? inUsePings : Object.values(health).map((h) => h.pingMs).filter((m) => typeof m === 'number' && m >= 0);
     const avgPing = activePings.length ? Math.round(activePings.reduce((a, b) => a + b, 0) / activePings.length) : null;
     const pingSummary = pingScore(avgPing);
     const totals = {
@@ -447,6 +463,7 @@ function startServers() {
       lastHour,
       pingMs: avgPing,
       pingScore: pingSummary.score,
+      pools,
       efficiency: efficiency(),
       hashrate: { m15: list.reduce((n, w) => n + w.hashrate15m, 0), h1: list.reduce((n, w) => n + w.hashrate, 0), h24: list.reduce((n, w) => n + w.hashrate24h, 0) },
     };

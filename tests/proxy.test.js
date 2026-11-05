@@ -203,3 +203,27 @@ test('failover: pool principal fora vai para a reserva e volta quando ela se rec
   assert.strictEqual(s.routes[0].upstreams[0].down, false);
   assert.strictEqual(s.workers.find((w) => w.name === 'esp').pool, 'principal');
 });
+
+test('ping separado por pool em uso (reservas só testadas não entram)', async (t) => {
+  const [l1, l2, statsPort] = [await freePort(), await freePort(), await freePort()];
+  const p1 = miniPool('um'), p2 = miniPool('dois'), spare = miniPool('reserva');
+  const port1 = await new Promise((r) => p1.listen(0, '127.0.0.1', () => r(p1.address().port)));
+  const port2 = await new Promise((r) => p2.listen(0, '127.0.0.1', () => r(p2.address().port)));
+  const portS = await new Promise((r) => spare.listen(0, '127.0.0.1', () => r(spare.address().port)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const routes = [
+    { listen: l1, host: '127.0.0.1', port: port1, label: 'public-pool', backup: [{ host: '127.0.0.1', port: portS, label: 'ckpool' }] },
+    { listen: l2, host: '127.0.0.1', port: port2, label: 'nerdminers' },
+  ];
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir }, stdio: 'ignore',
+  });
+  const socks = [];
+  t.after(() => { socks.forEach((s) => s.destroy()); proxy.kill(); p1.close(); p2.close(); spare.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  for (const port of [l1, l2, l2]) { const m = await mine(port); socks.push(m.sock); await waitFor(() => m.jobs.length); }
+  const s = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats`); return j.totals.pools.length === 2 && j; });
+  assert.deepStrictEqual(s.totals.pools.map((p) => [p.label, p.sessions, p.ports]), [['nerdminers', 2, [l2]], ['public-pool', 1, [l1]]]);
+  for (const p of s.totals.pools) { assert.ok(p.pingMs >= 0, p.label); assert.ok(['great', 'good', 'poor'].includes(p.pingScore)); }
+  assert.ok(!s.totals.pools.some((p) => p.label === 'ckpool'));   // reserva sem minerador não aparece
+});
