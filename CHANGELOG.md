@@ -7,12 +7,16 @@
 - **Docker:** new `minerador` profile (`docker compose --profile minerador up -d`) with cpuminer pointed at the proxy, and the 🌐 Network tab now explains how to set up Tailscale, Wi-Fi and SSH on the host instead of disappearing.
 - **Pools and ports guide** in ⚙️ Settings → Miners: every proxy port with its pool, backup, live status and ping, who it is for, and how to point a Bitaxe, a NerdMiner or cpuminer (server address and user filled in).
 - **Smart plugs:** the "new plug" row is laid out in two lines (four on phones), so the placeholders and options are no longer cut off.
+- **Local miner hashrate** (announced for v0.4.0, but it missed that release) is read with the journal's own timestamps, so it no longer shows 0 H/s when Node and the system disagree on the time zone. **CPU miners with few shares** (target 1) show an approximate hashrate marked with `~` instead of 0 H/s.
+- **`health.localMiner`** in `/api/mining` shows how the local miner log is being read (running, hashrate, last line, last read, error).
 
 ### Português
 - **Wi-Fi nas imagens do Orange Pi e do Odroid:** agora vêm com o NetworkManager cuidando só do Wi-Fi (o cabo continua com a configuração da imagem), então 🌐 Rede → Wi-Fi funciona com adaptador USB ou da placa. O cabo aparece como conectado mesmo sem o NetworkManager cuidar dele.
 - **Docker:** novo perfil `minerador` (`docker compose --profile minerador up -d`) com o cpuminer apontado para o proxy, e a aba 🌐 Rede passa a explicar como configurar Tailscale, Wi-Fi e SSH no host em vez de sumir.
 - **Guia "Pools e portas"** em ⚙️ Configurações → Mineradores: cada porta do proxy com a pool, a reserva, o status e o ping ao vivo, para quem serve, e como apontar um Bitaxe, um NerdMiner ou o cpuminer (com o endereço do servidor e o usuário preenchidos).
 - **Tomadas:** a linha de "nova tomada" ficou em duas linhas (quatro no celular), e os textos e opções não ficam mais cortados.
+- **O hashrate do minerador local** (anunciado na v0.4.0, mas ficou de fora dela) é lido com a hora do próprio journal, e não aparece mais 0 H/s quando o Node e o sistema discordam do fuso. **Mineradores de CPU com poucos shares** (alvo 1) mostram um hashrate aproximado, marcado com `~`, em vez de 0 H/s.
+- **`health.localMiner`** no `/api/mining` mostra como o log do minerador local está sendo lido (rodando, hashrate, última linha, última leitura, erro).
 
 ## v0.4.0 — 2026-11-05
 
