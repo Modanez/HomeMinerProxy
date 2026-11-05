@@ -363,7 +363,9 @@ test('health, readTempC, readCpuPct e readMem: métricas de hardware', () => {
 
   const temp = painel.readTempC();
   assert.ok(temp === null || (typeof temp === 'number' && temp > 0));
-  assert.strictEqual(painel.readCpuPct(), null);
+  // a primeira leitura volta null, mas outros testes deste arquivo podem ter lido a CPU antes
+  const cpu = painel.readCpuPct();
+  assert.ok(cpu === null || (typeof cpu === 'number' && cpu >= 0 && cpu <= 100), String(cpu));
   const mem = painel.readMem();
   assert.ok(mem && mem.total > 0);
 });
