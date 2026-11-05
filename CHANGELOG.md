@@ -3,12 +3,14 @@
 ## Unreleased
 
 ### English
-- **Weekly backup on Telegram:** new option (⚙️ Settings → Telegram, `TELEGRAM_BACKUP=1`): every Sunday at the summary hour the bot sends the backup file silently. New `/backup` command sends it any time. Off by default, because the file holds saved keys and passwords.
-- **Clock on boards without a battery:** the dashboard waits for the clock to sync from the internet (up to `CLOCK_WAIT_MIN`, default 10 min) before collecting, so history, records and the championship never get dates from the image or the last shutdown. A banner shows while it waits, or if it never syncs. `CLOCK_WAIT=0` turns it off.
+- **Wi-Fi on the Orange Pi and Odroid images:** they now ship NetworkManager handling only the Wi-Fi (the cable keeps the image's own setup), so 🌐 Network → Wi-Fi works with a USB or onboard adapter. The cable shows as connected even when NetworkManager does not manage it.
+- **Docker:** new `minerador` profile (`docker compose --profile minerador up -d`) with cpuminer pointed at the proxy, and the 🌐 Network tab now explains how to set up Tailscale, Wi-Fi and SSH on the host instead of disappearing.
+- **Smart plugs:** the "new plug" row is laid out in two lines (four on phones), so the placeholders and options are no longer cut off.
 
 ### Português
-- **Backup semanal no Telegram:** nova opção (⚙️ Configurações → Telegram, `TELEGRAM_BACKUP=1`): todo domingo, na hora do resumo, o bot manda o arquivo de backup sem som. O novo comando `/backup` manda na hora. Vem desligada, porque o arquivo tem as chaves e senhas salvas.
-- **Relógio das placas sem bateria:** o painel espera o relógio sincronizar pela internet (até `CLOCK_WAIT_MIN`, padrão 10 min) antes de coletar, para o histórico, os recordes e o campeonato nunca ficarem com a data da imagem ou do último desligamento. Um aviso aparece enquanto espera, ou se não sincronizar. `CLOCK_WAIT=0` desliga.
+- **Wi-Fi nas imagens do Orange Pi e do Odroid:** agora vêm com o NetworkManager cuidando só do Wi-Fi (o cabo continua com a configuração da imagem), então 🌐 Rede → Wi-Fi funciona com adaptador USB ou da placa. O cabo aparece como conectado mesmo sem o NetworkManager cuidar dele.
+- **Docker:** novo perfil `minerador` (`docker compose --profile minerador up -d`) com o cpuminer apontado para o proxy, e a aba 🌐 Rede passa a explicar como configurar Tailscale, Wi-Fi e SSH no host em vez de sumir.
+- **Tomadas:** a linha de "nova tomada" ficou em duas linhas (quatro no celular), e os textos e opções não ficam mais cortados.
 
 ## v0.4.0 — 2026-11-05
 
@@ -22,6 +24,8 @@
 - **Installer:** can run unattended (no address prompt → wizard; `HOMEMINER_IMAGE=1` skips the PIN so each device gets its own), writes `version.json`, never overwrites a PIN created in the wizard.
 - **Ping per pool:** the farm screen and the Telegram `/status` show the ping of each pool in use (e.g. `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) instead of one average. Backup pools only probed by the failover no longer count, and `/stats` has `totals.pools` with label, ports, sessions, ping and grade. The overall `pingMs` is now averaged only over pools in use.
 - **Network tab shows the Tailscale state as soon as it opens** and follows the authorization until it is approved.
+- **Weekly backup on Telegram:** new option (⚙️ Settings → Telegram, `TELEGRAM_BACKUP=1`): every Sunday at the summary hour the bot sends the backup file silently. New `/backup` command sends it any time. Off by default, because the file holds saved keys and passwords.
+- **Clock on boards without a battery:** the dashboard waits for the clock to sync from the internet (up to `CLOCK_WAIT_MIN`, default 10 min) before collecting, so history, records and the championship never get dates from the image or the last shutdown. A banner shows while it waits, or if it never syncs. `CLOCK_WAIT=0` turns it off.
 
 ### Português
 - **Imagens prontas para gravar no cartão SD** para Raspberry Pi 3/4/5, Orange Pi Zero 3 e Odroid-C2, anexadas a cada release: grave, ligue o cabo de rede e abra `http://homeminer.local:3000`. Montadas a partir das imagens mínimas oficiais (com SHA-256 conferido), sem endereço, PIN ou credenciais dentro, e com SSH desligado no Armbian.
@@ -33,6 +37,8 @@
 - **Instalador:** roda sem ninguém no teclado (sem endereço → assistente; `HOMEMINER_IMAGE=1` não cria PIN, para cada aparelho ter o seu), grava o `version.json` e nunca sobrescreve um PIN criado no assistente.
 - **Ping por pool:** a tela da fazenda e o `/status` do Telegram mostram o ping de cada pool em uso (ex.: `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) em vez de uma média só. As pools reserva só testadas pelo failover não contam mais, e o `/stats` ganhou `totals.pools` com nome, portas, sessões, ping e nota. O `pingMs` geral agora é a média só das pools em uso.
 - **A aba Rede mostra o estado do Tailscale assim que abre** e acompanha a autorização até ela ser aprovada.
+- **Backup semanal no Telegram:** nova opção (⚙️ Configurações → Telegram, `TELEGRAM_BACKUP=1`): todo domingo, na hora do resumo, o bot manda o arquivo de backup sem som. O novo comando `/backup` manda na hora. Vem desligada, porque o arquivo tem as chaves e senhas salvas.
+- **Relógio das placas sem bateria:** o painel espera o relógio sincronizar pela internet (até `CLOCK_WAIT_MIN`, padrão 10 min) antes de coletar, para o histórico, os recordes e o campeonato nunca ficarem com a data da imagem ou do último desligamento. Um aviso aparece enquanto espera, ou se não sincronizar. `CLOCK_WAIT=0` desliga.
 
 ## v0.3.0 — 2026-11-04
 
