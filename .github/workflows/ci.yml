@@ -50,6 +50,15 @@ jobs:
           docker compose exec -T painel wget -qO- http://proxy:3336/stats | grep -q '"routes"'
           docker run --rm homeminerproxy:ci python3 -c "import cubo; print(cubo.hashrate(1.2e12))"
 
+      - name: Smoke test (optional CPU miner profile)
+        run: |
+          docker compose --profile minerador build minerador
+          docker run --rm --entrypoint minerd homeminer-minerador:latest --help 2>&1 | grep -q sha256d
+          docker compose --profile minerador up -d minerador
+          sleep 20
+          test "$(docker compose ps -q minerador | xargs docker inspect -f '{{.State.Running}}')" = true
+          docker compose logs minerador | tail -5
+
       - name: Logs on failure
         if: failure()
         run: docker compose logs

@@ -2,6 +2,7 @@
 #   cp config/mineracao.env.example mineracao.env   # then set BTC_ADDRESS (and LANGUAGE, TZ…)
 #   docker compose up -d                            # proxy + dashboard
 #   docker compose --profile cubo up -d             # also the GeekMagic cube scoreboard (needs CUBE_IP)
+#   docker compose --profile minerador up -d        # also mine with this computer's CPU (cpuminer → proxy)
 x-app: &app
   build: .
   image: homeminerproxy:latest
@@ -53,6 +54,19 @@ services:
       PANEL_URL: http://painel:3000/api/mining
     depends_on:
       - painel
+
+  # Optional CPU miner on this same computer: cpuminer pointed at the proxy above.
+  # Name on the dashboard: LOCAL_WORKER (default "docker"); cores: MINER_THREADS (default: all but one).
+  minerador:
+    profiles: ["minerador"]
+    build:
+      context: docker
+      dockerfile: minerador.Dockerfile
+    image: homeminer-minerador:latest
+    env_file: mineracao.env
+    depends_on:
+      - proxy
+    restart: unless-stopped
 
 volumes:
   data:

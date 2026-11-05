@@ -91,7 +91,7 @@ No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange
 4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN, **whether the board should also mine** (the images ship cpuminer; pick the number of cores and the worker name) and the power price. Mining can be turned on or off later in ⚙️ Settings → Miners.
 5. Point your miners to `homeminer.local` (or the IP), ports as shown at the end of the wizard. Give the board a fixed IP in your router.
 
-**🌐 Network tab** (⚙️ Settings, PIN): **Wi-Fi** — find networks and connect, then unplug the cable (needs a Wi-Fi adapter and NetworkManager, which the Raspberry Pi image has); **Tailscale** — one tap to open the dashboard from outside home without opening router ports: tap *Connect to Tailscale*, open the authorization link, sign in to your (free) Tailscale account, approve the device. Then, on a phone with the Tailscale app on, open `http://homeminer:3000`. It ships installed and off; *Disconnect* logs out and turns it off again. **SSH** — paste your public key (`~/.ssh/id_ed25519.pub`) and turn it on: key only, password login off, then `ssh root@homeminer.local`. If SSH was already on outside the dashboard, its configuration is left alone and you can only add keys.
+**🌐 Network tab** (⚙️ Settings, PIN): **Wi-Fi** — find networks and connect, then unplug the cable (needs a Wi-Fi adapter; on the Orange Pi and Odroid images NetworkManager handles only the Wi-Fi and the cable keeps its own setup); **Tailscale** — one tap to open the dashboard from outside home without opening router ports: tap *Connect to Tailscale*, open the authorization link, sign in to your (free) Tailscale account, approve the device. Then, on a phone with the Tailscale app on, open `http://homeminer:3000`. It ships installed and off; *Disconnect* logs out and turns it off again. **SSH** — paste your public key (`~/.ssh/id_ed25519.pub`) and turn it on: key only, password login off, then `ssh root@homeminer.local`. If SSH was already on outside the dashboard, its configuration is left alone and you can only add keys.
 
 The boards have no clock battery, so they boot with the wrong time until it syncs from the internet; the dashboard shows "Setting the clock…" and waits for it (up to 10 minutes) before recording anything, so history and records keep the right dates.
 
@@ -129,7 +129,8 @@ The dashboard is at `http://SERVER-IP:3000` and the proxy ports are the same as 
 - **GeekMagic cube:** set `CUBE_IP` and run `docker compose --profile cubo up -d`.
 - **Settings screen:** set `SETTINGS_PIN` in `mineracao.env` to be able to save it.
 - **Arduino siren:** uncomment the `devices` lines of the `painel` service in `compose.yaml`.
-- **cpuminer on the same machine (`LOCAL_WORKER`):** not available inside the container, because it reads the host's systemd journal. The worker still shows up through the proxy.
+- **Mine with the same computer:** `docker compose --profile minerador up -d` adds a cpuminer container pointed at the proxy. It shows on the dashboard as `LOCAL_WORKER` (default `docker`); set the cores with `MINER_THREADS` (default: all but one). Its hashrate comes from the shares, like any other miner.
+- **🌐 Network tab:** Wi-Fi, SSH and Tailscale belong to the host, so in Docker the tab explains how to set them up there (Tailscale on the host gives you `http://HOST-NAME:3000` from outside home).
 
 ## Which pool for which miner?
 
