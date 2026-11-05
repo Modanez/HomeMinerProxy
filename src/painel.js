@@ -24,8 +24,13 @@ const CURRENCY = /^(BRL|USD)$/i.test(process.env.CURRENCY || '') ? process.env.C
 function normLang(v) { v = String(v || '').toLowerCase(); return v.startsWith('pt') ? 'pt' : v.startsWith('en') ? 'en' : ''; }
 const ADDRESS = (process.env.BTC_ADDRESS || '').trim();
 if (!ADDRESS && require.main === module) {
-  console.error('Set BTC_ADDRESS (the address your miners use as username) / Defina BTC_ADDRESS. See config/mineracao.env.example.');
-  process.exit(1);
+  // Sem endereço: assistente de primeira configuração no navegador (SETUP_WIZARD=0 volta ao erro antigo)
+  if (process.env.SETUP_WIZARD === '0') {
+    console.error('Set BTC_ADDRESS (the address your miners use as username) / Defina BTC_ADDRESS. See config/mineracao.env.example.');
+    process.exit(1);
+  }
+  require('./setup').serve({ port: PORT, dataDir: process.env.DATA_DIR || __dirname, lang: LANGUAGE || 'en', onDone: () => process.exit(0) });
+  return;   // o resto do painel só sobe depois da configuração (o systemd ou o Docker reiniciam)
 }
 let LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpuminer local (serviço minerd), se houver
 const ROTATE_S = Number(process.env.ROTATE_S || 20);

@@ -91,13 +91,13 @@ cd HomeMinerProxy
 sudo bash install.sh
 ```
 
-On first run the installer asks for your miners' bitcoin address and creates `/etc/mineracao.env`. Every option is documented in `config/mineracao.env.example`. After editing:
+On first run the installer asks for your miners' bitcoin address and creates `/etc/mineracao.env`. Press Enter to skip it: the dashboard then opens a **first-setup wizard in the browser** (`http://SERVER-NAME.local:3000` or the server IP) that asks for the language, the bitcoin address, an admin PIN of your choice and the power price, saves everything and restarts by itself. Every option is documented in `config/mineracao.env.example`. After editing:
 
 ```bash
 sudo systemctl restart mineracao-proxy mineracao-painel
 ```
 
-To update, run `git pull && sudo bash install.sh` again. Your configuration and data (records, history) are kept.
+To update, use the **⬆ Update now** button on ⚙️ Settings → 💾 Backup (it shows the installed and the latest version, and asks for the PIN), or run `git pull && sudo bash install.sh` again. Your configuration and data (records, history) are kept.
 
 ### With Docker
 

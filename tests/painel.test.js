@@ -16,8 +16,8 @@ const get = (url) => new Promise((res, rej) => http.get(url, (r) => { let b = ''
 const post = (url, body) => new Promise((res, rej) => { const d = JSON.stringify(body); const u = new URL(url); const req = http.request({ hostname: u.hostname, port: u.port, path: u.pathname, method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(d) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => res({ status: r.statusCode, body: JSON.parse(b || '{}') })); }); req.on('error', rej); req.write(d); req.end(); });
 const waitFor = async (fn, ms = 8000) => { const end = Date.now() + ms; for (;;) { try { const v = await fn(); if (v) return v; } catch (_) { /* tenta de novo */ } if (Date.now() > end) throw new Error('tempo esgotado'); await new Promise((r) => setTimeout(r, 100)); } };
 
-test('sem BTC_ADDRESS o painel não sobe', () => {
-  const env = { ...process.env }; delete env.BTC_ADDRESS;
+test('sem BTC_ADDRESS e com SETUP_WIZARD=0 o painel não sobe', () => {
+  const env = { ...process.env, SETUP_WIZARD: '0' }; delete env.BTC_ADDRESS;
   const r = spawnSync(process.execPath, ['-r', OFFLINE, PAINEL], { env, encoding: 'utf8', timeout: 10000 });
   assert.strictEqual(r.status, 1);
   assert.match(r.stderr, /BTC_ADDRESS/);
