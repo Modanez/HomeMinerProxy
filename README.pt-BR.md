@@ -81,6 +81,20 @@ O painel, o cubo, o widget e o instalador funcionam em **português (pt-BR)** e 
 - **`CURRENCY=BRL`** ou **`CURRENCY=USD`** define a moeda dos valores (cotação, prêmio, conta de luz). O padrão é BRL em pt-BR e USD nos outros casos.
 - **`POWER_PRICE_KWH=0.90`** define o preço do kWh da sua conta de luz, nessa moeda. O padrão é R$ 0,90 ou US$ 0,15. Junto com o `WATTS` de cada worker, ele calcula a estimativa da conta de luz.
 
+## Cartão SD pronto para gravar (o jeito mais fácil)
+
+Sem terminal. Cada release traz imagens para **Raspberry Pi 3/4/5**, **Orange Pi Zero 3** e **Odroid-C2**:
+
+1. Baixe o `homeminer-<placa>.img.xz` da [release mais recente](https://github.com/Modanez/HomeMinerProxy/releases/latest).
+2. Grave num cartão SD (8 GB ou mais; cartão "High Endurance" dura mais) com o [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ("Use custom") ou o [balenaEtcher](https://etcher.balena.io/).
+3. Coloque o cartão na placa, **ligue o cabo de rede** e ligue a energia. O primeiro boot leva alguns minutos (ele expande o cartão).
+4. No celular ou no computador, abra **http://homeminer.local:3000**. Se o nome não abrir, use o IP que o roteador mostra para "homeminer". O assistente de primeira configuração pergunta o idioma, o seu endereço de bitcoin, um PIN de administração, **se a placa também vai minerar** (as imagens vêm com o cpuminer; escolha os núcleos e o nome do worker) e o preço da energia. Dá para ligar ou desligar a mineração depois em ⚙️ Configurações → Mineradores.
+5. Aponte os mineradores para `homeminer.local` (ou o IP), nas portas que aparecem no fim do assistente. Reserve um IP fixo para a placa no roteador.
+
+**Aba 🌐 Rede** (⚙️ Configurações, com PIN): **Wi-Fi** — procure as redes e conecte, depois tire o cabo (precisa de um adaptador Wi-Fi e do NetworkManager, que a imagem do Raspberry Pi tem); **Tailscale** — um toque para abrir o painel de fora de casa sem abrir portas no roteador: toque em *Conectar ao Tailscale*, abra o link de autorização, entre na sua conta do Tailscale (grátis) e aprove o aparelho. Depois, no celular com o app do Tailscale ligado, abra `http://homeminer:3000`. Vem instalado e desligado; *Desconectar* sai da conta e desliga de novo. **SSH** — cole a sua chave pública (`~/.ssh/id_ed25519.pub`) e ligue: só com chave, login por senha desligado, depois `ssh root@homeminer.local`. Se o SSH já estava ligado por fora do painel, a configuração dele não é mexida e dá só para acrescentar chaves.
+
+As atualizações saem em ⚙️ Configurações → 💾 Backup → **Atualizar agora**. Por segurança, o SSH vem desligado nas imagens; ligue em 🌐 Rede com a sua chave (ou, no Orange Pi e no Odroid: monitor e teclado, login `root`, senha `1234`, escolha uma nova e rode `systemctl enable --now ssh`). Na imagem do Raspberry Pi o SSH vem desligado como de costume; dá para ligar nas configurações do Raspberry Pi Imager na hora de gravar.
+
 ## Instalação
 
 Precisa de Linux com systemd e Node.js 16 ou mais novo.

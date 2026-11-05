@@ -60,27 +60,41 @@ function canUpdate(info, env = process.env) {
   return { ok: true };
 }
 
+// Resultado da última atualização pelo botão: update.json (código de saída) e o fim do update.log
+function lastUpdate(appDir) {
+  try {
+    const j = JSON.parse(fs.readFileSync(path.join(appDir, 'update.json'), 'utf8'));
+    let tail = [];
+    try { tail = fs.readFileSync(path.join(appDir, 'update.log'), 'utf8').replace(/\x1b\[[0-9;]*m/g, '').trim().split('\n').slice(-15); } catch (_) { /* sem registro */ }
+    return { rc: Number(j.rc), at: j.at || null, ok: Number(j.rc) === 0, tail };
+  } catch (_) { return null; }
+}
+
 async function status(appDir) {
   const info = versionInfo(appDir);
   const latest = await latestRelease();
   const can = canUpdate(info);
-  return { ...info, latest, updateAvailable: !!(latest && info.version && newer(latest, info.version)), canUpdate: can.ok, reason: can.reason || null };
+  return { ...info, latest, updateAvailable: !!(latest && info.version && newer(latest, info.version)), canUpdate: can.ok, reason: can.reason || null, lastUpdate: lastUpdate(appDir) };
 }
 
 function runUpdate(appDir, env = process.env) {
   const info = versionInfo(appDir);
   const can = canUpdate(info, env);
   if (!can.ok) return { ok: false, error: can.reason };
+  // grava o registro e o código de saída, para a tela mostrar se deu certo ou o motivo da falha
+  try { fs.rmSync(path.join(appDir, 'update.json'), { force: true }); } catch (_) { /* segue */ }
+  const work = env.UPDATE_CMD ? env.UPDATE_CMD : 'cd "$0" && git pull --ff-only && bash install.sh';
+  const wrapped = '( echo "== $(date -u +%Y-%m-%dT%H:%M:%SZ)"; ' + work + ' ) > "$1/update.log" 2>&1; rc=$?; printf \'{"rc":%s,"at":"%s"}\\n\' "$rc" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$1/update.json"';
   let child;
   if (env.UPDATE_CMD) {
-    child = spawn('/bin/sh', ['-c', env.UPDATE_CMD], { detached: true, stdio: 'ignore' });   // testes / instalações próprias
+    child = spawn('/bin/sh', ['-c', wrapped, info.repo || '/', appDir], { detached: true, stdio: 'ignore' });   // testes / instalações próprias
   } else {
     const unit = 'homeminer-update-' + Date.now().toString(36);
-    child = spawn('systemd-run', ['--unit', unit, '--collect', '--setenv=HOMEMINER_UNATTENDED=1', '/bin/bash', '-c', 'cd "$0" && git pull --ff-only && bash install.sh', info.repo], { detached: true, stdio: 'ignore' });
+    child = spawn('systemd-run', ['--unit', unit, '--collect', '--setenv=HOMEMINER_UNATTENDED=1', '/bin/bash', '-c', wrapped, info.repo, appDir], { detached: true, stdio: 'ignore' });
   }
   child.on('error', () => {});
   child.unref();
   return { ok: true };
 }
 
-module.exports = { versionInfo, newer, latestRelease, canUpdate, status, runUpdate };
+module.exports = { lastUpdate, versionInfo, newer, latestRelease, canUpdate, status, runUpdate };

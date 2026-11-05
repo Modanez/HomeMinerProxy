@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -97,11 +97,39 @@ if command -v python3 >/dev/null; then
   services="$services mineracao-cubo"
 fi
 
-systemctl daemon-reload
-systemctl enable $services >/dev/null
-systemctl restart $services
-sleep 3
-systemctl --no-pager --lines=0 status $services || true
+# Minerador local opcional: com o cpuminer instalado (imagens prontas), cria o serviço desligado.
+# Quem liga e desliga é o painel, pela opção "Minerar também com este servidor".
+MINERD_BIN=$(command -v minerd || true)
+[ -n "$MINERD_BIN" ] || { [ -x /usr/local/bin/minerd ] && MINERD_BIN=/usr/local/bin/minerd; } || true
+if [ -n "$MINERD_BIN" ]; then
+  cat > /etc/systemd/system/mineracao-minerador.service <<UNIT
+[Unit]
+Description=Mining farm local cpuminer (optional, managed by the dashboard)
+After=network-online.target mineracao-proxy.service
+Wants=network-online.target
+
+[Service]
+EnvironmentFile=$APP_DIR/minerador.env
+ExecStart=$MINERD_BIN -a sha256d -o stratum+tcp://127.0.0.1:\${MINER_PORT} -u \${MINER_USER} -p x -t \${MINER_THREADS}
+Nice=19
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+fi
+
+if [ -n "${HOMEMINER_IMAGE:-}" ]; then
+  # montando a imagem do cartão (chroot, sem systemd rodando): só deixa os serviços ativados para o primeiro boot
+  systemctl enable $services >/dev/null
+else
+  systemctl daemon-reload
+  systemctl enable $services >/dev/null
+  systemctl restart $services
+  sleep 3
+  systemctl --no-pager --lines=0 status $services || true
+fi
 
 ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 port=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || true)

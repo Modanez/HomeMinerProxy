@@ -81,6 +81,20 @@ The dashboard, cube, widget and installer work in **English** and **Brazilian Po
 - **`CURRENCY=USD`** or **`CURRENCY=BRL`** sets the currency for money values (BTC price, prize, power bill). The default is BRL for pt-BR and USD otherwise.
 - **`POWER_PRICE_KWH=0.15`** sets your electricity price per kWh, in that currency (default 0.15 USD or 0.90 BRL). Together with `WATTS` per worker, it drives the power bill estimate.
 
+## Ready-to-flash SD card (easiest)
+
+No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange Pi Zero 3** and **Odroid-C2**:
+
+1. Download `homeminer-<board>.img.xz` from the [latest release](https://github.com/Modanez/HomeMinerProxy/releases/latest).
+2. Flash it to an SD card (8 GB or more; a "High Endurance" card lasts longer) with [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ("Use custom") or [balenaEtcher](https://etcher.balena.io/).
+3. Put the card in the board, **plug in the network cable** and power it on. The first boot takes a few minutes (it expands the card).
+4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN, **whether the board should also mine** (the images ship cpuminer; pick the number of cores and the worker name) and the power price. Mining can be turned on or off later in ⚙️ Settings → Miners.
+5. Point your miners to `homeminer.local` (or the IP), ports as shown at the end of the wizard. Give the board a fixed IP in your router.
+
+**🌐 Network tab** (⚙️ Settings, PIN): **Wi-Fi** — find networks and connect, then unplug the cable (needs a Wi-Fi adapter and NetworkManager, which the Raspberry Pi image has); **Tailscale** — one tap to open the dashboard from outside home without opening router ports: tap *Connect to Tailscale*, open the authorization link, sign in to your (free) Tailscale account, approve the device. Then, on a phone with the Tailscale app on, open `http://homeminer:3000`. It ships installed and off; *Disconnect* logs out and turns it off again. **SSH** — paste your public key (`~/.ssh/id_ed25519.pub`) and turn it on: key only, password login off, then `ssh root@homeminer.local`. If SSH was already on outside the dashboard, its configuration is left alone and you can only add keys.
+
+Updates come from ⚙️ Settings → 💾 Backup → **Update now**. For security, SSH is off on the images; turn it on in 🌐 Network with your key (or, on the Orange Pi and Odroid: monitor and keyboard, log in as `root`, password `1234`, choose a new one, then `systemctl enable --now ssh`). On the Raspberry Pi image SSH is off as usual; you can turn it on in Raspberry Pi Imager's settings when flashing.
+
 ## Install
 
 Requires Linux with systemd and Node.js 16 or newer.
