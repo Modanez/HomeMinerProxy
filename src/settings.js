@@ -80,8 +80,20 @@ function effective(f, raw) {
 }
 const rawOf = (f, env) => env[f.key] ?? (f.alias ? env[f.alias] : undefined);
 
+// PIN criado pelo assistente de primeira configuração (fica fora do settings.json e do backup)
+const pinFileOf = (dataDir) => path.join(dataDir, 'pin.json');
+function savePin(dataDir, pin) {
+  const p = pinFileOf(dataDir), tmp = p + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify({ pin: String(pin) }), { mode: 0o600 });
+  fs.renameSync(tmp, p);
+}
+function loadPin(dataDir) {
+  try { const j = JSON.parse(fs.readFileSync(pinFileOf(dataDir), 'utf8')); return j && /^\d{6,12}$/.test(String(j.pin)) ? String(j.pin) : ''; } catch (_) { return ''; }
+}
+
 // Chamado antes de o painel ler as variáveis: aplica os valores salvos na tela por cima do .env.
 function applyOverlay(dataDir, env = process.env) {
+  if (!String(env.SETTINGS_PIN || '').trim()) { const p = loadPin(dataDir); if (p) env.SETTINGS_PIN = p; }   // o do .env tem prioridade
   ORIGINAL = Object.fromEntries(FIELDS.map((f) => [f.key, rawOf(f, env)]));
   const ov = readOverlay(dataDir);
   for (const [k, v] of Object.entries(ov)) env[k] = v;
@@ -492,6 +504,9 @@ const T = {
     plugTypes: { tuya: 'SmartLife / Tuya (nuvem)', sonoff: 'Sonoff (rede local)' },
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
+    verTitle: 'Versão e atualização', verInstalled: 'Instalada', verLatest: 'Mais recente no GitHub', verNew: 'nova versão disponível!', verOk: 'você está na versão mais recente',
+    updBtn: '⬆ Atualizar agora', updRunning: 'Atualizando: baixando a versão nova e reinstalando. O painel reinicia sozinho em 1 ou 2 minutos…', updDone: 'Atualizado!', updSlow: 'A atualização está demorando. Recarregue a página em alguns minutos.',
+    updWhy: { docker: 'No Docker, atualize com: docker compose pull && docker compose up -d', norepo: 'A atualização pelo botão precisa da pasta do repositório (instalação pelo install.sh).', nosystemd: 'A atualização pelo botão precisa do serviço do systemd (instalação pelo install.sh).' },
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
     backupOk: 'Backup baixado.', restored: 'Backup restaurado! Reiniciando o painel…',
     pin: 'PIN', pinHelp: 'O SETTINGS_PIN que está em /etc/mineracao.env (o instalador cria e mostra no final).',
@@ -546,6 +561,9 @@ const T = {
     plugTypes: { tuya: 'SmartLife / Tuya (cloud)', sonoff: 'Sonoff (local network)' },
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
+    verTitle: 'Version and update', verInstalled: 'Installed', verLatest: 'Latest on GitHub', verNew: 'a new version is available!', verOk: 'you are on the latest version',
+    updBtn: '⬆ Update now', updRunning: 'Updating: downloading the new version and reinstalling. The dashboard restarts by itself in 1 or 2 minutes…', updDone: 'Updated!', updSlow: 'The update is taking a while. Reload the page in a few minutes.',
+    updWhy: { docker: 'With Docker, update with: docker compose pull && docker compose up -d', norepo: 'Updating from here needs the repository folder (install.sh install).', nosystemd: 'Updating from here needs the systemd service (install.sh install).' },
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
     backupOk: 'Backup downloaded.', restored: 'Backup restored! Restarting the dashboard…',
     pin: 'PIN', pinHelp: 'The SETTINGS_PIN in /etc/mineracao.env (the installer creates it and shows it at the end).',
@@ -624,7 +642,9 @@ function page(lang, hasPin, theme) {
   const backupGroup = `<fieldset class="tab-pane" data-pane="backup"><legend>${S.groups.backup}</legend><div class="f"><div class="hint">${htmlEsc(S.backupHelp)}</div>` +
     `<div class="bbar"><button type="button" class="ghost" data-backup="export">${htmlEsc(S.backupDown)}</button>` +
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
-    `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div></fieldset>`;
+    `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div>` +
+    `<div class="f"><label>${htmlEsc(S.verTitle)}</label><div class="hint" id="ver_info">…</div>` +
+    `<div class="bbar"><button type="button" class="ghost" id="update_btn" hidden>${htmlEsc(S.updBtn)}</button></div><div class="hint" id="ver_why"></div></div></fieldset>`;
   const msgs = {
     saved: S.saved, back2: S.back2, nothing: S.nothing, cubeOk: S.cubeOk, cubeFail: S.cubeFail,
     tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'),
@@ -632,6 +652,7 @@ function page(lang, hasPin, theme) {
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
+    verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSlow: S.updSlow, updWhy: S.updWhy,
   };
   return `<!doctype html>
 <html lang="${lang === 'pt' ? 'pt-br' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1112,6 +1133,37 @@ function showErrors(errs) {
   }
   if (firstErrPane) selectTab(firstErrPane);
 }
+// Versão instalada e botão de atualizar
+const updBtn = document.getElementById('update_btn');
+let verNow = null;
+fetch('/api/config/version').then((r) => r.json()).then((v) => {
+  verNow = v;
+  const box = document.getElementById('ver_info');
+  if (!v || !v.version) { box.textContent = '–'; return; }
+  let t = M.verInstalled + ': v' + v.version + (v.commit ? ' (' + v.commit + ')' : '');
+  if (v.latest) t += ' · ' + M.verLatest + ': v' + v.latest + ' · ' + (v.updateAvailable ? M.verNew : M.verOk);
+  box.textContent = t;
+  if (v.canUpdate) updBtn.hidden = false;
+  else if (v.reason) document.getElementById('ver_why').textContent = M.updWhy[v.reason] || '';
+}).catch(() => {});
+if (updBtn) updBtn.addEventListener('click', async () => {
+  updBtn.disabled = true;
+  try {
+    const r = await post('/api/config/update', { pin: pin() });
+    if (r.error) { say(M.err[r.error] || M.updWhy[r.error] || r.error, false); return; }
+    say(M.updRunning, true);
+    // espera o painel voltar com outro commit/versão (ou outro boot), até ~5 minutos
+    const before = verNow ? (verNow.commit || '') + verNow.version : '';
+    for (let i = 0; i < 100; i++) {
+      await new Promise((res) => setTimeout(res, 3000));
+      try {
+        const v = await fetch('/api/config/version', { cache: 'no-store' }).then((x) => x.json());
+        if (v && v.version && (v.commit || '') + v.version !== before) { say(M.updDone + ' v' + v.version, true); setTimeout(() => { location.reload(); }, 1500); return; }
+      } catch (_) { /* reiniciando */ }
+    }
+    say(M.updSlow, false);
+  } finally { updBtn.disabled = false; }
+});
 async function waitRestartAndGo(message) {
   say(message, true);
   await new Promise((res) => setTimeout(res, 2500));
@@ -1205,6 +1257,13 @@ function handle(req, res, ctx) {
     json(200, { values: current(), workers: ctx.workers(), pin: !!pinEnv });
     return true;
   }
+  if (url === '/api/config/version' && req.method === 'GET') {
+    require('./update').status(ctx.appDir || __dirname).then((st) => {
+      const { repo, ...pub } = st;   // a pasta do repositório não precisa sair do servidor
+      json(200, pub);
+    }).catch(() => json(200, { version: null }));
+    return true;
+  }
   if (req.method !== 'POST' || !/^application\/json/.test(req.headers['content-type'] || '')) { json(405, { error: 'option' }); return true; }
   const maxBody = url === '/api/config/restore' ? 512000 : 50000;
   let body = '', tooLarge = false;
@@ -1219,6 +1278,10 @@ function handle(req, res, ctx) {
     const pin = checkPin(j.pin, pinEnv);
     if (pin !== 'ok') return json(pin === 'wrong' ? 403 : pin === 'locked' ? 429 : 409, { error: pin });
     const form = j.values && typeof j.values === 'object' ? j.values : {};
+    if (url === '/api/config/update') {
+      const r = require('./update').runUpdate(ctx.appDir || __dirname);
+      return json(r.ok ? 200 : 409, r.ok ? { ok: true, restart: true } : { error: r.error });
+    }
     const S = T[ctx.lang] || T.en;
     if (url === '/api/config/test') {
       if (j.what === 'cube') return json(200, { ok: await testCube(String(form.CUBE_IP || '').trim()) });
@@ -1278,4 +1341,4 @@ function handle(req, res, ctx) {
   return true;
 }
 
-module.exports = { THEMES, normTheme, FIELDS, BACKUP_FILES, applyOverlay, readOverlay, parseHr, clean, current, merge, save, exportBackup, restoreBackup, checkPin, resetPinFails, testCube, testTelegram, page, handle };
+module.exports = { savePin, loadPin, THEMES, normTheme, FIELDS, BACKUP_FILES, applyOverlay, readOverlay, parseHr, clean, current, merge, save, exportBackup, restoreBackup, checkPin, resetPinFails, testCube, testTelegram, page, handle };

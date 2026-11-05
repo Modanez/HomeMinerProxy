@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -32,22 +32,35 @@ if [ ! -f "$ENV_FILE" ]; then
   m "   criada a partir de config/mineracao.env.example" "   created from config/mineracao.env.example"
 fi
 current=$(grep -E '^BTC_ADDRESS=' "$ENV_FILE" | cut -d= -f2- || true)
-if [ -z "$current" ]; then
+# Endereço já salvo pela tela (assistente de primeira configuração ou /config)?
+saved_addr=$(grep -o '"BTC_ADDRESS": *"[A-Za-z0-9]*"' "$APP_DIR/settings.json" 2>/dev/null || true)
+wizard=0
+if [ -z "$current" ] && [ -z "$saved_addr" ]; then
   addr=${BTC_ADDRESS:-}
-  if [ -z "$addr" ] && [ -t 0 ]; then read -r -p "$(m '   Endereço de bitcoin dos mineradores (bc1...): ' '   Bitcoin address used by the miners (bc1...): ')" addr; fi
-  [ -n "$addr" ] || { m "   Defina BTC_ADDRESS em $ENV_FILE e rode de novo." "   Set BTC_ADDRESS in $ENV_FILE and run again."; exit 1; }
-  case "$addr" in *[!A-Za-z0-9]*) m "   Endereço com caracteres inválidos: $addr" "   Address has invalid characters: $addr"; exit 1;; esac
-  sed -i "s|^BTC_ADDRESS=.*|BTC_ADDRESS=$addr|" "$ENV_FILE"
+  if [ -z "$addr" ] && [ -t 0 ] && [ -z "${HOMEMINER_UNATTENDED:-}" ]; then read -r -p "$(m '   Endereço de bitcoin dos mineradores (bc1..., Enter para configurar pelo navegador): ' '   Bitcoin address used by the miners (bc1..., Enter to set it up in the browser): ')" addr; fi
+  if [ -n "$addr" ]; then
+    case "$addr" in *[!A-Za-z0-9]*) m "   Endereço com caracteres inválidos: $addr" "   Address has invalid characters: $addr"; exit 1;; esac
+    sed -i "s|^BTC_ADDRESS=.*|BTC_ADDRESS=$addr|" "$ENV_FILE"
+  else
+    wizard=1   # o painel abre o assistente no navegador e pergunta lá
+    m "   Sem endereço por enquanto: o painel vai abrir o assistente de primeira configuração no navegador." "   No address yet: the dashboard will open the first-setup wizard in the browser."
+  fi
 fi
 
-# PIN da tela de configurações do painel (criado uma vez; fica no .env)
-if ! grep -qE '^SETTINGS_PIN=.+' "$ENV_FILE"; then
+# PIN da tela de configurações do painel (criado uma vez; fica no .env).
+# Não cria quando o assistente vai pedir um PIN (imagem pronta) ou quando ele já criou (pin.json).
+if [ "$wizard" = 0 ] && [ -z "${HOMEMINER_IMAGE:-}" ] && [ ! -f "$APP_DIR/pin.json" ] && ! grep -qE '^SETTINGS_PIN=.+' "$ENV_FILE"; then
   pin=$(printf '%06d' $(( $(od -An -N4 -tu4 /dev/urandom | tr -d ' ') % 1000000 )))
   sed -i '/^#\?SETTINGS_PIN=/d' "$ENV_FILE"
   printf '\n# PIN to save the dashboard Settings screen (http://SERVER-IP:3000/config)\nSETTINGS_PIN=%s\n' "$pin" >> "$ENV_FILE"
   m "   PIN da tela de configurações criado" "   Settings screen PIN created"
 fi
-settings_pin=$(grep -E '^SETTINGS_PIN=' "$ENV_FILE" | cut -d= -f2-)
+settings_pin=$(grep -E '^SETTINGS_PIN=' "$ENV_FILE" | cut -d= -f2- || true)
+
+# Versão instalada (para a tela de configurações e o botão "Atualizar")
+ver=$("$NODE_BIN" -p "require('$HERE/package.json').version" 2>/dev/null || true)
+commit=$(git -C "$HERE" rev-parse --short HEAD 2>/dev/null || true)
+printf '{"version":"%s","commit":"%s","repo":"%s","installedAt":"%s"}\n' "$ver" "$commit" "$HERE" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$APP_DIR/version.json"
 
 unit() {   # unit <name> <description> <command> [After=...]
   cat > "/etc/systemd/system/$1.service" <<UNIT
@@ -95,6 +108,12 @@ port=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || true)
 echo
 m "Pronto." "Done."
 m "  Painel:  http://${ip:-IP-DO-SERVIDOR}:${port:-3000}" "  Dashboard:  http://${ip:-SERVER-IP}:${port:-3000}"
-m "  Configurações: http://${ip:-IP-DO-SERVIDOR}:${port:-3000}/config  ·  PIN: $settings_pin" "  Settings: http://${ip:-SERVER-IP}:${port:-3000}/config  ·  PIN: $settings_pin"
+if [ "$wizard" = 1 ]; then
+  m "  Primeira configuração: abra http://$(hostname).local:${port:-3000} ou http://${ip:-IP-DO-SERVIDOR}:${port:-3000} no navegador" "  First setup: open http://$(hostname).local:${port:-3000} or http://${ip:-SERVER-IP}:${port:-3000} in your browser"
+elif [ -n "$settings_pin" ]; then
+  m "  Configurações: http://${ip:-IP-DO-SERVIDOR}:${port:-3000}/config  ·  PIN: $settings_pin" "  Settings: http://${ip:-SERVER-IP}:${port:-3000}/config  ·  PIN: $settings_pin"
+else
+  m "  Configurações: http://${ip:-IP-DO-SERVIDOR}:${port:-3000}/config (PIN criado no assistente)" "  Settings: http://${ip:-SERVER-IP}:${port:-3000}/config (PIN set in the wizard)"
+fi
 m "  Aponte os mineradores para ${ip:-IP-DO-SERVIDOR}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU" \
   "  Point your miners to ${ip:-SERVER-IP}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU"
