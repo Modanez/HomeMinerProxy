@@ -20,3 +20,9 @@ coverage/
 *.env
 !config/*.env.example
 .DS_Store
+
+# resultado do botão de atualizar (gerado pelos testes ao rodar do repositório)
+src/update.json
+src/update.log
+src/version.json
+src/minerador.env
