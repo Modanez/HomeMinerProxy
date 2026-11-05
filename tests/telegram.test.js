@@ -193,6 +193,7 @@ function fakeTelegram(opts = {}) {
       }
       if (method === 'getMe') return reply({ username: 'FazendaBot' });
       if (method === 'sendMessage') { sent.push(body); return reply({ message_id: sent.length }); }
+      if (method === 'sendDocument') { sent.push({ document: true, raw: body.raw }); return reply({ message_id: sent.length }); }
       if (method === 'sendPhoto') { sent.push({ photo: true, raw: body.raw }); return reply({ message_id: sent.length }); }
       if (method === 'getUpdates') {
         const ups = queue.splice(0).filter((u) => u.update_id >= (body.offset || 0));
@@ -215,7 +216,7 @@ test('bot responde só ao chat configurado e manda os avisos', async (t) => {
 
   await waitFor(() => api.calls.some((c) => c.method === 'setMyCommands'));
   const cmds = api.calls.find((c) => c.method === 'setMyCommands').body.commands.map((c) => c.command);
-  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'tomada', 'bilhete', 'ajuda']);
+  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'tomada', 'bilhete', 'backup', 'ajuda']);
 
   api.push(999, '/status');   // estranho: ignorado
   api.push(42, '/status');
@@ -547,4 +548,51 @@ test('/tomada: nome errado não cai em outra tomada, e o erro da tomada do servi
   await waitFor(() => api.sent.length >= 3);
   assert.match(api.sent[2].text, /Tomada <b>desligada<\/b>/);
   assert.deepStrictEqual(calls.at(-1), [false, 'sonoff_devkit']);
+});
+
+test('/backup manda o arquivo; o backup semanal sai no domingo, uma vez, só com a opção ligada', async (t) => {
+  const api = await fakeTelegram();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tg-bk-'));
+  let made = 0;
+  const backup = () => { made++; return { name: 'homeminer-backup-2026-11-08.json', json: JSON.stringify({ app: 'home-miner-proxy', version: 1, data: { settings: { LANGUAGE: 'pt-BR' } } }) }; };
+  let clock = new Date(2026, 10, 7, 21, 5);   // sábado 21:05
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'pt', snapshot: () => snap(), api: api.url, pollS: 0, warmupMs: 1e9,
+    stateFile: path.join(dir, 'telegram.json'), dailyHour: null, backupWeekly: true, backup, now: () => clock, log: () => {} });
+  t.after(() => { bot.stop(); api.server.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+
+  api.push(999, '/backup');   // estranho: nada
+  api.push(42, '/backup');
+  await waitFor(() => api.sent.some((m) => m.document));
+  await new Promise((r) => setTimeout(r, 200));
+  const docs = () => api.sent.filter((m) => m.document);
+  assert.strictEqual(docs().length, 1);
+  assert.match(docs()[0].raw, /name="document"; filename="homeminer-backup-2026-11-08.json"/);
+  assert.match(docs()[0].raw, /"app":"home-miner-proxy"/);
+  assert.match(docs()[0].raw, /não encaminhe/);
+  assert.match(docs()[0].raw, /name="chat_id"\r\n\r\n42\r\n/);
+
+  bot.tick();                                   // sábado: nada
+  clock = new Date(2026, 10, 8, 20, 59); bot.tick();   // domingo, antes das 21 h: nada
+  clock = new Date(2026, 10, 8, 21, 0); bot.tick();    // domingo 21 h (sem resumo diário, vale 21 h): manda
+  clock = new Date(2026, 10, 8, 21, 30); bot.tick();   // mesmo dia: não repete
+  await waitFor(() => docs().length >= 2);
+  await new Promise((r) => setTimeout(r, 200));
+  assert.strictEqual(docs().length, 2);
+  assert.match(docs()[1].raw, /Backup semanal/);
+  assert.match(docs()[1].raw, /name="disable_notification"\r\n\r\ntrue/);
+  assert.strictEqual(JSON.parse(fs.readFileSync(path.join(dir, 'telegram.json'), 'utf8')).lastBackup, '2026-11-08');
+  assert.strictEqual(made, 2);
+});
+
+test('sem a opção, domingo não manda backup (o /backup continua valendo)', async (t) => {
+  const api = await fakeTelegram();
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'en', snapshot: () => snap(), api: api.url, pollS: 0, warmupMs: 1e9,
+    dailyHour: 21, backup: () => ({ name: 'b.json', json: '{}' }), now: () => new Date(2026, 10, 8, 21, 0), log: () => {} });
+  t.after(() => { bot.stop(); api.server.close(); });
+  bot.tick();
+  await new Promise((r) => setTimeout(r, 300));
+  assert.ok(!api.sent.some((m) => m.document));
+  api.push(42, '/backup');
+  await waitFor(() => api.sent.some((m) => m.document));
+  assert.match(api.sent.find((m) => m.document).raw, /do not forward/);
 });

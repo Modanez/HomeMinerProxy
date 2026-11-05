@@ -60,12 +60,14 @@ const STRINGS = {
     plugErr: (e) => `⚠️ Falha ao falar com a tomada: ${e}`,
     plugNotFound: (q, list) => `Não achei a tomada "${q}". Tomadas: ${list}`,
     plugErrs: { selfplug: 'essa tomada alimenta o próprio servidor do painel (LOCAL_WORKER). Desligar daqui apagaria o painel sem como religar; use o app da tomada.', sonoffoffline: 'o Sonoff não respondeu. Confira o IP e se o modo LAN/DIY está ligado.', sonofflan: 'o Sonoff recusou o comando: o modo LAN/DIY está desligado.', sonoffid: 'o Sonoff não reconheceu o Device ID informado.', sonoffformat: 'resposta inesperada do Sonoff.', tuyamissing: 'faltam as credenciais da Tuya Cloud em /config.', tuyaoffline: 'a tomada está offline na nuvem Tuya (sem Wi-Fi ou sem energia). Confira o app SmartLife.' },
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle das tomadas (SmartLife ou Sonoff)\n/bilhete · bilhete de loteria de hoje\n/ajuda · esta lista',
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle das tomadas (SmartLife ou Sonoff)\n/bilhete · bilhete de loteria de hoje\n/backup · arquivo de backup da configuração\n/ajuda · esta lista',
+    backupCaption: (auto) => `💾 ${auto ? 'Backup semanal' : 'Backup'} da fazenda (configuração, recordes e histórico). Para restaurar: ⚙️ Configurações → 💾 Backup → Restaurar.\n⚠️ Ele tem as chaves e senhas salvas (Tuya, MQTT, este bot): não encaminhe para ninguém.`,
+    backupFail: (e) => `⚠️ Não consegui mandar o backup: ${e}`,
     ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
     noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Ligar, desligar e reiniciar tomadas'], ['bilhete', 'Bilhete de loteria de hoje'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Ligar, desligar e reiniciar tomadas'], ['bilhete', 'Bilhete de loteria de hoje'], ['backup', 'Arquivo de backup da configuração'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -117,17 +119,19 @@ const STRINGS = {
     plugErr: (e) => `⚠️ Smart plug error: ${e}`,
     plugNotFound: (q, list) => `No smart plug named "${q}". Plugs: ${list}`,
     plugErrs: { selfplug: 'this plug powers the dashboard server itself (LOCAL_WORKER). Turning it off from here would take the dashboard down with no way to turn it back on; use the plug\'s app.', sonoffoffline: 'the Sonoff did not answer. Check the IP and that LAN/DIY mode is on.', sonofflan: 'the Sonoff refused the command: LAN/DIY mode is off.', sonoffid: 'the Sonoff did not recognize the Device ID.', sonoffformat: 'unexpected answer from the Sonoff.', tuyamissing: 'Tuya Cloud credentials are missing in /config.', tuyaoffline: 'the plug is offline in the Tuya cloud (no Wi-Fi or no power). Check the SmartLife app.' },
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control (SmartLife or Sonoff)\n/ticket · today\'s lottery ticket\n/help · this list',
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control (SmartLife or Sonoff)\n/ticket · today\'s lottery ticket\n/backup · settings backup file\n/help · this list',
+    backupCaption: (auto) => `💾 ${auto ? 'Weekly backup' : 'Backup'} of the farm (settings, records and history). To restore: ⚙️ Settings → 💾 Backup → Restore.\n⚠️ It contains your saved keys and passwords (Tuya, MQTT, this bot): do not forward it.`,
+    backupFail: (e) => `⚠️ Could not send the backup: ${e}`,
     ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
     noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Turn smart plugs on, off or reboot'], ['ticket', 'Today\'s lottery ticket'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Turn smart plugs on, off or reboot'], ['ticket', 'Today\'s lottery ticket'], ['backup', 'Settings backup file'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
 };
-const ALIASES = { sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', tomada: 'plug', plug: 'plug', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
+const ALIASES = { backup: 'backup', sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', tomada: 'plug', plug: 'plug', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
 
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
@@ -395,15 +399,18 @@ function apiCall(base, token, method, body, timeoutMs = 15000) {
   });
 }
 
-// Upload de foto (multipart/form-data, sem dependências)
+// Upload de arquivo (multipart/form-data, sem dependências): foto do bilhete, documento do backup
 function apiPhoto(base, token, fields, png, timeoutMs = 30000) {
+  return apiUpload(base, token, 'sendPhoto', { field: 'photo', filename: 'bilhete.png', type: 'image/png' }, fields, png, timeoutMs);
+}
+function apiUpload(base, token, method, file, fields, buf, timeoutMs = 30000) {
   return new Promise((resolve, reject) => {
     const boundary = '----fazenda' + Date.now().toString(16);
     const parts = [];
     for (const [k, v] of Object.entries(fields)) if (v !== undefined) parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${k}"\r\n\r\n${v}\r\n`));
-    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="photo"; filename="bilhete.png"\r\nContent-Type: image/png\r\n\r\n`), png, Buffer.from(`\r\n--${boundary}--\r\n`));
+    parts.push(Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="${file.field}"; filename="${file.filename}"\r\nContent-Type: ${file.type}\r\n\r\n`), buf, Buffer.from(`\r\n--${boundary}--\r\n`));
     const body = Buffer.concat(parts);
-    const u = new URL(`${base}/bot${token}/sendPhoto`);
+    const u = new URL(`${base}/bot${token}/${method}`);
     const req = (u.protocol === 'http:' ? http : https).request(u, { method: 'POST', timeout: timeoutMs, headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': body.length } }, (res) => {
       let b = '';
       res.on('data', (c) => (b += c));
@@ -429,7 +436,7 @@ function start(opts) {
 
   let saved = {};
   try { saved = JSON.parse(fs.readFileSync(opts.stateFile, 'utf8')); } catch (_) { /* primeira vez */ }
-  const state = { offset: saved.offset || 0, lastDaily: saved.lastDaily || null };
+  const state = { offset: saved.offset || 0, lastDaily: saved.lastDaily || null, lastBackup: saved.lastBackup || null };
   const save = () => { if (opts.stateFile) try { fs.writeFileSync(opts.stateFile, JSON.stringify(state)); } catch (_) { /* segue */ } };
 
   let stopped = false;
@@ -444,6 +451,15 @@ function start(opts) {
     chat_id: chatId, caption: caption.length <= 1024 ? caption : undefined, parse_mode: 'HTML', disable_notification: silent ? 'true' : undefined,
   }, png).then(() => (caption.length > 1024 ? send(chatId, caption, silent) : null))
     .catch((e) => { log('falha ao enviar o bilhete: ' + e.message); return send(chatId, caption, silent); });
+  // backup: opts.backup() devolve { name, json } (o mesmo arquivo do 💾 Backup da tela de configurações)
+  const sendBackup = async (chatId, auto) => {
+    let b = null;
+    try { b = opts.backup && opts.backup(); } catch (e) { log('backup: ' + e.message); }
+    if (!b) return send(chatId, T.backupFail('–'));
+    return apiUpload(base, opts.token, 'sendDocument', { field: 'document', filename: b.name, type: 'application/json' },
+      { chat_id: chatId, caption: T.backupCaption(auto), disable_notification: auto ? 'true' : undefined }, Buffer.from(b.json))
+      .catch((e) => { log('falha ao enviar o backup: ' + e.message); return send(chatId, T.backupFail(escHtml(e.message))); });
+  };
   const ticketFor = (snap) => (todayBest(snap) ? ticketImage(snap, lang, { python: opts.python, script: opts.ticketScript }) : Promise.resolve(null));
 
   // comandos
@@ -459,6 +475,7 @@ function start(opts) {
     }
     const snap = opts.snapshot();
     const o = fopts();
+    if (cmd === 'backup') return sendBackup(id, false);
     if (cmd === 'ticket') {
       const png = await ticketFor(snap), b = todayBest(snap);
       if (!png) return send(id, T.noTicket);
@@ -555,11 +572,17 @@ function start(opts) {
     for (const ev of diffEvents(prev, cur, { ...fopts(), down })) broadcast(ev.text, silent && ev.type !== 'block');
     prev = cur;
     // resumo diário, uma vez por dia, na hora marcada
-    const now = new Date(), day = now.toLocaleDateString('sv');
+    const now = opts.now ? opts.now() : new Date(), day = now.toLocaleDateString('sv');
     if (opts.dailyHour != null && now.getHours() === opts.dailyHour && state.lastDaily !== day) {
       state.lastDaily = day; save();
       const text = dailyText(snap, fopts());
       ticketFor(snap).then((png) => Promise.all(chatIds.map((id) => (png ? sendPhoto(id, png, text, silent) : send(id, text, silent)))));
+    }
+    // backup semanal (opção TELEGRAM_BACKUP): domingo, na hora do resumo (ou 21 h), sem som
+    const bh = opts.dailyHour != null ? opts.dailyHour : 21;
+    if (opts.backupWeekly && now.getDay() === 0 && now.getHours() === bh && state.lastBackup !== day) {
+      state.lastBackup = day; save();
+      Promise.all(chatIds.map((id) => sendBackup(id, true)));
     }
   }
 

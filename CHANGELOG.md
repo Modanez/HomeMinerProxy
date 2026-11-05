@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Weekly backup on Telegram:** new option (⚙️ Settings → Telegram, `TELEGRAM_BACKUP=1`): every Sunday at the summary hour the bot sends the backup file silently. New `/backup` command sends it any time. Off by default, because the file holds saved keys and passwords.
+- **Clock on boards without a battery:** the dashboard waits for the clock to sync from the internet (up to `CLOCK_WAIT_MIN`, default 10 min) before collecting, so history, records and the championship never get dates from the image or the last shutdown. A banner shows while it waits, or if it never syncs. `CLOCK_WAIT=0` turns it off.
+
+### Português
+- **Backup semanal no Telegram:** nova opção (⚙️ Configurações → Telegram, `TELEGRAM_BACKUP=1`): todo domingo, na hora do resumo, o bot manda o arquivo de backup sem som. O novo comando `/backup` manda na hora. Vem desligada, porque o arquivo tem as chaves e senhas salvas.
+- **Relógio das placas sem bateria:** o painel espera o relógio sincronizar pela internet (até `CLOCK_WAIT_MIN`, padrão 10 min) antes de coletar, para o histórico, os recordes e o campeonato nunca ficarem com a data da imagem ou do último desligamento. Um aviso aparece enquanto espera, ou se não sincronizar. `CLOCK_WAIT=0` desliga.
+
 ## v0.4.0 — 2026-11-05
 
 ### English

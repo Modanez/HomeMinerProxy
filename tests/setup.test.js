@@ -159,3 +159,15 @@ test('aba Rede: GET só diz o que existe; estado e ações só com o PIN', async
   assert.strictEqual(st.wifi.available, false);
   assert.strictEqual((await req(port, 'POST', '/api/config/net', { pin: '424242', action: 'rm -rf' })).status, 400);
 });
+
+test('relógio atrasado: o painel abre, avisa e só começa a coletar depois', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'clk-'));
+  fs.writeFileSync(path.join(dir, 'version.json'), JSON.stringify({ installedAt: new Date(Date.now() + 86400e3).toISOString() }));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, CLOCK_WAIT_MIN: '0.05' });   // desiste em 3 s
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const first = JSON.parse((await waitFor(() => req(port, 'GET', '/api/mining'))).body);
+  assert.deepStrictEqual(first.clock, { waiting: true, suspect: false });
+  const after = await waitFor(async () => { const j = JSON.parse((await req(port, 'GET', '/api/mining')).body); return !j.clock.waiting && j.clock; }, 15000);
+  assert.deepStrictEqual(after, { waiting: false, suspect: true });
+});

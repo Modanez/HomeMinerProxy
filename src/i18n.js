@@ -181,6 +181,8 @@ const EN = [
   ["'Pool instável (' + j.error + ') — mostrando dados de ' + (j.okAt ? hora(j.okAt) : '–') + ', tentando de novo…'", "'Pool unstable (' + j.error + ') — showing data from ' + (j.okAt ? hora(j.okAt) : '–') + ', retrying…'"],
   ["set('upd', 'atualizado '", "set('upd', 'updated '"],
   ["'Sem conexão com o servidor local.'", "'No connection to the local server.'"],
+  ["'🕒 Acertando o relógio pela internet antes de começar (placas sem bateria ligam com a hora errada)…'", "'🕒 Setting the clock from the internet before starting (boards without a battery boot with the wrong time)…'"],
+  ["'🕒 O relógio não acertou pela internet: datas do histórico podem sair erradas. Confira a conexão.'", "'🕒 The clock did not sync from the internet: history dates may be wrong. Check the connection.'"],
   ["' fora do ar desde ' + hora(f.since) +\n      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)",
     "' down since ' + hora(f.since) +\n      (f.active ? ' — miners on port ' + f.listen + ' moved to backup ' + f.active : ' — no backup available on port ' + f.listen)"],
   ["celebrate({ worker: 'teste',", "celebrate({ worker: 'test',"],
