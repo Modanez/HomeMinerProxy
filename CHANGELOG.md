@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.4.0 — 2026-11-05
 
 ### English
 - **Ready-to-flash SD card images** for Raspberry Pi 3/4/5, Orange Pi Zero 3 and Odroid-C2, attached to every release: flash, plug the network cable, open `http://homeminer.local:3000`. Built from the official minimal images (SHA-256 checked), no address, PIN or credentials inside, SSH off on Armbian.
@@ -10,6 +10,8 @@
 - **First-setup wizard:** without `BTC_ADDRESS` the dashboard no longer refuses to start: it opens a 4-step wizard in the browser (language, bitcoin address, an admin PIN of your choice, currency and kWh price), saves it, restarts by itself and shows where to point each miner. If `/etc/mineracao.env` already has `SETTINGS_PIN`, the wizard asks for it. `SETUP_WIZARD=0` keeps the old behaviour. This is step 1 of ready-to-flash SD card images.
 - **Update button:** ⚙️ Settings → 💾 Backup shows the installed version (and commit), the latest release on GitHub, and an **Update now** button (PIN) that runs `git pull && install.sh` through `systemd-run`. With Docker it shows the `docker compose` command instead.
 - **Installer:** can run unattended (no address prompt → wizard; `HOMEMINER_IMAGE=1` skips the PIN so each device gets its own), writes `version.json`, never overwrites a PIN created in the wizard.
+- **Ping per pool:** the farm screen and the Telegram `/status` show the ping of each pool in use (e.g. `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) instead of one average. Backup pools only probed by the failover no longer count, and `/stats` has `totals.pools` with label, ports, sessions, ping and grade. The overall `pingMs` is now averaged only over pools in use.
+- **Network tab shows the Tailscale state as soon as it opens** and follows the authorization until it is approved.
 
 ### Português
 - **Imagens prontas para gravar no cartão SD** para Raspberry Pi 3/4/5, Orange Pi Zero 3 e Odroid-C2, anexadas a cada release: grave, ligue o cabo de rede e abra `http://homeminer.local:3000`. Montadas a partir das imagens mínimas oficiais (com SHA-256 conferido), sem endereço, PIN ou credenciais dentro, e com SSH desligado no Armbian.
@@ -19,14 +21,8 @@
 - **Assistente de primeira configuração:** sem `BTC_ADDRESS` o painel não se recusa mais a subir: abre um assistente de 4 passos no navegador (idioma, endereço de bitcoin, um PIN de administração escolhido pela pessoa, moeda e preço do kWh), grava, reinicia sozinho e mostra para onde apontar cada minerador. Se o `/etc/mineracao.env` já tem `SETTINGS_PIN`, o assistente pede esse PIN. `SETUP_WIZARD=0` mantém o comportamento antigo. É a etapa 1 das imagens prontas para gravar no cartão.
 - **Botão de atualizar:** ⚙️ Configurações → 💾 Backup mostra a versão instalada (e o commit), a versão mais recente no GitHub e o botão **Atualizar agora** (com PIN), que roda `git pull && install.sh` pelo `systemd-run`. No Docker, mostra o comando do `docker compose`.
 - **Instalador:** roda sem ninguém no teclado (sem endereço → assistente; `HOMEMINER_IMAGE=1` não cria PIN, para cada aparelho ter o seu), grava o `version.json` e nunca sobrescreve um PIN criado no assistente.
-
-## Unreleased
-
-### English
-- **Ping per pool:** the farm screen and the Telegram `/status` show the ping of each pool in use (e.g. `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) instead of one average. Backup pools only probed by the failover no longer count, and `/stats` has `totals.pools` with label, ports, sessions, ping and grade. The overall `pingMs` is now averaged only over pools in use.
-
-### Português
 - **Ping por pool:** a tela da fazenda e o `/status` do Telegram mostram o ping de cada pool em uso (ex.: `public-pool 🟢 180 ms · nerdminers 🔴 706 ms`) em vez de uma média só. As pools reserva só testadas pelo failover não contam mais, e o `/stats` ganhou `totals.pools` com nome, portas, sessões, ping e nota. O `pingMs` geral agora é a média só das pools em uso.
+- **A aba Rede mostra o estado do Tailscale assim que abre** e acompanha a autorização até ela ser aprovada.
 
 ## v0.3.0 — 2026-11-04
 

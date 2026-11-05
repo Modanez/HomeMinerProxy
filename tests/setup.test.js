@@ -149,7 +149,7 @@ test('aba Rede: GET só diz o que existe; estado e ações só com o PIN', async
   const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', NMCLI_PATH: path.join(dir, 'sem-nmcli'), TAILSCALE_PATH: ts, NET_SYSTEMCTL: sc, SSHD_PATH: path.join(dir, 'sem-sshd') });
   t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
   const caps = JSON.parse((await waitFor(() => req(port, 'GET', '/api/config/net'))).body);
-  assert.deepStrictEqual(caps, { wifi: false, wifiReason: null, tailscale: true, ssh: false });
+  assert.deepStrictEqual(caps, { wifi: false, wifiReason: null, tailscale: true, tsState: 'login', ssh: false });
   assert.doesNotMatch(JSON.stringify(caps), /login\.tailscale/);
   assert.match((await req(port, 'GET', '/config')).body, /data-tab="net"/);
   assert.strictEqual((await req(port, 'POST', '/api/config/net', { pin: '1', action: 'status' })).status, 403);

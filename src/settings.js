@@ -479,7 +479,7 @@ const T = {
       wifiHint: 'Ao trocar de rede com o painel aberto pelo próprio Wi-Fi, a página pode perder a conexão por alguns segundos.',
       ts: 'Acesso de fora de casa (Tailscale)', tsHint: 'Abre o painel de qualquer lugar pela sua conta do Tailscale, sem abrir portas no roteador. Grátis para uso pessoal.',
       tsOff: 'Desligado.', tsLogin: 'Falta autorizar: abra o link, entre na sua conta do Tailscale e aprove este aparelho. Depois toque em "Ver estado".', tsOn: 'Conectado como %n · %i. No celular com o app do Tailscale ligado: http://%h:3000',
-      tsConnect: 'Conectar ao Tailscale', tsOpen: 'Abrir o link de autorização', tsDisconnect: 'Desconectar', tsWait: 'Iniciando o Tailscale…',
+      tsConnect: 'Conectar ao Tailscale', tsOpen: 'Abrir o link de autorização', tsDisconnect: 'Desconectar', tsWait: 'Iniciando o Tailscale…', tsDone: 'Tailscale conectado!',
       ssh: 'Acesso SSH (só com chave)', sshHint: 'Cole a sua chave pública (o conteúdo de ~/.ssh/id_ed25519.pub; para criar uma: ssh-keygen -t ed25519). O login por senha fica desligado. Depois: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… voce@computador', sshOn: 'Ligado.', sshOff: 'Desligado.', sshOutside: 'Ligado por fora do painel: a configuração dele não é alterada aqui, só dá para acrescentar chaves.', sshKeys: 'Chaves: ',
       sshEnable: 'Ligar o SSH', sshAdd: 'Adicionar a chave', sshDisable: 'Desligar o SSH', sshDone: 'Pronto: SSH com a sua chave.' },
@@ -548,7 +548,7 @@ const T = {
       wifiHint: 'If you change networks while the dashboard is open over that same Wi-Fi, the page may lose the connection for a few seconds.',
       ts: 'Access from outside home (Tailscale)', tsHint: 'Opens the dashboard from anywhere through your Tailscale account, without opening router ports. Free for personal use.',
       tsOff: 'Off.', tsLogin: 'Not authorized yet: open the link, sign in to Tailscale and approve this device. Then tap "Show status".', tsOn: 'Connected as %n · %i. On a phone with the Tailscale app on: http://%h:3000',
-      tsConnect: 'Connect to Tailscale', tsOpen: 'Open the authorization link', tsDisconnect: 'Disconnect', tsWait: 'Starting Tailscale…',
+      tsConnect: 'Connect to Tailscale', tsOpen: 'Open the authorization link', tsDisconnect: 'Disconnect', tsWait: 'Starting Tailscale…', tsDone: 'Tailscale connected!',
       ssh: 'SSH access (key only)', sshHint: 'Paste your public key (the content of ~/.ssh/id_ed25519.pub; to create one: ssh-keygen -t ed25519). Password login stays off. Then: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… you@computer', sshOn: 'On.', sshOff: 'Off.', sshOutside: 'Turned on outside the dashboard: its configuration is not changed here, you can only add keys.', sshKeys: 'Keys: ',
       sshEnable: 'Turn SSH on', sshAdd: 'Add the key', sshDisable: 'Turn SSH off', sshDone: 'Done: SSH with your key.' },
@@ -678,7 +678,7 @@ function page(lang, hasPin, theme) {
     `<div id="wifi_form" hidden style="margin-top:10px"><select id="wifi_ssid"></select><div class="pw" style="margin-top:8px"><input type="password" id="wifi_pass" autocomplete="new-password" spellcheck="false" autocapitalize="off" placeholder="${htmlEsc(N.pass)}"><button type="button" class="ghost eye" data-eye="wifi_pass">👁</button></div>` +
     `<div class="bbar"><button type="button" class="ghost" id="wifi_connect">${htmlEsc(N.connect)}</button></div></div><div class="hint">${htmlEsc(N.wifiHint)}</div></div>` +
     `<div class="f" id="net_ts" hidden><label>${htmlEsc(N.ts)}</label><div class="hint">${htmlEsc(N.tsHint)}</div><div class="hint" id="ts_state">–</div>` +
-    `<div class="bbar"><button type="button" class="ghost" id="ts_connect">${htmlEsc(N.tsConnect)}</button><a class="ghost tslink" id="ts_link" target="_blank" rel="noopener noreferrer" hidden>${htmlEsc(N.tsOpen)}</a>` +
+    `<div class="bbar"><button type="button" class="ghost" id="ts_connect" hidden>${htmlEsc(N.tsConnect)}</button><a class="ghost tslink" id="ts_link" target="_blank" rel="noopener noreferrer" hidden>${htmlEsc(N.tsOpen)}</a>` +
     `<button type="button" class="ghost" id="ts_disconnect" hidden>${htmlEsc(N.tsDisconnect)}</button></div></div>` +
     `<div class="f" id="net_ssh" hidden><label>${htmlEsc(N.ssh)}</label><div class="hint">${htmlEsc(N.sshHint)}</div><div class="hint" id="ssh_state">–</div>` +
     `<textarea id="ssh_key" rows="3" spellcheck="false" autocapitalize="off" autocomplete="off" placeholder="${htmlEsc(N.sshKey)}" style="margin-top:8px;font-family:ui-monospace, Menlo, monospace;font-size:12px;resize:vertical"></textarea>` +
@@ -1238,6 +1238,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   fetch('/api/config/net').then((r) => r.json()).then((c) => {
     $('net_wifi').hidden = !(c.wifi || c.wifiReason === 'noadapter');
     $('net_ts').hidden = !c.tailscale;
+    if (c.tailscale) showTs({ available: true, state: c.tsState });   // só o estado; nome, IP e link vêm com o PIN
     $('net_ssh').hidden = !c.ssh;
     if (c.wifiReason === 'noadapter') { $('wifi_state').textContent = N.wifiNone; $('wifi_scan').hidden = true; }
     if (!c.wifi && c.wifiReason !== 'noadapter' && !c.tailscale && !c.ssh) { msg.textContent = N.none; $('net_refresh').hidden = true; }
@@ -1269,7 +1270,9 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   async function refresh() {
     const r = await netPost('status');
     if (r.error) { say(err(r), false); return false; }
-    msg.textContent = ''; showWifi(r.wifi); showTs(r.tailscale); showSsh(r.ssh); return true;
+    msg.textContent = ''; showWifi(r.wifi); showTs(r.tailscale); showSsh(r.ssh);
+    if (r.tailscale && r.tailscale.state === 'login') waitTsLogin();
+    return true;
   }
   $('net_refresh').addEventListener('click', refresh);
   $('wifi_scan').addEventListener('click', async () => {
@@ -1302,8 +1305,23 @@ if (updBtn) updBtn.addEventListener('click', async () => {
       const r = await netPost('ts-connect');
       if (!r.ok) { say(err(r), false); return; }
       msg.textContent = ''; showTs(r.status);
+      if (r.status && r.status.state === 'login') waitTsLogin();
     } finally { b.disabled = false; }
   });
+  // depois de abrir o link e aprovar no site, a tela percebe sozinha (até 5 min)
+  let tsWaiting = false;
+  async function waitTsLogin() {
+    if (tsWaiting) return; tsWaiting = true;
+    try {
+      for (let i = 0; i < 75; i++) {
+        await new Promise((res) => setTimeout(res, 4000));
+        const r = await netPost('status').catch(() => null);
+        if (!r || r.error) return;
+        showTs(r.tailscale);
+        if (r.tailscale && r.tailscale.state === 'connected') { say(N.tsDone, true); return; }
+      }
+    } finally { tsWaiting = false; }
+  }
   $('ssh_enable').addEventListener('click', async () => {
     const b = $('ssh_enable'); b.disabled = true;
     try {
@@ -1418,7 +1436,7 @@ function handle(req, res, ctx) {
   if (url === '/api/config/net' && req.method === 'GET') {
     // só diz o que existe; estado, redes e o link do Tailscale ficam atrás do PIN (POST)
     const net = require('./netctl');
-    Promise.all([net.wifiStatus(), net.tailscaleStatus(), net.sshStatus()]).then(([w, t, h]) => json(200, { wifi: !!w.available, wifiReason: w.reason || null, tailscale: !!t.available, ssh: !!h.available }))
+    Promise.all([net.wifiStatus(), net.tailscaleStatus(), net.sshStatus()]).then(([w, t, h]) => json(200, { wifi: !!w.available, wifiReason: w.reason || null, tailscale: !!t.available, tsState: t.state || null, ssh: !!h.available }))
       .catch(() => json(200, { wifi: false, tailscale: false }));
     return true;
   }
