@@ -1,8 +1,9 @@
 # Changelog
 
-## Unreleased
+## v0.3.0 — 2026-11-04
 
 ### English
+- **Tuya plugs offline in the cloud:** the cloud keeps returning the last known readings and accepts commands for a plug that left the Wi-Fi. The dashboard now checks the `online` flag on every read and before every command, shows "offline in the Tuya cloud" instead of stale watts, stops counting them in the energy estimate and refuses on/off/reboot (dashboard and Telegram) with an explanation. New read-only diagnostic: `POST /api/plug` with `"action":"info"` (PIN protected) returns online state, category, raw status and the functions the device accepts.
 - **Proxy diagnostics:** pool ping score (TCP connect and submit RTT, graded great/good/poor), a persisted event timeline (worker/pool up and down, failover, rejects), worker IP, share difficulty and extranonce1, global efficiency, proxy process uptime/RAM/CPU/write queue, 15 min / 1 h / 24 h hashrate averages (farm and per worker) and rejected shares split into stale and duplicate. All on `/stats` and the dashboard.
 - **Sonoff plugs on the local network:** the plug list on `/config` now takes Sonoff plugs in LAN/DIY mode (by IP, no cloud or credentials) next to SmartLife/Tuya. They get the same dashboard buttons, Telegram `/plug on|off|reboot <worker>` and watchdog. The plug of the server itself (`LOCAL_WORKER`) can no longer be turned off or rebooted remotely, and a plug name the bot does not know is refused instead of falling back to the first plug.
 - **Daily ticket on Telegram:** the 21:00 summary now comes with today's lottery-ticket image, and `/ticket` sends it any time. Rendered on the server by `ticket.py` (Pillow); without Pillow the summary stays text only.
@@ -14,6 +15,7 @@
 - **Architecture & API docs:** C4 Model diagrams (`docs/c4`), Architecture Decision Records (`docs/adr`) and Postman v2.1 collections + environment (`docs/postman`), all in English and Brazilian Portuguese.
 
 ### Português
+- **Tomadas Tuya offline na nuvem:** a nuvem continua devolvendo a última leitura e aceita comandos para uma tomada que saiu do Wi-Fi. O painel agora confere o campo `online` a cada leitura e antes de cada comando, mostra "offline na nuvem Tuya" no lugar de watts velhos, deixa de contá-los na estimativa de energia e recusa ligar/desligar/reiniciar (painel e Telegram) com uma explicação. Novo diagnóstico só de leitura: `POST /api/plug` com `"action":"info"` (protegido por PIN) devolve o estado online, a categoria, o status bruto e as funções que o aparelho aceita.
 - **Diagnóstico do proxy:** nota de ping da pool (conexão TCP e RTT do submit, classificado em ótimo/bom/ruim), linha do tempo de eventos gravada em disco (worker/pool no ar ou fora, failover, recusas), IP do worker, dificuldade e extranonce1, eficiência global, uptime/RAM/CPU/fila de escrita do processo do proxy, médias de hashrate de 15 min / 1 h / 24 h (fazenda e por worker) e shares recusados separados em stale e duplicado. Tudo no `/stats` e no painel.
 - **Tomadas Sonoff pela rede local:** a lista de tomadas em `/config` agora aceita Sonoff no modo LAN/DIY (pelo IP, sem nuvem nem credenciais) junto com as SmartLife/Tuya. Elas ganham os mesmos botões no painel, o `/tomada ligar|desligar|reiniciar <worker>` no Telegram e o watchdog. A tomada do próprio servidor (`LOCAL_WORKER`) não pode mais ser desligada ou reiniciada de longe, e um nome de tomada que o bot não conhece é recusado em vez de cair na primeira tomada.
 - **Bilhete do dia no Telegram:** o resumo das 21h agora vem com a imagem do bilhete de loteria do dia, e o `/bilhete` manda a qualquer hora. Gerado no servidor pelo `ticket.py` (Pillow); sem Pillow, o resumo continua só em texto.
