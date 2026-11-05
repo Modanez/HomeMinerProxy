@@ -53,7 +53,7 @@ jobs:
         run: gh release upload "${{ github.event.release.tag_name }}" "homeminer-${{ matrix.board }}.img.xz" "homeminer-${{ matrix.board }}.img.xz.sha256" --clobber
       - name: Keep as artifact
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: homeminer-${{ matrix.board }}
           path: |
