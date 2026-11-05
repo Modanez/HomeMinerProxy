@@ -50,6 +50,42 @@ let TUYA_PLUGS = [];
 let tuyaCloud = null;
 let sonoffLan = null;
 let tuyaClient = null;
+// Bitaxe pela API local do AxeOS (BITAXES = "bitaxe1=192.168.0.140, bitaxe2=192.168.0.141")
+const bitaxe = require('./bitaxe');
+const BITAXES = bitaxe.parseList(process.env.BITAXES) || [];
+const BITAXE_MS = Number(process.env.BITAXE_MS || 30e3);
+const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist }
+const BITAXE_STALE_MS = Number(process.env.BITAXE_STALE_MS || Math.max(3 * BITAXE_MS, 120e3));   // sem leitura há mais que isso = sem resposta
+const bitaxeFresh = (st) => st && st.data && st.okAt && Date.now() - st.okAt < BITAXE_STALE_MS;
+// o worker de cada Bitaxe: o nome depois do ponto no usuário da pool, ou o nome cadastrado
+const bitaxeWorker = (b) => { const st = bitaxeState.get(b.name); return (st && st.data && st.data.worker) || b.name; };
+function bitaxeOfWorker(name) {
+  const b = BITAXES.find((x) => bitaxeWorker(x) === name);
+  const st = b && bitaxeState.get(b.name);
+  return b && bitaxeFresh(st) ? { name: b.name, host: b.host, d: st.data } : null;
+}
+async function tickBitaxe() {
+  for (const b of BITAXES) {
+    const st = bitaxeState.get(b.name) || { ok: false, at: 0, okAt: 0, error: null, fails: 0, data: null, hist: [] };
+    bitaxeState.set(b.name, st);
+    const r = await bitaxe.info(b.host);
+    st.at = Date.now();
+    if (!r.ok) { st.ok = false; st.error = r.error; st.fails++; continue; }
+    Object.assign(st, { ok: true, okAt: st.at, error: null, fails: 0, data: r.data });
+    // histórico curto para o gráfico: um ponto a cada 5 min, 24 h
+    const last = st.hist.at(-1);
+    if (!last || st.at - last.t >= 5 * 60e3) {
+      st.hist.push({ t: st.at, hr: r.data.hashRate10m ?? r.data.hashRate, temp: r.data.tempC, w: r.data.watts });
+      if (st.hist.length > 288) st.hist.shift();
+    }
+  }
+}
+function bitaxesView() {
+  return BITAXES.map((b) => {
+    const st = bitaxeState.get(b.name) || {};
+    return { name: b.name, host: b.host, worker: bitaxeWorker(b), ok: !!st.ok, fresh: !!bitaxeFresh(st), okAt: st.okAt || null, error: st.error || null, fails: st.fails || 0, data: st.data || null, hist: st.hist || [] };
+  });
+}
 let tuyaPlugsState = new Map();
 function initTuya() {
   TUYA_PLUGS = require('./tuya').normalizePlugs(process.env.TUYA_PLUGS, {
@@ -239,7 +275,8 @@ function workersView() {
   const listed = new Set([...poolActive.map((w) => w.name), ...Object.values(ckpools).flatMap((p) => p.active), ...ocean.active, ...viaProxy.map((w) => w.name)]);
   const proxied = new Map(viaProxy.map((w) => [w.name, w]));
   const now = Date.now();
-  const names = new Set([...Object.keys(known), ...Object.keys(EXPECTED).filter((n) => EXPECTED[n] > 0)]);
+  const names = new Set([...Object.keys(known), ...Object.keys(EXPECTED).filter((n) => EXPECTED[n] > 0),
+    ...BITAXES.filter((b) => bitaxeFresh(bitaxeState.get(b.name))).map(bitaxeWorker)]);
   return [...names].map((name) => {
     const k = known[name] || { name, hashRate: 0, bestDifficulty: 0, lastSeen: null };
     const nominal = EXPECTED[name] || 0;
@@ -267,6 +304,8 @@ function workersView() {
       state = 'ok';
     } else if (listed.has(name)) {
       state = 'ok';
+    } else if (bitaxeOfWorker(name) && !bitaxeOfWorker(name).d.paused && bitaxeOfWorker(name).d.hashRate > 0) {
+      state = 'ok';   // o próprio Bitaxe diz que está minerando, mesmo que a pool ainda não liste
     } else if (!lastSeen) {
       state = 'unknown';
     } else {
@@ -281,7 +320,18 @@ function workersView() {
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
     const pxw = proxied.get(name);
     const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0 } : {};
-    return { ...k, name, hashRate, approx, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx };
+    // Bitaxe com API: o hashrate medido pelo próprio aparelho (média de 10 min) vale mais que a estimativa por shares
+    const bx = bitaxeOfWorker(name);
+    let device = null;
+    if (bx) {
+      const d = bx.d;
+      approx = false;
+      const hr = d.hashRate10m || d.hashRate;
+      if (hr > 0 || d.paused) { hashRate = d.paused ? 0 : hr; source = 'bitaxe'; }
+      device = { name: bx.name, host: bx.host, tempC: d.tempC, vrTempC: d.vrTempC, watts: d.watts, jth: d.jth, fanPct: d.fanPct, fanRpm: d.fanRpm,
+        expected: d.expected, fallback: d.pool.fallback, paused: d.paused, model: d.model };
+    }
+    return { ...k, name, hashRate, approx, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx, bitaxe: device };
   }).sort((a, b) => b.hashRate - a.hashRate);
 }
 
@@ -740,7 +790,9 @@ function energy(view) {
   const parts = view.filter((w) => w.state === 'ok' || w.state === 'quiet').map((w) => {
     const linked = plugs.filter((p) => p.worker === w.name && p.watts != null);
     const liveWatts = linked.length ? Number(linked.reduce((s, p) => s + p.watts, 0).toFixed(1)) : null;
-    return { name: w.name, watts: liveWatts != null ? liveWatts : (WATTS[w.name] ?? WATTS_DEFAULT), live: liveWatts != null };
+    if (liveWatts != null) return { name: w.name, watts: liveWatts, live: true, src: 'plug' };
+    if (w.bitaxe && w.bitaxe.watts > 0) return { name: w.name, watts: Number(w.bitaxe.watts.toFixed(1)), live: true, src: 'bitaxe' };
+    return { name: w.name, watts: WATTS[w.name] ?? WATTS_DEFAULT, live: false, src: 'estimate' };
   });
   const wholeFarm = plugs.filter((p) => p.worker === '*' && p.watts != null);
   const watts = wholeFarm.length
@@ -889,6 +941,7 @@ function snapshot(internal = false) {
     history,
     health: health(),
     energy: energy(view),
+    bitaxes: bitaxesView(),
     theme: THEME,
   };
 }
@@ -979,6 +1032,16 @@ const PAGE = `<!doctype html>
   .temp { font-size:12px; color:var(--dim); border:1px solid var(--line); border-radius:6px; padding:1px 6px; margin-left:6px; white-space:nowrap; }
   .temp.warm { color:var(--gold); border-color:var(--gold); }
   .temp.hot { color:var(--warn); border-color:var(--warn); }
+  .bxlist { display:grid; gap:10px; }
+  .bx { border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
+  .bx .bxh { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
+  .bx .bxh b { font-size:15px; }
+  .bx .bxh a { margin-left:auto; font-size:12px; color:var(--dim); }
+  .bxg { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px 14px; margin-top:8px; }
+  .bxg div { font-size:14px; }
+  .bxg span { display:block; font-size:11px; color:var(--dim); }
+  .bxg .warm { color:var(--gold); } .bxg .hot { color:var(--warn); }
+  .bxwarn { color:var(--warn); font-size:13px; margin-top:6px; }
   .legend { float:right; text-transform:none; letter-spacing:0; }
   .legend .dot { width:7px; height:7px; margin:0 4px 0 10px; }
   .err { color:var(--warn); margin-top:8px; font-size:13px; }
@@ -1138,6 +1201,10 @@ const PAGE = `<!doctype html>
     <details style="margin-top:6px"><summary class="sub" style="cursor:pointer">Eventos recentes</summary>
       <ul class="sub" id="evs" style="list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto"></ul>
     </details>
+  </div>
+  <div class="card" id="bxcard" hidden>
+    <div class="label" style="margin-bottom:6px">Bitaxe</div>
+    <div class="bxlist" id="bxlist"></div>
   </div>
   <div class="card wallet">
     <div><div class="label">Carteira</div><div class="big gold" id="wbtc">–</div><div class="sub" id="wsats">–</div></div>
@@ -1447,6 +1514,35 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura' };
+function bxTemp(t) { return t >= 68 ? 'hot' : t >= 60 ? 'warm' : ''; }
+function renderBitaxes(j) {
+  const list = j.bitaxes || [];
+  $('bxcard').hidden = !list.length;
+  if (!list.length) return;
+  const st = (label, val) => '<div><span>' + label + '</span>' + val + '</div>';
+  $('bxlist').innerHTML = list.map((b) => {
+    const d = b.data;
+    const link = /^[\w.:\-]+$/.test(b.host) ? '<a href="http://' + esc(b.host) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + '</a>' : '';
+    const head = '<div class="bxh"><b>' + esc(b.name) + '</b><span class="sub">' + esc([d && d.model, d && d.version, b.host].filter(Boolean).join(' · ')) + '</span>' +
+      (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '</div>';
+    if (!d) return '<div class="bx">' + head + '</div>';
+    const hr = d.hashRate10m || d.hashRate;
+    const warn = [d.paused && BXT.paused, d.overheat && BXT.overheat, d.powerFault && BXT.powerFault, d.hardwareFault && BXT.hwFault].filter(Boolean);
+    return '<div class="bx">' + head + '<div class="bxg">' +
+      st(BXT.hash, fmtHash(hr) + (d.expected ? ' <span>' + BXT.of + ' ' + fmtHash(d.expected) + ' ' + BXT.expected + '</span>' : '')) +
+      st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + nf(d.tempC, 1) + ' °C</b>' : '–') +
+      (d.vrTempC != null ? st(BXT.vr, nf(d.vrTempC, 1) + ' °C') : '') +
+      st(BXT.power, (d.watts != null ? nf(d.watts, 1) + ' W' : '–') + (d.jth ? ' · ' + nf(d.jth, 1) + ' J/TH' : '')) +
+      st(BXT.fan, (d.fanPct != null ? nf(d.fanPct) + '%' : '–') + (d.fanRpm ? ' · ' + nf(d.fanRpm) + ' RPM' : '')) +
+      st(BXT.freq, (d.freqMhz != null ? nf(d.freqMhz) + ' MHz' : '–') + (d.coreMv ? ' · ' + nf(d.coreMv) + ' mV' : '')) +
+      st(BXT.pool, esc((d.pool.url || '–') + (d.pool.port ? ':' + d.pool.port : '')) + (d.pool.fallback ? ' <b class="warm">(' + BXT.backup + ')</b>' : '')) +
+      st(BXT.best, d.bestSessionDiff != null ? nf(d.bestSessionDiff, 0) : '–') +
+      st(BXT.up, d.uptimeS != null ? dur(d.uptimeS * 1000) : '–') +
+      (d.rssi != null ? st(BXT.wifi, nf(d.rssi) + ' dBm') : '') +
+      '</div>' + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
+  }).join('');
+}
 function renderFarm(j) {
   const f = j.farm, a = f.accounting || {}, D = f.difficulty;
   if (!f.hasData) return;
@@ -1480,6 +1576,10 @@ function renderFarm(j) {
     let temp = '';
     if (h.tempC != null && w.name === h.worker) {
       temp = ' <span class="temp ' + (h.tempC >= 75 ? 'hot' : h.tempC >= 60 ? 'warm' : '') + '">' + nf(h.tempC) + ' °C</span>';
+    }
+    if (w.bitaxe) {
+      const bx = w.bitaxe;
+      temp = ' <span class="temp ' + bxTemp(bx.tempC) + '">' + [bx.tempC != null ? nf(bx.tempC) + ' °C' : null, bx.watts != null ? nf(bx.watts, 1) + ' W' : null, bx.fallback ? BXT.backup : null, bx.paused ? BXT.paused : null].filter(Boolean).join(' · ') + '</span>';
     }
     const hr = (w.state === 'unknown' || w.approx ? '~' : '') + fmtHash(Number(w.hashRate));
     let best = Number(w.bestDifficulty) > 0 ? nf(Number(w.bestDifficulty), 2) : '–';
@@ -2120,6 +2220,7 @@ async function load() {
       : '');
     renderWallet(j.wallet);
     renderFarm(j);
+    renderBitaxes(j);
     renderNet(j);
     renderHistory(j);
     renderNear(j);
@@ -2281,6 +2382,7 @@ function start(port = PORT, host = '0.0.0.0') {
       everyTimer(tickOcean, 300e3);
       everyTimer(tickProxy, PROXY_MS);
       if (tuyaClient) everyTimer(tickTuya, 30e3);
+      if (BITAXES.length) everyTimer(tickBitaxe, BITAXE_MS);
       everyTimer(async () => { alarmOpen(); alarmStatus(); }, 60e3);
       // minerador local opcional (imagens prontas): liga/desliga o serviço conforme a opção LOCAL_MINER
       require('./localminer').sync({
@@ -2342,6 +2444,7 @@ function startMqtt() {
     snapshot: () => snapshot(true),
     ignore: ALARM_IGNORE,
     personal: process.env.TELEGRAM_PERSONAL === '1',
+    bitaxes: BITAXES.map((b) => b.name),
   });
 }
 

@@ -19,6 +19,8 @@ function pickLang(req, serverLang) {
 
 // [trecho em português, trecho em inglês] — aplicados em ordem (os mais longos e específicos primeiro)
 const EN = [
+  ["const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura' };",
+    "const BXT = { noAnswer: 'no answer', hash: 'Hashrate (10 min)', of: 'of', expected: 'expected', chip: 'Chip', vr: 'Regulator', power: 'Power', fan: 'Fan', freq: 'Frequency', pool: 'Pool', backup: 'backup', best: 'Session best', up: 'Up for', wifi: 'Wi-Fi', paused: 'paused', overheat: 'overheated: AxeOS lowered the frequency', powerFault: 'power fault (check the power supply)', hwFault: 'hardware fault', open: 'open AxeOS ↗', last: 'last read' };"],
   // ---------- cabeçalho e telas fixas
   ['<html lang="pt-br">', '<html lang="en">'],
   ['<title>Fazenda de Mineração</title>', '<title>Mining Farm</title>'],

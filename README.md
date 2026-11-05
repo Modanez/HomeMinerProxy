@@ -160,6 +160,16 @@ Give the server a fixed IP in your router (DHCP reservation): if its IP changes,
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u YOUR_ADDRESS.laptop -p x
 ```
 
+## Bitaxe telemetry (AxeOS API)
+
+The dashboard can read each Bitaxe straight from its local AxeOS API (firmware 2.14 and 2.15): measured hashrate (1 min, 10 min, 1 h and expected), chip and regulator temperature, power and J/TH, fan, frequency and core voltage, pool in use (primary or backup), session best, uptime and Wi-Fi signal.
+
+1. Reserve a fixed IP for each Bitaxe in your router.
+2. In ⚙️ Settings → Miners → **Bitaxe (AxeOS API)**, type `name=IP` for each one (`bitaxe1=192.168.0.140, bitaxe2=192.168.0.141`), or tap **Find on the network** and **Use these**. **Test** shows model, firmware, hashrate, temperature and watts. Use the worker name (what comes after the dot in the pool user).
+3. Save. The farm screen gets a **Bitaxe** card, the worker row shows temperature and watts, and the measured power replaces the `WATTS` estimate in the energy cost (a plug with a meter still wins).
+
+Telegram `/status` gets one line per Bitaxe, and MQTT / Home Assistant gets hashrate, temperature, power and fan sensors for each one. The dashboard only reads (`GET /api/system/info` every 30 s): overclocking, firmware and the Bitaxe Wi-Fi stay in AxeOS. The AxeOS API has no password and only answers the home network, so never expose a Bitaxe to the internet: from outside home, open the dashboard through Tailscale.
+
 ## Mining with cpuminer (step by step)
 
 [cpuminer](https://github.com/pooler/cpuminer) (`minerd`) mines Bitcoin on any CPU: a laptop, an old PC, a Raspberry Pi, an Android phone. Be honest with yourself about the odds: a CPU makes a few MH/s, so a block is a one-in-billions-per-year lottery. It is fun because every share shows up on the dashboard, records included. On this project's farm, a MacBook M2 makes about 9 MH/s, an Android tablet about 4 MH/s and an Odroid-C2 about 2.7 MH/s.

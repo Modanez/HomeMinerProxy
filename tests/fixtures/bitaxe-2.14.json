@@ -1,0 +1,13 @@
+{
+  "power": 17.82, "voltage": 5100, "current": 3494, "temp": 61.5, "vrTemp": 52, "maxPower": 40, "nominalVoltage": 5,
+  "hashRate": 1195.3, "hashRate_1m": 1201.2, "hashRate_10m": 1188.4, "hashRate_1h": 1190.1, "expectedHashrate": 1200,
+  "bestDiff": "4.29G", "bestSessionDiff": "12.3M", "poolDifficulty": 2048,
+  "isUsingFallbackStratum": 0, "freeHeap": 8123456, "coreVoltage": 1150, "coreVoltageActual": 1144, "frequency": 525, "actualFrequency": 524.9,
+  "ssid": "CasaPaulo", "macAddr": "AA:BB:CC:DD:EE:01", "hostname": "bitaxe", "wifiStatus": "Connected!", "wifiRSSI": -58,
+  "sharesAccepted": 1234, "sharesRejected": 3, "uptimeSeconds": 86400, "resetReason": "Power on reset",
+  "ASICModel": "BM1370", "boardVersion": "602", "version": "v2.14.2",
+  "stratumURL": "192.168.0.134", "stratumPort": 3338, "stratumUser": "bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w.bitaxe1",
+  "fallbackStratumURL": "solo.ckpool.org", "fallbackStratumPort": 3333, "fallbackStratumUser": "bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w.bitaxe1",
+  "autofanspeed": 1, "fanspeed": 55, "temptarget": 60, "fanrpm": 4100, "overheat_mode": 0, "responseTime": 12.5,
+  "blockFound": 0, "miningPaused": false, "power_fault": false, "hardware_fault": false
+}

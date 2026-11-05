@@ -186,3 +186,39 @@ test('guia "Pools e portas": portas de fábrica quando o proxy não responde, co
   assert.ok(d.hosts[0].endsWith('.local'));
   assert.match((await req(port, 'GET', '/config')).body, /id="pools_list"/);
 });
+
+test('Bitaxe: o painel lê a API, usa o hashrate e o consumo do aparelho e avisa quando ele some', async (t) => {
+  const http = require('http');
+  const info = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'bitaxe-2.14.json'), 'utf8'));
+  const fake = http.createServer((q, s) => { s.writeHead(200, { 'Content-Type': 'application/json' }); s.end(JSON.stringify(info)); });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const host = `127.0.0.1:${fake.address().port}`;
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bx-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', BITAXES: `bitaxe1=${host}`, BITAXE_ALLOW_LOOPBACK: '1', BITAXE_MS: '300', BITAXE_STALE_MS: '1500', WATTS: '{"bitaxe1":30}' });
+  t.after(() => { p.kill(); fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const snap = async () => JSON.parse((await req(port, 'GET', '/api/mining')).body);
+  const j = await waitFor(async () => { const s = await snap(); return s.bitaxes && s.bitaxes[0] && s.bitaxes[0].fresh && s; }, 10000);
+  assert.strictEqual(j.bitaxes[0].data.model, 'BM1370');
+  const w = j.farm.workers.find((x) => x.name === 'bitaxe1');
+  assert.ok(w, 'o Bitaxe aparece na lista mesmo sem a pool listar');
+  assert.strictEqual(w.source, 'bitaxe');
+  assert.strictEqual(w.state, 'ok');
+  assert.strictEqual(w.hashRate, 1188.4e9);
+  assert.strictEqual(w.bitaxe.tempC, 61.5);
+  const part = j.energy.parts.find((x) => x.name === 'bitaxe1');
+  assert.deepStrictEqual(part, { name: 'bitaxe1', watts: 17.8, live: true, src: 'bitaxe' });   // medido vale mais que o WATTS (30)
+  // teste e validação pela tela de configurações
+  const tr = JSON.parse((await req(port, 'POST', '/api/config/test', { pin: '424242', what: 'bitaxe', values: { BITAXES: `bitaxe1=${host}` } })).body);
+  assert.strictEqual(tr.ok, true);
+  assert.strictEqual(tr.bitaxes[0].worker, 'bitaxe1');
+  const bad = await req(port, 'POST', '/api/config/test', { pin: '424242', what: 'bitaxe', values: { BITAXES: 'bitaxe1=8.8.8.8' } });
+  assert.strictEqual(JSON.parse(bad.body).errors.BITAXES, 'bitaxes');
+  assert.match((await req(port, 'GET', '/')).body, /id="bxcard"/);
+  // o Bitaxe some: depois da janela, "sem resposta" e o worker volta para a estimativa
+  fake.close(); fake.closeAllConnections && fake.closeAllConnections();
+  const gone = await waitFor(async () => { const s = await snap(); return s.bitaxes[0].fresh === false && s; }, 10000);
+  assert.ok(gone.bitaxes[0].error);
+  const w2 = gone.farm.workers.find((x) => x.name === 'bitaxe1');
+  assert.ok(!w2 || w2.source !== 'bitaxe');
+});

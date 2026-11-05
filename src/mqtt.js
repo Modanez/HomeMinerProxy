@@ -121,7 +121,15 @@ const LABELS = {
   },
 };
 
-function discoveryConfigs(prefix = 'homeminerproxy', lang = 'en', currency = 'USD') {
+const bxSlug = (n) => String(n).toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 32);
+const BX_SENSORS = [
+  { id: 'hashrate', unit: 'H/s', icon: 'mdi:pickaxe', state_class: 'measurement', pt: 'hashrate', en: 'hashrate' },
+  { id: 'temp', unit: '°C', device_class: 'temperature', state_class: 'measurement', pt: 'temperatura do chip', en: 'chip temperature' },
+  { id: 'power', unit: 'W', device_class: 'power', state_class: 'measurement', pt: 'consumo', en: 'power' },
+  { id: 'fan', unit: '%', icon: 'mdi:fan', state_class: 'measurement', pt: 'fan', en: 'fan' },
+];
+
+function discoveryConfigs(prefix = 'homeminerproxy', lang = 'en', currency = 'USD', bitaxes = []) {
   const L = LABELS[lang] || LABELS.en;
   const nodeId = prefix.replace(/[^a-zA-Z0-9_-]/g, '_');
   const stateTopic = `${prefix}/state`;
@@ -174,6 +182,25 @@ function discoveryConfigs(prefix = 'homeminerproxy', lang = 'en', currency = 'US
       device,
     }),
   });
+  // um conjunto de sensores por Bitaxe (BITAXES), lidos da API do aparelho
+  for (const name of bitaxes) {
+    const slug = bxSlug(name);
+    for (const s of BX_SENSORS) {
+      const cfg = {
+        name: `${name} ${s[lang] || s.en}`,
+        unique_id: `${nodeId}_bitaxe_${slug}_${s.id}`,
+        state_topic: stateTopic,
+        availability_topic: availTopic,
+        value_template: `{{ value_json.bitaxes.${slug}.${s.id} if value_json.bitaxes is defined and value_json.bitaxes.${slug} is defined else none }}`,
+        unit_of_measurement: s.unit,
+        device,
+      };
+      if (s.icon) cfg.icon = s.icon;
+      if (s.device_class) cfg.device_class = s.device_class;
+      if (s.state_class) cfg.state_class = s.state_class;
+      out.push({ topic: `homeassistant/sensor/${nodeId}/bitaxe_${slug}_${s.id}/config`, payload: JSON.stringify(cfg) });
+    }
+  }
   return out;
 }
 
@@ -210,6 +237,16 @@ function statePayload(snap) {
     const totalPlugWatts = plugs.reduce((s, x) => s + (x.watts != null ? Number(x.watts) : 0), 0);
     out.plug_watts = p.watts != null ? Number(totalPlugWatts.toFixed(1)) : null;
     out.plug_volts = p.volts != null ? Number(p.volts.toFixed(1)) : null;
+  }
+  const bxs = (snap && snap.bitaxes) || [];
+  if (bxs.length) {
+    out.bitaxes = {};
+    for (const b of bxs) {
+      const d = b.fresh && b.data;
+      out.bitaxes[bxSlug(b.name)] = d
+        ? { hashrate: Math.round(d.hashRate10m || d.hashRate || 0), temp: d.tempC, power: d.watts != null ? Number(d.watts.toFixed(1)) : null, fan: d.fanPct, online: 'ON' }
+        : { hashrate: null, temp: null, power: null, fan: null, online: 'OFF' };
+    }
   }
   return out;
 }
@@ -262,7 +299,7 @@ function start(opts = {}) {
 
   function publishDiscovery() {
     publish(`${prefix}/availability`, 'online', true);
-    for (const d of discoveryConfigs(prefix, lang, currency)) {
+    for (const d of discoveryConfigs(prefix, lang, currency, opts.bitaxes || [])) {
       send(publishPacket(d.topic, d.payload, true));
     }
   }
