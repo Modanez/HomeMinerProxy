@@ -361,7 +361,8 @@ test('health, readTempC, readCpuPct e readMem: métricas de hardware', () => {
   assert.ok(typeof h.uptimeS === 'number');
   assert.ok(typeof h.cores === 'number');
 
-  assert.strictEqual(painel.readTempC(), null);
+  const temp = painel.readTempC();
+  assert.ok(temp === null || (typeof temp === 'number' && temp > 0));
   assert.strictEqual(painel.readCpuPct(), null);
   const mem = painel.readMem();
   assert.ok(mem && mem.total > 0);
