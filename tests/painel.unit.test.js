@@ -555,6 +555,21 @@ test('parseMinerdLog: interpreta hashrate e shares aceitos do log', () => {
   assert.strictEqual(empty.lastShare, null);
 });
 
+test('parseMinerdLog: a hora do journal (short-unix) vale, mesmo com o fuso do Node diferente do sistema', () => {
+  const now = Math.floor(Date.now() / 1000);
+  const off = new Date(Date.now() - 3 * 3600e3).toISOString().replace('T', ' ').slice(0, 19);   // hora do cpuminer 3 h "atrás" para o Node
+  const log = [
+    `${now - 30}.123456 homeminer minerd[812]: [${off}] thread 0: 41045675 hashes, 685.63 khash/s`,
+    `${now - 10}.654321 homeminer minerd[812]: [${off}] thread 1: 41266343 hashes, 687.66 khash/s`,
+    `${now - 5}.000001 homeminer minerd[812]: [${off}] accepted: 3/3 (100.00%), 2058.42 khash/s (yay!!!)`,
+    `${now - 4000}.1 homeminer minerd[812]: [${off}] thread 2: 1 hashes, 999.00 khash/s`,   // velho: fica de fora
+  ].join('\n');
+  const p = painel.parseMinerdLog(log);
+  assert.strictEqual(Math.round(p.hashrate), 1373290);
+  assert.strictEqual(p.lastShare, (now - 5) * 1000);
+  assert.strictEqual(p.lastTs, (now - 10) * 1000);
+});
+
 test('readTempC, readCpuPct e readMem com arquivos simulados', () => {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'hw-'));
   try {

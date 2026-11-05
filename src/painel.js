@@ -246,6 +246,7 @@ function workersView() {
     let hashRate = Number(k.hashRate) || nominal;
     let lastSeen = k.lastSeen;
     let source = 'pool';
+    let approx = false;
     let state;
     if (name === LOCAL_WORKER && local.running && now - local.at < 5 * 60e3) {
       hashRate = local.hashrate;
@@ -255,6 +256,12 @@ function workersView() {
     } else if (proxied.has(name)) {
       const p = proxied.get(name);
       if (proxyHashrate(p)) hashRate = proxyHashrate(p);
+      else if (!(Number(k.hashRate) > 0)) {
+        // CPU com alvo 1 manda poucos shares por hora (o macbook, ~8): em vez de 0, uma estimativa marcada com "~",
+        // pela média de 24 h do proxy ou, sem ela, pela última hora com ao menos 3 shares
+        const est = p.hashrate24h > 0 ? p.hashrate24h : p.shares1h >= 3 && p.hashrate > 0 ? p.hashrate : 0;
+        if (est > 0) { hashRate = est; approx = true; }
+      }
       if (p.lastShareAt && (!lastSeen || p.lastShareAt > new Date(lastSeen).getTime())) lastSeen = new Date(p.lastShareAt).toISOString();
       source = 'proxy';
       state = 'ok';
@@ -274,7 +281,7 @@ function workersView() {
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
     const pxw = proxied.get(name);
     const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0 } : {};
-    return { ...k, name, hashRate, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx };
+    return { ...k, name, hashRate, approx, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx };
   }).sort((a, b) => b.hashRate - a.hashRate);
 }
 
@@ -580,12 +587,16 @@ function alarmStatus() {
 const { execFile } = require('child_process');
 let local = { at: 0, hashrate: 0, lastShare: null, running: false };
 
+// Cada linha pode vir com a hora do journal em segundos Unix ("-o short-unix": "1762364828.123 host minerd[12]: [..] thread 0: ...").
+// Essa é a hora que vale: a do próprio cpuminer ("[2026-11-05 14:47:08]") é hora local sem fuso, e o Node
+// pode estar em outro fuso que o sistema (ex.: /etc/localtime copiado em vez de link), o que descartava tudo.
 function parseMinerdLog(out) {
   const perThread = {};
   let lastTs = 0, lastShare = null;
   for (const line of (out || '').split('\n')) {
-    const ts = (line.match(/^\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]/) || [])[1];
-    const t = ts ? new Date(ts.replace(' ', 'T')).getTime() : 0;
+    const unix = (line.match(/^(\d{9,11})(?:\.\d+)?\s/) || [])[1];
+    const ts = (line.match(/\[(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d)\]/) || [])[1];
+    const t = unix ? Number(unix) * 1000 : ts ? new Date(ts.replace(' ', 'T')).getTime() : 0;
     const m = line.match(/thread (\d+): \d+ hashes, ([\d.]+) khash\/s/);
     if (m && t && Date.now() - t < 5 * 60e3) { perThread[m[1]] = Number(m[2]) * 1000; lastTs = t; }
     if (t && line.includes('accepted:')) lastShare = t;
@@ -596,7 +607,7 @@ function parseMinerdLog(out) {
 
 function tickLocal(runner = null) {
   return new Promise((resolve) => {
-    const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '-u', 'mineracao-minerador', '--since', '-3 hours', '-o', 'cat', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
+    const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '-u', 'mineracao-minerador', '--since', '-3 hours', '-o', 'short-unix', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
     fn((err, out) => {
       if (err || !out) { local.running = false; return resolve(); }
       const p = parseMinerdLog(out);
@@ -1459,7 +1470,7 @@ function renderFarm(j) {
     if (h.tempC != null && w.name === h.worker) {
       temp = ' <span class="temp ' + (h.tempC >= 75 ? 'hot' : h.tempC >= 60 ? 'warm' : '') + '">' + nf(h.tempC) + ' °C</span>';
     }
-    const hr = (w.state === 'unknown' ? '~' : '') + fmtHash(Number(w.hashRate));
+    const hr = (w.state === 'unknown' || w.approx ? '~' : '') + fmtHash(Number(w.hashRate));
     let best = Number(w.bestDifficulty) > 0 ? nf(Number(w.bestDifficulty), 2) : '–';
     if (w.lastDiff && w.lastDiff.diff != null) {
       const fresh = Date.now() - w.lastDiff.at < 5 * 60e3;   // destaque nos 5 min depois do share
