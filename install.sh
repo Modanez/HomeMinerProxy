@@ -97,11 +97,16 @@ if command -v python3 >/dev/null; then
   services="$services mineracao-cubo"
 fi
 
-systemctl daemon-reload
-systemctl enable $services >/dev/null
-systemctl restart $services
-sleep 3
-systemctl --no-pager --lines=0 status $services || true
+if [ -n "${HOMEMINER_IMAGE:-}" ]; then
+  # montando a imagem do cartão (chroot, sem systemd rodando): só deixa os serviços ativados para o primeiro boot
+  systemctl enable $services >/dev/null
+else
+  systemctl daemon-reload
+  systemctl enable $services >/dev/null
+  systemctl restart $services
+  sleep 3
+  systemctl --no-pager --lines=0 status $services || true
+fi
 
 ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 port=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || true)
