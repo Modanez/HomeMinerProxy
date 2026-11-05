@@ -81,6 +81,18 @@ The dashboard, cube, widget and installer work in **English** and **Brazilian Po
 - **`CURRENCY=USD`** or **`CURRENCY=BRL`** sets the currency for money values (BTC price, prize, power bill). The default is BRL for pt-BR and USD otherwise.
 - **`POWER_PRICE_KWH=0.15`** sets your electricity price per kWh, in that currency (default 0.15 USD or 0.90 BRL). Together with `WATTS` per worker, it drives the power bill estimate.
 
+## Ready-to-flash SD card (easiest)
+
+No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange Pi Zero 3** and **Odroid-C2**:
+
+1. Download `homeminer-<board>.img.xz` from the [latest release](https://github.com/Modanez/HomeMinerProxy/releases/latest).
+2. Flash it to an SD card (8 GB or more; a "High Endurance" card lasts longer) with [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ("Use custom") or [balenaEtcher](https://etcher.balena.io/).
+3. Put the card in the board, **plug in the network cable** and power it on. The first boot takes a few minutes (it expands the card).
+4. On your phone or computer, open **http://homeminer.local:3000**. If the name does not open, use the IP your router shows for "homeminer". The first-setup wizard asks for the language, your bitcoin address, an admin PIN and the power price.
+5. Point your miners to `homeminer.local` (or the IP), ports as shown at the end of the wizard. Give the board a fixed IP in your router.
+
+Updates come from ⚙️ Settings → 💾 Backup → **Update now**. For security, SSH is off on the Orange Pi and Odroid images (to turn it on: monitor and keyboard, log in as `root`, password `1234`, choose a new one, then `systemctl enable --now ssh`). On the Raspberry Pi image SSH is off as usual; you can turn it on in Raspberry Pi Imager's settings when flashing.
+
 ## Install
 
 Requires Linux with systemd and Node.js 16 or newer.

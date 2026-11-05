@@ -81,6 +81,18 @@ O painel, o cubo, o widget e o instalador funcionam em **português (pt-BR)** e 
 - **`CURRENCY=BRL`** ou **`CURRENCY=USD`** define a moeda dos valores (cotação, prêmio, conta de luz). O padrão é BRL em pt-BR e USD nos outros casos.
 - **`POWER_PRICE_KWH=0.90`** define o preço do kWh da sua conta de luz, nessa moeda. O padrão é R$ 0,90 ou US$ 0,15. Junto com o `WATTS` de cada worker, ele calcula a estimativa da conta de luz.
 
+## Cartão SD pronto para gravar (o jeito mais fácil)
+
+Sem terminal. Cada release traz imagens para **Raspberry Pi 3/4/5**, **Orange Pi Zero 3** e **Odroid-C2**:
+
+1. Baixe o `homeminer-<placa>.img.xz` da [release mais recente](https://github.com/Modanez/HomeMinerProxy/releases/latest).
+2. Grave num cartão SD (8 GB ou mais; cartão "High Endurance" dura mais) com o [Raspberry Pi Imager](https://www.raspberrypi.com/software/) ("Use custom") ou o [balenaEtcher](https://etcher.balena.io/).
+3. Coloque o cartão na placa, **ligue o cabo de rede** e ligue a energia. O primeiro boot leva alguns minutos (ele expande o cartão).
+4. No celular ou no computador, abra **http://homeminer.local:3000**. Se o nome não abrir, use o IP que o roteador mostra para "homeminer". O assistente de primeira configuração pergunta o idioma, o seu endereço de bitcoin, um PIN de administração e o preço da energia.
+5. Aponte os mineradores para `homeminer.local` (ou o IP), nas portas que aparecem no fim do assistente. Reserve um IP fixo para a placa no roteador.
+
+As atualizações saem em ⚙️ Configurações → 💾 Backup → **Atualizar agora**. Por segurança, o SSH vem desligado nas imagens do Orange Pi e do Odroid (para ligar: monitor e teclado, login `root`, senha `1234`, escolha uma nova e rode `systemctl enable --now ssh`). Na imagem do Raspberry Pi o SSH vem desligado como de costume; dá para ligar nas configurações do Raspberry Pi Imager na hora de gravar.
+
 ## Instalação
 
 Precisa de Linux com systemd e Node.js 16 ou mais novo.
