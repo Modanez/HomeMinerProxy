@@ -93,3 +93,51 @@ test('Tailscale conectado mostra o nome e o IP; sem tailscale instalado', async 
   assert.deepStrictEqual(await net.tailscaleStatus(), { available: false });
   assert.deepStrictEqual(await net.tailscaleConnect(), { ok: false, error: 'notailscale' });
 });
+
+function sshSandbox(t, { active = false } = {}) {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ssh-'));
+  const log = path.join(dir, 'calls.log'), on = path.join(dir, 'on');
+  if (active) fs.writeFileSync(on, '');
+  const sh = (name, body) => { const f = path.join(dir, name); fs.writeFileSync(f, `#!/bin/sh\necho "${name} $*" >> "${log}"\n${body}\n`, { mode: 0o755 }); return f; };
+  const env = {
+    SSHD_PATH: sh('sshd', ''), SSH_KEYGEN: sh('ssh-keygen', ''), SSH_DIR: path.join(dir, 'root-ssh'), SSHD_DROPIN: path.join(dir, 'sshd_config.d', '10-homeminer.conf'),
+    NET_SYSTEMCTL: sh('systemctl', `case "$1" in is-active) [ -f "${on}" ] ;; enable) touch "${on}" ;; disable) rm -f "${on}" ;; esac`),
+  };
+  Object.assign(process.env, env);
+  delete require.cache[require.resolve('../src/netctl')];
+  t.after(() => { for (const k of Object.keys(env)) delete process.env[k]; fs.rmSync(dir, { recursive: true, force: true }); });
+  const calls = () => { try { return fs.readFileSync(log, 'utf8').trim().split('\n'); } catch (_) { return []; } };
+  return { net: require('../src/netctl'), env, calls };
+}
+const KEY = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBx5oUqZ8yN7rTq2mW3vKp9sLd4fGh6jK8lM0nP2qR4s paulo@mac';
+
+test('SSH pelo painel: só com chave, senha desligada, desligar desfaz', async (t) => {
+  const { net, env, calls } = sshSandbox(t);
+  assert.deepStrictEqual(await net.sshStatus(), { available: true, active: false, managed: false, keys: [] });
+  assert.deepStrictEqual(await net.sshEnable(''), { ok: false, error: 'sshkey' });                      // sem chave nenhuma
+  assert.deepStrictEqual(await net.sshEnable('-----BEGIN OPENSSH PRIVATE KEY-----'), { ok: false, error: 'sshkey' });
+  assert.deepStrictEqual(await net.sshEnable(KEY + '\ncommand="x" ssh-rsa AAAA'), { ok: false, error: 'sshkey' });   // uma linha só
+  const r = await net.sshEnable('  ' + KEY + '\n');
+  assert.strictEqual(r.ok, true);
+  assert.deepStrictEqual(r.status, { available: true, active: true, managed: true, keys: ['paulo@mac …lM0nP2qR4s'.replace('lM0nP2qR4s', KEY.split(' ')[1].slice(-8))] });
+  const ak = path.join(env.SSH_DIR, 'authorized_keys');
+  assert.strictEqual(fs.readFileSync(ak, 'utf8'), KEY + '\n');
+  assert.strictEqual(fs.statSync(ak).mode & 0o777, 0o600);
+  assert.strictEqual(fs.statSync(env.SSH_DIR).mode & 0o777, 0o700);
+  assert.match(fs.readFileSync(env.SSHD_DROPIN, 'utf8'), /PasswordAuthentication no/);
+  assert.ok(calls().includes('ssh-keygen -A') && calls().includes('systemctl enable --now ssh'));
+  await net.sshEnable(KEY);                                                                              // a mesma chave não repete
+  assert.strictEqual(fs.readFileSync(ak, 'utf8'), KEY + '\n');
+  const off = await net.sshDisable();
+  assert.strictEqual(off.status.active, false);
+  assert.ok(!fs.existsSync(env.SSHD_DROPIN));
+});
+
+test('SSH ligado por fora do painel: só acrescenta a chave, não mexe na configuração', async (t) => {
+  const { net, env, calls } = sshSandbox(t, { active: true });
+  const r = await net.sshEnable(KEY);
+  assert.strictEqual(r.ok, true);
+  assert.strictEqual(r.status.managed, false);
+  assert.ok(!fs.existsSync(env.SSHD_DROPIN));
+  assert.ok(!calls().some((c) => /enable --now/.test(c)));
+});

@@ -4,6 +4,7 @@
 
 const fs = require('fs');
 const os = require('os');
+const path = require('path');
 const { execFile } = require('child_process');
 
 const find = (env, list) => (env ? [env] : list).find((p) => fs.existsSync(p)) || null;
@@ -120,4 +121,63 @@ async function tailscaleDisconnect() {
   return { ok: true };
 }
 
-module.exports = { splitTerse, wifiStatus, wifiScan, wifiConnect, wifiForget, tailscaleStatus, tailscaleConnect, tailscaleDisconnect };
+// ---------------------------------------------------------------- SSH (só com chave)
+// Ligar pelo painel: grava a chave pública em /root/.ssh/authorized_keys, desliga o login por senha
+// (as imagens Armbian vêm com root/1234) e sobe o serviço. Se o SSH já foi ligado por fora do painel,
+// o painel não mexe na configuração: só acrescenta chaves.
+const SSH = {
+  sshd: () => find(process.env.SSHD_PATH, ['/usr/sbin/sshd']),
+  keygen: () => process.env.SSH_KEYGEN || 'ssh-keygen',
+  dir: () => process.env.SSH_DIR || '/root/.ssh',
+  dropin: () => process.env.SSHD_DROPIN || '/etc/ssh/sshd_config.d/10-homeminer.conf',
+};
+const DROPIN = '# criado pelo painel do HomeMinerProxy (⚙️ Configurações → 🌐 Rede → SSH)\nPasswordAuthentication no\nKbdInteractiveAuthentication no\nPermitRootLogin prohibit-password\n';
+const KEY_RE = /^(ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp(256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com) [A-Za-z0-9+/]{40,}={0,3}( [\x20-\x7e]{0,100})?$/;
+
+function sshKeys() {
+  try { return fs.readFileSync(path.join(SSH.dir(), 'authorized_keys'), 'utf8').split('\n').map((l) => l.trim()).filter((l) => KEY_RE.test(l)); } catch (_) { return []; }
+}
+const keyLabel = (k) => { const [type, body, ...c] = k.split(' '); return (c.join(' ') || type) + ' …' + body.slice(-8); };
+
+async function sshStatus() {
+  if (!SSH.sshd() || (process.getuid && process.getuid() !== 0 && !process.env.SSH_DIR)) return { available: false };
+  const active = (await run(BIN.systemctl(), ['is-active', '--quiet', 'ssh'])).ok;
+  return { available: true, active, managed: fs.existsSync(SSH.dropin()), keys: sshKeys().map(keyLabel) };
+}
+
+async function sshEnable(pubkey) {
+  const st = await sshStatus();
+  if (!st.available) return { ok: false, error: 'nossh' };
+  const raw = String(pubkey || '').trim();
+  if (/[\r\n]/.test(raw)) return { ok: false, error: 'sshkey' };   // uma chave por vez, numa linha só
+  const key = raw.replace(/\s+/g, ' ');
+  if (key && !KEY_RE.test(key)) return { ok: false, error: 'sshkey' };
+  if (!key && !st.keys.length) return { ok: false, error: 'sshkey' };
+  if (key && !sshKeys().includes(key)) {
+    fs.mkdirSync(SSH.dir(), { recursive: true, mode: 0o700 });
+    fs.chmodSync(SSH.dir(), 0o700);
+    const f = path.join(SSH.dir(), 'authorized_keys');
+    let cur = ''; try { cur = fs.readFileSync(f, 'utf8'); } catch (_) { /* primeira chave */ }
+    fs.writeFileSync(f, cur + (cur && !cur.endsWith('\n') ? '\n' : '') + key + '\n', { mode: 0o600 });
+    fs.chmodSync(f, 0o600);
+  }
+  if (!st.active) {
+    // ligado pelo painel: só chave, nunca senha
+    fs.mkdirSync(path.dirname(SSH.dropin()), { recursive: true });
+    fs.writeFileSync(SSH.dropin(), DROPIN, { mode: 0o644 });
+    await run(SSH.keygen(), ['-A'], 60000);   // chaves do servidor, se faltarem
+    const r = await run(BIN.systemctl(), ['enable', '--now', 'ssh'], 30000);
+    if (!r.ok) return { ok: false, error: 'sshstart' };
+  }
+  return { ok: true, status: await sshStatus() };
+}
+
+async function sshDisable() {
+  const st = await sshStatus();
+  if (!st.available) return { ok: false, error: 'nossh' };
+  await run(BIN.systemctl(), ['disable', '--now', 'ssh'], 30000);
+  try { fs.rmSync(SSH.dropin(), { force: true }); } catch (_) { /* segue */ }
+  return { ok: true, status: await sshStatus() };
+}
+
+module.exports = { sshStatus, sshEnable, sshDisable, splitTerse, wifiStatus, wifiScan, wifiConnect, wifiForget, tailscaleStatus, tailscaleConnect, tailscaleDisconnect };
