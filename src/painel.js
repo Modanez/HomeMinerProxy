@@ -642,6 +642,13 @@ async function tickProxy() {
         listen: r.listen, primary: r.upstreams[0].label, since: r.upstreams[0].since,
         active: (r.upstreams.slice(1).find((u) => !u.down) || {}).label || null,
       })),
+      // portas do proxy (para o guia "Pools e portas" da tela de configurações)
+      routes: (s.routes || []).map((r) => {
+        const up = r.upstreams || [];
+        const main = up[0] || r;
+        return { listen: r.listen, label: main.label || r.label, host: main.host || r.host, down: !!main.down, pingMs: main.pingMs ?? null,
+          backups: up.slice(1).map((u) => u.label), active: main.down ? (up.slice(1).find((u) => !u.down) || {}).label || null : null };
+      }),
       bestHash: s.bestHash || null,
       dayBestHash: s.dayBestHash || null,
       week: s.week || null,
@@ -2169,6 +2176,7 @@ function requestHandler(req, res) {
     onSaved: () => { console.log('configuração salva pela tela; reiniciando'); if (require.main === module) process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
     tuyaApi: process.env.TUYA_API,
+    pools: () => ({ routes: proxy.routes && proxy.routes.length ? proxy.routes : null, hosts: [os.hostname().split('.')[0] + '.local', ...require('./setup').lanAddresses()], address: ADDRESS || null }),
   })) return;
   if (req.url.startsWith('/api/widget')) {
     // resumo enxuto e já formatado, para widgets (KWGT etc.)
