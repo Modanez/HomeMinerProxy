@@ -1,0 +1,15 @@
+{
+  "power": 18.4, "voltage": 5080, "current": 3620, "temp": 69.2, "vrTemp": 0,
+  "hashRate": 1170.0, "hashRate_1m": 1165.0, "hashRate_10m": 1172.5, "hashRate_1h": 1180.0, "expectedHashrate": 1200,
+  "bestDiff": 4290000000, "bestSessionDiff": 812000,
+  "isUsingFallbackStratum": 1, "coreVoltage": 1150, "frequency": 525, "hostname": "bitaxe-2", "wifiRSSI": -71,
+  "sharesAccepted": 50, "sharesRejected": 0, "uptimeSeconds": 600, "resetReason": "Software reset",
+  "ASICModel": "BM1370", "boardVersion": "602", "version": "v2.15.0",
+  "pools": [
+    { "url": "192.168.0.134", "port": 3338, "user": "bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w.bitaxe2" },
+    { "url": "solo.ckpool.org", "port": 3333, "user": "bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w.bitaxe2" }
+  ],
+  "primaryPoolIndex": 0, "secondaryPoolIndex": 1,
+  "autofanspeed": 1, "fanspeed": 80, "fanrpm": 5600, "overheat_mode": 0,
+  "blockFound": 0, "miningPaused": false, "power_fault": false, "hardware_fault": false
+}

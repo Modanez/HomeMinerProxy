@@ -160,6 +160,16 @@ Reserve um IP fixo para o servidor no roteador (DHCP estático): se o IP mudar, 
 minerd -a sha256d -o stratum+tcp://192.168.0.10:3333 -u SEU_ENDERECO.notebook -p x
 ```
 
+## Telemetria do Bitaxe (API do AxeOS)
+
+O painel lê cada Bitaxe direto da API local do AxeOS (firmware 2.14 e 2.15): hashrate medido (1 min, 10 min, 1 h e esperado), temperatura do chip e do regulador, consumo e J/TH, fan, frequência e tensão do chip, pool em uso (principal ou reserva), melhor da sessão, tempo ligado e sinal do Wi-Fi.
+
+1. Reserve um IP fixo para cada Bitaxe no roteador.
+2. Em ⚙️ Configurações → Mineradores → **Bitaxe (API do AxeOS)**, escreva `nome=IP` de cada um (`bitaxe1=192.168.0.140, bitaxe2=192.168.0.141`), ou toque em **Procurar na rede** e **Usar estes**. **Testar** mostra modelo, firmware, hashrate, temperatura e watts. Use o nome do worker (o que vem depois do ponto no usuário da pool).
+3. Salve. A tela da fazenda ganha um cartão **Bitaxe**, a linha do worker mostra temperatura e watts, e o consumo medido substitui a estimativa do `WATTS` no custo de energia (uma tomada com medidor continua tendo prioridade).
+
+O `/status` do Telegram ganha uma linha por Bitaxe, e o MQTT / Home Assistant ganha sensores de hashrate, temperatura, consumo e fan de cada um. O painel só lê (`GET /api/system/info` a cada 30 s): overclock, firmware e o Wi-Fi do Bitaxe ficam no AxeOS. A API do AxeOS não tem senha e só responde na rede de casa, então nunca exponha um Bitaxe à internet: de fora de casa, abra o painel pelo Tailscale.
+
 ## Minerando com o cpuminer (passo a passo)
 
 O [cpuminer](https://github.com/pooler/cpuminer) (`minerd`) minera bitcoin em qualquer processador: notebook, PC velho, Raspberry Pi, celular Android. Seja honesto com as chances: uma CPU faz poucos MH/s, então um bloco é uma loteria de uma em bilhões por ano. A graça é ver cada share aparecer no painel, com direito a recorde. Na fazenda deste projeto, um MacBook M2 faz uns 9 MH/s, um tablet Android uns 4 MH/s e um Odroid-C2 uns 2,7 MH/s.

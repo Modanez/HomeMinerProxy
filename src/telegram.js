@@ -29,6 +29,8 @@ const STRINGS = {
     dayBest: (d, w) => `Melhor hash do dia: <b>${d}</b> (${w})`,
     farmRecord: (d, w) => `Recorde da fazenda: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Mais sortudo: ${w} (${f}×)`,
+    bitaxeOff: (n) => `🟥 ${n}: o Bitaxe não responde`,
+    bitaxeBackup: 'na reserva',
     poolPing: (ms, sc) => `⚡ Ping da pool: <b>${ms} ms</b> (${sc === 'great' ? '🟢 ótimo' : sc === 'good' ? '🟡 bom' : '🔴 ruim'})`,
     failoverNow: (port, primary, active) => `⚠️ porta ${port}: ${primary} fora, usando ${active || '–'}`,
     stoppedNow: (list) => `🔴 Parados: ${list}`,
@@ -88,6 +90,8 @@ const STRINGS = {
     dayBest: (d, w) => `Best hash today: <b>${d}</b> (${w})`,
     farmRecord: (d, w) => `Farm record: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Luckiest: ${w} (${f}×)`,
+    bitaxeOff: (n) => `🟥 ${n}: the Bitaxe is not answering`,
+    bitaxeBackup: 'on backup',
     poolPing: (ms, sc) => `⚡ Pool ping: <b>${ms} ms</b> (${sc === 'great' ? '🟢 great' : sc === 'good' ? '🟡 good' : '🔴 poor'})`,
     failoverNow: (port, primary, active) => `⚠️ port ${port}: ${primary} down, using ${active || '–'}`,
     stoppedNow: (list) => `🔴 Stopped: ${list}`,
@@ -243,6 +247,13 @@ function statusText(snap, opts = {}) {
   if (day && day.date === (opts.today || new Date().toLocaleDateString('sv'))) lines.push(T.dayBest(fm.diff(day.diff), escHtml(day.worker)));
   if (top) lines.push(T.farmRecord(fm.diff(top.value), escHtml(top.worker)));
   if (luck) lines.push(T.luckiest(escHtml(luck.name), fm.num(luck.factor, 2)));
+  // uma linha por Bitaxe com a API: hashrate do aparelho, temperatura, consumo
+  for (const b of snap.bitaxes || []) {
+    const d = b.data;
+    if (!b.fresh || !d) { lines.push(T.bitaxeOff(escHtml(b.name))); continue; }
+    const parts = [fm.hashrate(d.hashRate10m || d.hashRate), d.tempC != null ? `${fm.num(d.tempC, 0)} °C` : null, d.watts != null ? `${fm.num(d.watts, 1)} W` : null, d.pool && d.pool.fallback ? T.bitaxeBackup : null];
+    lines.push(`🟧 <b>${escHtml(b.name)}</b> · ${parts.filter(Boolean).join(' · ')}`);
+  }
   const pools = (snap.proxy || {}).pools || [];
   if (pools.length) lines.push('⚡ Ping: ' + pools.map((p) => `${escHtml(p.label)} <b>${p.pingMs != null ? p.pingMs + ' ms' : '–'}</b> ${p.pingScore === 'great' ? '🟢' : p.pingScore === 'good' ? '🟡' : p.pingScore === 'poor' ? '🔴' : '⚪'}`).join(' · '));
   else if ((snap.proxy || {}).pingMs != null) lines.push(T.poolPing(snap.proxy.pingMs, snap.proxy.pingScore));
