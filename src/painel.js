@@ -586,6 +586,7 @@ function alarmStatus() {
 // Minerador local: lê o hashrate e o último share aceito direto do log do serviço minerd
 const { execFile } = require('child_process');
 let local = { at: 0, hashrate: 0, lastShare: null, running: false };
+let localTick = { at: 0, error: null, bytes: 0 };   // diagnóstico da última leitura do log (aparece em health.localMiner)
 
 // Cada linha pode vir com a hora do journal em segundos Unix ("-o short-unix": "1762364828.123 host minerd[12]: [..] thread 0: ...").
 // Essa é a hora que vale: a do próprio cpuminer ("[2026-11-05 14:47:08]") é hora local sem fuso, e o Node
@@ -609,6 +610,7 @@ function tickLocal(runner = null) {
   return new Promise((resolve) => {
     const fn = runner || ((cb) => execFile('journalctl', ['-u', 'minerd', '-u', 'mineracao-minerador', '--since', '-3 hours', '-o', 'short-unix', '--no-pager'], { timeout: 10000, maxBuffer: 4 * 1024 * 1024 }, cb));
     fn((err, out) => {
+      localTick = { at: Date.now(), error: err ? String(err.message || err).slice(0, 200) : null, bytes: (out || '').length };
       if (err || !out) { local.running = false; return resolve(); }
       const p = parseMinerdLog(out);
       local = { at: p.lastTs, hashrate: p.hashrate, lastShare: p.lastShare || local.lastShare, running: p.hashrate > 0 };
@@ -696,6 +698,7 @@ function readMem(file = '/proc/meminfo') {
 function health() {
   return {
     worker: LOCAL_WORKER,
+    localMiner: LOCAL_WORKER ? { running: local.running, hashrate: local.hashrate, lineAt: local.at || null, readAt: localTick.at || null, error: localTick.error, bytes: localTick.bytes } : null,
     tempC: readTempC(),
     cpuPct: readCpuPct(),
     load: os.loadavg()[0],
