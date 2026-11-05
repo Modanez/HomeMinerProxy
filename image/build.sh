@@ -112,6 +112,15 @@ step "Ajustes do aparelho / appliance tweaks"
 echo homeminer > "$ROOT/etc/hostname"
 if grep -q '^127\.0\.1\.1' "$ROOT/etc/hosts"; then sed -i 's/^127\.0\.1\.1.*/127.0.1.1\thomeminer/' "$ROOT/etc/hosts"; else printf '127.0.1.1\thomeminer\n' >> "$ROOT/etc/hosts"; fi
 chroot "$ROOT" systemctl enable avahi-daemon >/dev/null 2>&1 || true
+if [ "$BOARD" = odroidc2 ] && [ -f "$ROOT/boot/armbianEnv.txt" ]; then
+  # Odroid-C2 com kernel novo: sem fw_devlink=permissive o vídeo (DRM) não inicializa e a tela fica preta
+  if grep -q '^extraargs=' "$ROOT/boot/armbianEnv.txt"; then
+    grep -q 'fw_devlink=permissive' "$ROOT/boot/armbianEnv.txt" || sed -i 's/^extraargs=\(.*\)/extraargs=\1 fw_devlink=permissive/' "$ROOT/boot/armbianEnv.txt"
+  else
+    echo 'extraargs=fw_devlink=permissive' >> "$ROOT/boot/armbianEnv.txt"
+  fi
+  grep '^extraargs=' "$ROOT/boot/armbianEnv.txt" | sed 's/^/    /'
+fi
 if [ "$BOARD" != rpi ]; then
   # Armbian vem com SSH ligado e root/1234 até o primeiro login: num aparelho na rede de casa, desliga.
   # Para ligar: monitor e teclado, login root (senha 1234, ele pede para trocar) e "systemctl enable --now ssh".
