@@ -59,10 +59,17 @@ fi
 step "Descompactando e abrindo espaço / decompressing and growing by ${GROW_MB} MB"
 xz -dc "$WORK/base.img.xz" > "$WORK/base.img"
 rm -f "$WORK/base.img.xz"
+# Odroid-C2 (Amlogic) e outras placas guardam o começo do carregador de boot nos primeiros 442 bytes
+# do cartão, no mesmo setor da tabela de partições. O growpart reescreve esse setor: guarda e devolve.
+dd if="$WORK/base.img" of="$WORK/bootcode.bin" bs=1 count=442 status=none
 truncate -s "+${GROW_MB}M" "$WORK/base.img"
 LOOP=$(losetup -fP --show "$WORK/base.img")
 PARTN=$(parted -sm "$LOOP" print | tail -1 | cut -d: -f1)
 growpart "$LOOP" "$PARTN" || true
+if ! cmp -s "$WORK/bootcode.bin" <(dd if="$LOOP" bs=1 count=442 status=none); then
+  echo "    o growpart mexeu no código de boot do setor 0; restaurando / growpart touched the boot code; restoring"
+  dd if="$WORK/bootcode.bin" of="$LOOP" bs=1 count=442 conv=notrunc status=none
+fi
 partprobe "$LOOP" 2>/dev/null || true
 sleep 1
 e2fsck -fy "${LOOP}p${PARTN}" || [ $? -le 2 ]
@@ -139,6 +146,8 @@ for m in run sys proc dev/pts dev; do umount "$ROOT/$m"; done
 [ "$BOARD" = rpi ] && umount "$ROOT/boot/firmware"
 umount "$ROOT"
 e2fsck -fy "${LOOP}p${PARTN}" >/dev/null || [ $? -le 2 ]
+cmp -s "$WORK/bootcode.bin" <(dd if="$LOOP" bs=1 count=442 status=none) || fail "código de boot do setor 0 mudou / sector 0 boot code changed"
+echo "    código de boot do setor 0 intacto / sector 0 boot code intact"
 losetup -d "$LOOP"; LOOP=""
 
 step "Compactando / compressing → $OUT"
