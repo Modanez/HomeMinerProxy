@@ -505,7 +505,7 @@ const T = {
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
     verTitle: 'Versão e atualização', verInstalled: 'Instalada', verLatest: 'Mais recente no GitHub', verNew: 'nova versão disponível!', verOk: 'você está na versão mais recente',
-    updSame: 'já estava na versão mais recente: reinstalado sem mudanças.', updBtn: '⬆ Atualizar agora', updRunning: 'Atualizando: baixando a versão nova e reinstalando. O painel reinicia sozinho em 1 ou 2 minutos…', updDone: 'Atualizado!', updSlow: 'A atualização está demorando. Recarregue a página em alguns minutos.',
+    updSame: 'já estava na versão mais recente: reinstalado sem mudanças.', updFail: 'A atualização falhou:', updBtn: '⬆ Atualizar agora', updRunning: 'Atualizando: baixando a versão nova e reinstalando. O painel reinicia sozinho em 1 ou 2 minutos…', updDone: 'Atualizado!', updSlow: 'A atualização está demorando. Recarregue a página em alguns minutos.',
     updWhy: { docker: 'No Docker, atualize com: docker compose pull && docker compose up -d', norepo: 'A atualização pelo botão precisa da pasta do repositório (instalação pelo install.sh).', nosystemd: 'A atualização pelo botão precisa do serviço do systemd (instalação pelo install.sh).' },
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
     backupOk: 'Backup baixado.', restored: 'Backup restaurado! Reiniciando o painel…',
@@ -562,7 +562,7 @@ const T = {
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
     verTitle: 'Version and update', verInstalled: 'Installed', verLatest: 'Latest on GitHub', verNew: 'a new version is available!', verOk: 'you are on the latest version',
-    updSame: 'it was already the latest version: reinstalled with no changes.', updBtn: '⬆ Update now', updRunning: 'Updating: downloading the new version and reinstalling. The dashboard restarts by itself in 1 or 2 minutes…', updDone: 'Updated!', updSlow: 'The update is taking a while. Reload the page in a few minutes.',
+    updSame: 'it was already the latest version: reinstalled with no changes.', updFail: 'The update failed:', updBtn: '⬆ Update now', updRunning: 'Updating: downloading the new version and reinstalling. The dashboard restarts by itself in 1 or 2 minutes…', updDone: 'Updated!', updSlow: 'The update is taking a while. Reload the page in a few minutes.',
     updWhy: { docker: 'With Docker, update with: docker compose pull && docker compose up -d', norepo: 'Updating from here needs the repository folder (install.sh install).', nosystemd: 'Updating from here needs the systemd service (install.sh install).' },
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
     backupOk: 'Backup downloaded.', restored: 'Backup restored! Restarting the dashboard…',
@@ -652,7 +652,7 @@ function page(lang, hasPin, theme) {
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
-    verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updSlow: S.updSlow, updWhy: S.updWhy,
+    verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updFail: S.updFail, updSlow: S.updSlow, updWhy: S.updWhy,
   };
   return `<!doctype html>
 <html lang="${lang === 'pt' ? 'pt-br' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -1149,6 +1149,7 @@ fetch('/api/config/version').then((r) => r.json()).then((v) => {
 if (updBtn) updBtn.addEventListener('click', async () => {
   updBtn.disabled = true;
   try {
+    const started = Date.now();
     const r = await post('/api/config/update', { pin: pin() });
     if (r.error) { say(M.err[r.error] || M.updWhy[r.error] || r.error, false); return; }
     say(M.updRunning, true);
@@ -1159,7 +1160,12 @@ if (updBtn) updBtn.addEventListener('click', async () => {
       await new Promise((res) => setTimeout(res, 3000));
       try {
         const v = await fetch('/api/config/version', { cache: 'no-store' }).then((x) => x.json());
-        if (v && v.version && key(v) !== before) {
+        const lu = v && v.lastUpdate;
+        if (lu && lu.at && Date.parse(lu.at) >= started - 5000 && !lu.ok) {   // a atualização falhou: mostra o porquê
+          say(M.updFail + ' ' + (lu.tail || []).slice(-6).join(' · '), false);
+          return;
+        }
+        if (v && v.version && (key(v) !== before || (lu && lu.ok && Date.parse(lu.at) >= started - 5000))) {
           const same = verNow && (v.commit || '') + v.version === (verNow.commit || '') + verNow.version;
           say(M.updDone + ' v' + v.version + (same ? ' · ' + M.updSame : ''), true);
           setTimeout(() => { location.reload(); }, same ? 3500 : 1500);

@@ -92,6 +92,9 @@ cp -a "$HERE" "$ROOT/opt/HomeMinerProxy"
 rm -rf "$ROOT/opt/HomeMinerProxy/node_modules" "$ROOT/opt/HomeMinerProxy/tests/__pycache__" "$ROOT/opt/HomeMinerProxy/src/__pycache__"
 chown -R 0:0 "$ROOT/opt/HomeMinerProxy"   # o checkout do CI é de outro usuário; na placa tudo roda como root
 git config --global --add safe.directory "$ROOT/opt/HomeMinerProxy"
+# nenhuma credencial do CI pode ir para a imagem (o actions/checkout grava um token no .git/config)
+git -C "$ROOT/opt/HomeMinerProxy" config --unset-all http.https://github.com/.extraheader 2>/dev/null || true
+git -C "$ROOT/opt/HomeMinerProxy" config --remove-section credential 2>/dev/null || true
 # repositório pronto para o botão "Atualizar" (git pull na main)
 git -C "$ROOT/opt/HomeMinerProxy" remote set-url origin "$REPO_URL" 2>/dev/null || git -C "$ROOT/opt/HomeMinerProxy" remote add origin "$REPO_URL"
 git -C "$ROOT/opt/HomeMinerProxy" checkout -q -B main
@@ -142,6 +145,7 @@ grep -q '^BTC_ADDRESS=$' "$ROOT/etc/mineracao.env" || fail "BTC_ADDRESS deveria 
 chroot "$ROOT" node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 16 ? 0 : 1)" || fail "node >= 16"
 chroot "$ROOT" python3 -c "import PIL" || fail "python3-pil"
 [ "$(cat "$ROOT/etc/hostname")" = homeminer ] || fail hostname
+! grep -qiE 'extraheader|authorization|token|password' "$ROOT/opt/HomeMinerProxy/.git/config" || fail "credencial no .git/config / credential in .git/config"
 git -C "$ROOT/opt/HomeMinerProxy" rev-parse --abbrev-ref '@{u}' >/dev/null 2>&1 || echo "    aviso: sem upstream (o botão Atualizar usa a origin/main depois do primeiro fetch)"
 echo "    tudo certo / all good"
 

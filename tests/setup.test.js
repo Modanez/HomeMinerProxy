@@ -111,6 +111,21 @@ test('versões e botão de atualizar', async (t) => {
   assert.strictEqual((await req(port, 'POST', '/api/config/update', { pin: '1' })).status, 403);
   assert.deepStrictEqual(JSON.parse((await req(port, 'POST', '/api/config/update', { pin: '424242' })).body), { ok: true, restart: true });
   await waitFor(() => fs.existsSync(flag), 5000);
+  const ok = await waitFor(async () => { const j = JSON.parse((await req(port, 'GET', '/api/config/version')).body); return j.lastUpdate && j.lastUpdate; });
+  assert.strictEqual(ok.ok, true);
+});
+
+test('atualização que falha aparece com o motivo (ex.: git pull recusado)', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', UPDATE_CMD: 'echo "fatal: Authentication failed" >&2; exit 128' });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => req(port, 'GET', '/api/config/version'));
+  assert.strictEqual((await req(port, 'POST', '/api/config/update', { pin: '424242' })).status, 200);
+  const lu = await waitFor(async () => JSON.parse((await req(port, 'GET', '/api/config/version')).body).lastUpdate);
+  assert.strictEqual(lu.ok, false);
+  assert.strictEqual(lu.rc, 128);
+  assert.match(lu.tail.join('\n'), /Authentication failed/);
 });
 
 test('sem systemd nem repositório, o botão explica em vez de atualizar', async (t) => {
