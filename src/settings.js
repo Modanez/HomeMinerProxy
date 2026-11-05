@@ -36,6 +36,7 @@ const FIELDS = [
   { key: 'TELEGRAM_CHAT_ID', group: 'telegram', type: 'chatids' },
   { key: 'TELEGRAM_DAILY', group: 'telegram', type: 'hour', unset: '21' },
   { key: 'TELEGRAM_PERSONAL', group: 'telegram', type: 'bool' },
+  { key: 'TELEGRAM_BACKUP', group: 'telegram', type: 'bool' },
   { key: 'TELEGRAM_PANEL_URL', group: 'telegram', type: 'url' },
   { key: 'MQTT_URL', group: 'mqtt', type: 'mqtturl' },
   { key: 'MQTT_USER', group: 'mqtt', type: 'mqttuser' },
@@ -505,6 +506,7 @@ const T = {
     TELEGRAM_CHAT_ID: ['Id do chat', 'Mande /start para o bot depois de salvar o token: ele responde com o id. Vários: separe por vírgula.'],
     TELEGRAM_DAILY: ['Resumo diário', 'Hora do resumo (0 a 23). Vazio desliga.'],
     TELEGRAM_PERSONAL: ['Avisar recordes pessoais', 'Além do recorde da fazenda, avisa o recorde de cada worker (pode falar bastante no começo).'],
+    TELEGRAM_BACKUP: ['Backup semanal no Telegram', 'Todo domingo, na hora do resumo, o bot manda o arquivo de backup (o mesmo do 💾 Backup) sem som. A qualquer hora: /backup. O arquivo tem as chaves e senhas salvas (Tuya, MQTT, o token do bot): fica no seu chat com o bot.'],
     TELEGRAM_PANEL_URL: ['Link do painel', 'Aparece no /status. Ex.: http://odroid:3000 (Tailscale).'],
     MQTT_URL: ['Broker MQTT', 'URL do broker (ex.: mqtt://homeassistant.local:1883 ou mqtts://host:8883). Vazio desliga.'],
     MQTT_USER: ['Usuário MQTT', 'Usuário configurado no broker (Mosquitto / Home Assistant). Opcional se o broker aceitar conexão anônima.'],
@@ -574,6 +576,7 @@ const T = {
     TELEGRAM_CHAT_ID: ['Chat id', 'Send /start to the bot after saving the token: it replies with the id. Several: comma separated.'],
     TELEGRAM_DAILY: ['Daily summary', 'Hour of the summary (0 to 23). Empty turns it off.'],
     TELEGRAM_PERSONAL: ['Alert personal records', 'Besides the farm record, alert each worker\'s record (chatty at first).'],
+    TELEGRAM_BACKUP: ['Weekly backup on Telegram', 'Every Sunday, at the summary hour, the bot sends the backup file (the same as 💾 Backup) silently. Any time: /backup. The file has your saved keys and passwords (Tuya, MQTT, the bot token): it stays in your chat with the bot.'],
     TELEGRAM_PANEL_URL: ['Dashboard link', 'Shown in /status. E.g. http://odroid:3000 (Tailscale).'],
     MQTT_URL: ['MQTT broker', 'Broker URL (e.g. mqtt://homeassistant.local:1883 or mqtts://host:8883). Empty turns it off.'],
     MQTT_USER: ['MQTT username', 'Username configured on the broker (Mosquitto / Home Assistant). Optional if anonymous access is allowed.'],
@@ -662,7 +665,7 @@ function page(lang, hasPin, theme) {
       : f.key === 'TELEGRAM_CHAT_ID' ? ` <button type="button" class="ghost" data-test="telegram">${S.testTg}</button>`
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>` : '';
-    const half = ['LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    const half = ['LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
   };

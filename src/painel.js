@@ -777,6 +777,7 @@ function snapshot(internal = false) {
   for (const r of steps) if (r.value > run) { run = r.value; recordSteps.push({ t: new Date(r.at).getTime(), v: r.value, worker: r.worker }); }
   return {
     boot: BOOT,
+    clock: clockState,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
     ocean: OCEAN_API() ? { ...ocean, ...(SHOW_WALLET || internal ? {} : { unpaidSats: null }) } : null,
@@ -2090,7 +2091,9 @@ async function load() {
     set('fo', ((j.proxy && j.proxy.failover) || []).map((f) => '⚠️ ' + f.primary + ' fora do ar desde ' + hora(f.since) +
       (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)).join(' · '));
     renderProxyExtras(j.proxy);
-    set('err', j.error && stale
+    set('err', j.clock && j.clock.waiting ? '🕒 Acertando o relógio pela internet antes de começar (placas sem bateria ligam com a hora errada)…'
+      : j.clock && j.clock.suspect ? '🕒 O relógio não acertou pela internet: datas do histórico podem sair erradas. Confira a conexão.'
+      : j.error && stale
       ? (px ? 'API da public-pool fora do ar — shares e recordes seguem ao vivo pelo proxy.'
             : 'Pool instável (' + j.error + ') — mostrando dados de ' + (j.okAt ? hora(j.okAt) : '–') + ', tentando de novo…')
       : '');
@@ -2220,9 +2223,11 @@ function requestHandler(req, res) {
   res.end(html);
 }
 
+let clockState = { waiting: false, suspect: false };
 function start(port = PORT, host = '0.0.0.0') {
   const server = http.createServer(requestHandler);
   const timers = [];
+  let stopped = false;
   function everyTimer(fn, ms) {
     let busy = false;
     const run = async () => {
@@ -2235,8 +2240,16 @@ function start(port = PORT, host = '0.0.0.0') {
   }
   return new Promise((resolve, reject) => {
     server.on('error', reject);
-    server.listen(port, host, () => {
+    server.listen(port, host, async () => {
       console.log(`Painel de mineração em http://${host}:${port}`);
+      // placas sem bateria ligam com a hora errada: espera o relógio antes de coletar e gravar histórico
+      const clk = await require('./clock').waitOk({
+        appDir: __dirname, dataDir: process.env.DATA_DIR || __dirname,
+        onWait: (fl) => { clockState = { waiting: true, suspect: false }; console.log(`relógio atrasado (${new Date().toISOString()}, esperado depois de ${new Date(fl).toISOString()}); aguardando o NTP`); },
+      });
+      clockState = { waiting: false, suspect: !clk.ok };
+      if (clk.waitedMs) console.log(clk.ok ? 'relógio certo; começando' : 'o relógio não acertou (sem internet?); seguindo assim mesmo');
+      if (stopped) return;
       everyTimer(tickPool, POOL_MS);
       everyTimer(tickWallet, WALLET_MS);
       everyTimer(tickNetwork, NET_MS);
@@ -2258,6 +2271,7 @@ function start(port = PORT, host = '0.0.0.0') {
         server,
         timers,
         stop() {
+          stopped = true;
           timers.forEach((t) => clearInterval(t));
           if (tgBot && tgBot.stop) tgBot.stop();
           if (mqttClient && mqttClient.stop) mqttClient.stop();
@@ -2287,6 +2301,8 @@ function startTelegram() {
     panelUrl: (process.env.TELEGRAM_PANEL_URL || '').trim() || null,
     stateFile: file('telegram.json'),
     api: process.env.TELEGRAM_API,
+    backupWeekly: process.env.TELEGRAM_BACKUP === '1',
+    backup: () => ({ name: `homeminer-backup-${new Date().toLocaleDateString('sv')}.json`, json: JSON.stringify(settings.exportBackup(process.env.DATA_DIR || __dirname), null, 2) }),
   });
 }
 

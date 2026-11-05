@@ -93,6 +93,8 @@ Sem terminal. Cada release traz imagens para **Raspberry Pi 3/4/5**, **Orange Pi
 
 **Aba 🌐 Rede** (⚙️ Configurações, com PIN): **Wi-Fi** — procure as redes e conecte, depois tire o cabo (precisa de um adaptador Wi-Fi e do NetworkManager, que a imagem do Raspberry Pi tem); **Tailscale** — um toque para abrir o painel de fora de casa sem abrir portas no roteador: toque em *Conectar ao Tailscale*, abra o link de autorização, entre na sua conta do Tailscale (grátis) e aprove o aparelho. Depois, no celular com o app do Tailscale ligado, abra `http://homeminer:3000`. Vem instalado e desligado; *Desconectar* sai da conta e desliga de novo. **SSH** — cole a sua chave pública (`~/.ssh/id_ed25519.pub`) e ligue: só com chave, login por senha desligado, depois `ssh root@homeminer.local`. Se o SSH já estava ligado por fora do painel, a configuração dele não é mexida e dá só para acrescentar chaves.
 
+As placas não têm bateria de relógio, então ligam com a hora errada até sincronizar pela internet. O painel mostra "Acertando o relógio…" e espera (até 10 minutos) antes de gravar qualquer coisa, para o histórico e os recordes ficarem com as datas certas.
+
 As atualizações saem em ⚙️ Configurações → 💾 Backup → **Atualizar agora**. Por segurança, o SSH vem desligado nas imagens; ligue em 🌐 Rede com a sua chave (ou, no Orange Pi e no Odroid: monitor e teclado, login `root`, senha `1234`, escolha uma nova e rode `systemctl enable --now ssh`). Na imagem do Raspberry Pi o SSH vem desligado como de costume; dá para ligar nas configurações do Raspberry Pi Imager na hora de gravar.
 
 ## Instalação
@@ -272,8 +274,9 @@ O bot avisa:
 - **Dinheiro na carteira:** qualquer pagamento para o seu endereço. Um bloco solo chega como 🎉 **ACHAMOS UM BLOCO!**
 - **Conquistas:** avisa quando a fazenda desbloqueia um marco novo (ex.: primeiro share de dificuldade 1.000, 100 mil shares, uma semana sem parar ou o troféu vovô).
 - **Resumo diário:** às 21h por padrão (`TELEGRAM_DAILY`), com a imagem do bilhete de loteria do dia (e o anúncio do campeão da semana no domingo).
+- **Backup semanal (opcional):** com ⚙️ Configurações → Telegram → *Backup semanal no Telegram* ligado (`TELEGRAM_BACKUP=1`), todo domingo, na hora do resumo, o bot manda o arquivo de backup sem som. O `/backup` manda na hora. É o mesmo arquivo do 💾 Backup (restaure por lá) e ele tem as chaves e senhas salvas, então deixe no seu chat privado com o bot.
 
-Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/tomada` (`ligar`/`desligar`/`reiniciar`), `/bilhete` (imagem do bilhete de hoje), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
+Comandos: `/status`, `/workers`, `/sorte`, `/recordes`, `/campeonato`, `/conquistas`, `/tomada` (`ligar`/`desligar`/`reiniciar`), `/bilhete` (imagem do bilhete de hoje), `/backup` (arquivo de backup da configuração), `/ajuda`. A imagem do bilhete precisa de Python com Pillow no servidor (o instalador instala; a imagem Docker já tem); sem isso, o resumo vai só em texto. O bot só responde aos chats do `TELEGRAM_CHAT_ID`. Ele usa long polling, então nada da sua rede precisa ficar exposto. No `QUIET_HOURS`, os avisos chegam sem som.
 
 ## Cubo GeekMagic (opcional)
 

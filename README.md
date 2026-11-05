@@ -93,6 +93,8 @@ No terminal needed. Each release has images for **Raspberry Pi 3/4/5**, **Orange
 
 **🌐 Network tab** (⚙️ Settings, PIN): **Wi-Fi** — find networks and connect, then unplug the cable (needs a Wi-Fi adapter and NetworkManager, which the Raspberry Pi image has); **Tailscale** — one tap to open the dashboard from outside home without opening router ports: tap *Connect to Tailscale*, open the authorization link, sign in to your (free) Tailscale account, approve the device. Then, on a phone with the Tailscale app on, open `http://homeminer:3000`. It ships installed and off; *Disconnect* logs out and turns it off again. **SSH** — paste your public key (`~/.ssh/id_ed25519.pub`) and turn it on: key only, password login off, then `ssh root@homeminer.local`. If SSH was already on outside the dashboard, its configuration is left alone and you can only add keys.
 
+The boards have no clock battery, so they boot with the wrong time until it syncs from the internet; the dashboard shows "Setting the clock…" and waits for it (up to 10 minutes) before recording anything, so history and records keep the right dates.
+
 Updates come from ⚙️ Settings → 💾 Backup → **Update now**. For security, SSH is off on the images; turn it on in 🌐 Network with your key (or, on the Orange Pi and Odroid: monitor and keyboard, log in as `root`, password `1234`, choose a new one, then `systemctl enable --now ssh`). On the Raspberry Pi image SSH is off as usual; you can turn it on in Raspberry Pi Imager's settings when flashing.
 
 ## Install
@@ -272,8 +274,9 @@ The bot sends:
 - **Money in the wallet:** any payment to your address. A solo block shows up as 🎉 **WE FOUND A BLOCK!**
 - **Achievements:** real-time alerts when the farm unlocks a new milestone (e.g. first 1k difficulty share, 100k shares, 7 days nonstop, or the underdog trophy).
 - **Daily summary:** at 21:00 by default (`TELEGRAM_DAILY`), with today's lottery ticket image attached (and the weekly champion announced on Sundays).
+- **Weekly backup (optional):** with ⚙️ Settings → Telegram → *Weekly backup on Telegram* on (`TELEGRAM_BACKUP=1`), every Sunday at the summary hour the bot sends the backup file silently. `/backup` sends it any time. It is the same file as 💾 Backup (restore it there) and it contains your saved keys and passwords, so keep it in your private chat with the bot.
 
-Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/plug` (`on`/`off`/`reboot`), `/ticket` (today's ticket image), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
+Commands: `/status`, `/workers`, `/luck`, `/records`, `/championship`, `/achievements`, `/plug` (`on`/`off`/`reboot`), `/ticket` (today's ticket image), `/backup` (settings backup file), `/help`. The ticket image needs Python with Pillow on the server (the installer adds it; the Docker image has it); without it, the summary goes as text only. The bot answers only the chats in `TELEGRAM_CHAT_ID`. It uses long polling, so nothing on your network needs to be exposed. During `QUIET_HOURS` the alerts arrive without sound.
 
 ## GeekMagic cube (optional)
 
