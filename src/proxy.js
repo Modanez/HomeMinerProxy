@@ -78,7 +78,9 @@ function rollWeek() {
   }
 }
 try {
-  const saved = JSON.parse(fs.readFileSync(STATS_FILE, 'utf8'));
+  // com .bak: se a energia caiu no meio da última gravação, vale a anterior (store.js)
+  const saved = require('./store').readJson(STATS_FILE, null);
+  if (!saved) throw new Error('sem estatísticas salvas');
   workers = saved.workers || {};
   recent = Array.isArray(saved.recent) ? saved.recent : [];
   if (Array.isArray(saved.events)) events.push(...saved.events.slice(0, EVENTS_MAX));
@@ -106,7 +108,7 @@ function worker(name, pool) {
 function saveStats() {
   const out = {};
   for (const [k, w] of Object.entries(workers)) { const { window, ...rest } = w; out[k] = rest; }
-  try { fs.writeFileSync(STATS_FILE, JSON.stringify({ savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist })); } catch (_) { /* segue */ }
+  try { require('./store').writeJson(STATS_FILE, { savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist }); } catch (_) { /* segue */ }
 }
 setInterval(saveStats, 60e3).unref();
 

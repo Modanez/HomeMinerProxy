@@ -6,7 +6,7 @@
   "private": true,
   "engines": { "node": ">=16" },
   "scripts": {
-    "check": "node --check src/painel.js && node --check src/proxy.js && node --check src/stratum.js && node --check src/i18n.js && node --check src/luck.js && node --check src/telegram.js && node --check src/mqtt.js && node --check src/tuya.js && node --check src/sonoff.js && node --check src/settings.js && node --check src/setup.js && node --check src/update.js && node --check src/localminer.js && node --check src/netctl.js && node --check src/clock.js && node --check src/bitaxe.js && python3 -m py_compile src/cubo.py src/ticket.py && bash -n install.sh",
+    "check": "node --check src/painel.js && node --check src/proxy.js && node --check src/stratum.js && node --check src/i18n.js && node --check src/luck.js && node --check src/telegram.js && node --check src/mqtt.js && node --check src/tuya.js && node --check src/sonoff.js && node --check src/settings.js && node --check src/setup.js && node --check src/update.js && node --check src/localminer.js && node --check src/netctl.js && node --check src/clock.js && node --check src/bitaxe.js && node --check src/store.js && python3 -m py_compile src/cubo.py src/ticket.py && bash -n install.sh",
     "test": "node --test tests/*.test.js && python3 -m unittest discover -s tests -p 'test_*.py'"
   }
 }

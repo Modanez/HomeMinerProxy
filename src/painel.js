@@ -237,8 +237,10 @@ const HIDE_STALE_MS = Number(process.env.HIDE_STALE_H || 24) * 3600e3;   // para
 
 function safeJson(s) { try { return s ? JSON.parse(s) : {}; } catch (_) { return {}; } }
 const file = (n) => path.join(process.env.DATA_DIR || __dirname, n);   // workers.json, records.json, history.json…
-function loadJson(n, fallback) { try { return JSON.parse(fs.readFileSync(file(n), 'utf8')); } catch (_) { return fallback; } }
-function saveJson(n, v) { try { fs.writeFileSync(file(n), JSON.stringify(v)); } catch (_) { /* segue em memória */ } }
+// gravação atômica com .bak (store.js): queda de energia no meio não corrompe recordes nem histórico
+const store = require('./store');
+function loadJson(n, fallback) { return store.readJson(file(n), fallback, { onRecover: (why) => console.log(`${n}: arquivo ${why === 'missing' ? 'ausente' : 'corrompido'}; usando o ${n}.bak`) }); }
+function saveJson(n, v) { try { store.writeJson(file(n), v); } catch (_) { /* segue em memória */ } }
 
 // ---------------------------------------------------------------- HTTP com nova tentativa
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));

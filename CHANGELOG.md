@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Power-loss-safe state files:** records, history, achievements, worker list, proxy stats and the Telegram bot state are written atomically (temporary file + fsync + rename) and keep the previous version as `.bak`. If the power drops mid-write (a smart plug, a restart from Telegram), the file is never left cut in half; when reading, a missing or damaged file falls back to the `.bak` and the log says so.
+
+### Português
+- **Arquivos de estado à prova de queda de energia:** recordes, histórico, conquistas, lista de workers, estatísticas do proxy e o estado do bot do Telegram são gravados de forma atômica (arquivo temporário + fsync + renomeação) e guardam a versão anterior como `.bak`. Se a energia cair no meio da gravação (tomada inteligente, reinício pelo Telegram), o arquivo nunca fica cortado; na leitura, um arquivo ausente ou danificado volta pelo `.bak`, com aviso no log.
+
 ## v0.5.0 — 2026-11-05
 
 ### English
