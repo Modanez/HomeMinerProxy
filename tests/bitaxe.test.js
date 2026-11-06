@@ -199,3 +199,70 @@ test('Telegram: avisa quando o alerta começa e quando termina; ALARM_IGNORE sil
   assert.deepStrictEqual(ev(base({}), base({ fault: { power: true, hardware: false, overheat: true } })), ['⚠️ <b>bitaxe1</b>: falha de energia (confira a fonte) · superaquecido: o AxeOS baixou a frequência']);
   assert.deepStrictEqual(ev(null, base({ hot: { tempC: 70, max: 68 } })), []);   // primeira olhada não avisa
 });
+
+// ---------------------------------------------------------------- fase 3: ações
+test('fan: só faixas seguras', () => {
+  assert.deepStrictEqual(bx.fanPatch({ auto: true, temptarget: 60 }), { autofanspeed: 1, temptarget: 60 });
+  assert.deepStrictEqual(bx.fanPatch({ auto: false, fanspeed: 75 }), { autofanspeed: 0, fanspeed: 75 });
+  for (const bad of [{ auto: true, temptarget: 80 }, { auto: true, temptarget: 45 }, { auto: false, fanspeed: 10 }, { auto: false, fanspeed: 101 }, { auto: false, fanspeed: 'x' }, {}]) {
+    assert.strictEqual(bx.fanPatch(bad), null, JSON.stringify(bad));
+  }
+});
+
+test('pool: grava no formato da versão (2.14 stratum*, 2.15 lista pools) e confere na releitura', () => {
+  const main = { url: '192.168.0.134', port: 3338, user: 'bc1q.bitaxe1' }, backup = { url: 'solo.ckpool.org', port: 3333, user: 'bc1q.bitaxe1' };
+  const p14 = bx.poolPatch(fx('2.14'), main, backup);
+  assert.deepStrictEqual(p14, { stratumURL: '192.168.0.134', stratumPort: 3338, stratumUser: 'bc1q.bitaxe1', stratumPassword: 'x',
+    fallbackStratumURL: 'solo.ckpool.org', fallbackStratumPort: 3333, fallbackStratumUser: 'bc1q.bitaxe1', fallbackStratumPassword: 'x' });
+  assert.ok(bx.poolMatches({ ...fx('2.14'), ...p14 }, main));
+  assert.ok(!bx.poolMatches(fx('2.14'), main));
+  const p15 = bx.poolPatch(fx('2.15'), main, backup);
+  assert.deepStrictEqual(p15.pools, [{ url: '192.168.0.134', port: 3338, user: 'bc1q.bitaxe1', password: 'x' }, { url: 'solo.ckpool.org', port: 3333, user: 'bc1q.bitaxe1', password: 'x' }]);
+  assert.ok(bx.poolMatches({ ...fx('2.15'), ...p15 }, main));
+});
+
+test('ações: método e caminho certos; 404 = sem suporte; restart que derruba a conexão conta como feito', async (t) => {
+  process.env.BITAXE_ALLOW_LOOPBACK = '1';
+  t.after(() => { delete process.env.BITAXE_ALLOW_LOOPBACK; });
+  const calls = [];
+  const server = http.createServer((req, res) => {
+    let b = ''; req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      calls.push([req.method, req.url, b]);
+      if (req.url === '/api/system/identify') { res.writeHead(404); return res.end(); }
+      if (req.url === '/api/system/restart') return req.socket.destroy();
+      res.writeHead(200); res.end('{}');
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const host = `127.0.0.1:${server.address().port}`;
+  assert.deepStrictEqual(await bx.simpleAction(host, 'pause'), { ok: true });
+  assert.deepStrictEqual(await bx.simpleAction(host, 'identify'), { ok: false, error: 'unsupported' });
+  assert.deepStrictEqual(await bx.simpleAction(host, 'restart'), { ok: true });
+  assert.deepStrictEqual(await bx.simpleAction(host, 'frequency'), { ok: false, error: 'action' });   // fora da lista
+  assert.deepStrictEqual(await bx.patch(host, { autofanspeed: 1, temptarget: 60 }), { ok: true });
+  assert.deepStrictEqual(calls.map((c) => c.slice(0, 2)), [['POST', '/api/system/pause'], ['POST', '/api/system/identify'], ['POST', '/api/system/restart'], ['PATCH', '/api/system']]);
+  assert.deepStrictEqual(JSON.parse(calls[3][2]), { autofanspeed: 1, temptarget: 60 });
+});
+
+test('reinício pedido pelo painel não vira "reiniciou sozinho"', () => {
+  let s = bx.evaluate(null, read({ uptimeS: 5000 }), {}, 0);
+  s = { ...s, expectRebootUntil: 60e3 };
+  s = bx.evaluate(s, read({ uptimeS: 20 }), {}, 30e3);
+  assert.strictEqual(s.reboots, 0);
+  assert.strictEqual(s.expectRebootUntil, null);
+  s = bx.evaluate(s, read({ uptimeS: 10 }), {}, 90e3);   // o próximo, sem pedir, conta
+  assert.strictEqual(s.reboots, 1);
+});
+
+test('°F: Telegram mostra temperaturas e limites em Fahrenheit', () => {
+  const tg = require('../src/telegram');
+  const base = (alerts) => tg.digest({ farm: { hasData: true, workers: [] }, bitaxes: [{ name: 'bitaxe1', worker: 'bitaxe1', alerts, reboots: 0, blocks: 0, data: { tempC: 59.2 } }] });
+  const on = tg.diffEvents(base({}), base({ hot: { tempC: 70.4, max: 68 } }), { lang: 'en', tempUnit: 'F' }).map((e) => e.text);
+  assert.deepStrictEqual(on, ['🌡️ <b>bitaxe1</b>: chip at <b>158.7 °F</b> (limit 154 °F)']);
+  const off = tg.diffEvents(base({ hot: { tempC: 70.4, max: 68 } }), base({}), { lang: 'pt', tempUnit: 'F' }).map((e) => e.text);
+  assert.deepStrictEqual(off, ['✅ <b>bitaxe1</b>: chip de volta a 138,6 °F']);
+  const txt = tg.statusText({ farm: { hasData: true, hashrate: 1e12, workers: [], shares: { today: 1 } }, bitaxes: [{ name: 'bitaxe1', fresh: true, data: bx.normalize(fx('2.14')) }] }, { lang: 'en', tempUnit: 'F' });
+  assert.match(txt, /143 °F/);   // 61,5 °C
+});

@@ -32,22 +32,28 @@ const STRINGS = {
     bitaxeOff: (n) => `🟥 ${n}: o Bitaxe não responde`,
     bxOn: {
       offline: (n) => `🟥 <b>${n}</b> parou de responder (3 leituras seguidas). Confira a tomada e o Wi-Fi.`,
-      hot: (n, a) => `🌡️ <b>${n}</b>: chip a <b>${a.t} °C</b> (limite ${a.max} °C)`,
-      vrhot: (n, a) => `🌡️ <b>${n}</b>: regulador de tensão a <b>${a.t} °C</b> (limite ${a.max} °C)`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip a <b>${a.t}</b> (limite ${a.max})`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: regulador de tensão a <b>${a.t}</b> (limite ${a.max})`,
       lowhash: (n, a) => `📉 <b>${n}</b>: hashrate em <b>${a.hr}</b>, ${a.pct}% do esperado (${a.exp}), há 10 min`,
       fallback: (n, a) => `🔀 <b>${n}</b> está na pool reserva (${a.url})`,
       fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
     },
     bxOff: {
       offline: (n) => `✅ <b>${n}</b> voltou a responder`,
-      hot: (n, a) => `✅ <b>${n}</b>: chip de volta a ${a.t} °C`,
-      vrhot: (n, a) => `✅ <b>${n}</b>: regulador de volta a ${a.t} °C`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip de volta a ${a.t}`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulador de volta a ${a.t}`,
       lowhash: (n, a) => `✅ <b>${n}</b>: hashrate normal de novo (${a.hr})`,
       fallback: (n) => `✅ <b>${n}</b> voltou para a pool principal`,
       fault: (n) => `✅ <b>${n}</b>: sem falhas`,
     },
     bxFault: { power: 'falha de energia (confira a fonte)', hardware: 'falha de hardware', overheat: 'superaquecido: o AxeOS baixou a frequência' },
     bxReboot: (n, why) => `🔄 <b>${n}</b> reiniciou sozinho${why ? ` (${why})` : ''}`,
+    bxUsage: (cmd, list) => `Uso: <code>/${cmd} bitaxe1</code>. Bitaxe: ${list}`,
+    bxNone: 'Nenhum Bitaxe cadastrado. Cadastre em ⚙️ Configurações → Mineradores.',
+    bxNotFound: (q, list) => `Não achei o Bitaxe "${q}". Bitaxe: ${list}`,
+    bxDone: { restart: (n) => `🔄 <b>${n}</b> reiniciando…`, pause: (n) => `⏸️ <b>${n}</b> pausado`, resume: (n) => `▶️ <b>${n}</b> minerando de novo` },
+    bxFail: (n, e) => `⚠️ <b>${n}</b>: ${e}`,
+    bxErrs: { unsupported: 'este firmware não tem essa ação', offline: 'o Bitaxe não respondeu', timeout: 'o Bitaxe não respondeu a tempo', http500: 'o Bitaxe recusou o comando' },
     bxBlock: (n) => `🎉🎉🎉 <b>${n} ENCONTROU UM BLOCO!</b> 🎉🎉🎉`,
     bitaxeBackup: 'na reserva',
     poolPing: (ms, sc) => `⚡ Ping da pool: <b>${ms} ms</b> (${sc === 'great' ? '🟢 ótimo' : sc === 'good' ? '🟡 bom' : '🔴 ruim'})`,
@@ -81,14 +87,14 @@ const STRINGS = {
     plugErr: (e) => `⚠️ Falha ao falar com a tomada: ${e}`,
     plugNotFound: (q, list) => `Não achei a tomada "${q}". Tomadas: ${list}`,
     plugErrs: { selfplug: 'essa tomada alimenta o próprio servidor do painel (LOCAL_WORKER). Desligar daqui apagaria o painel sem como religar; use o app da tomada.', sonoffoffline: 'o Sonoff não respondeu. Confira o IP e se o modo LAN/DIY está ligado.', sonofflan: 'o Sonoff recusou o comando: o modo LAN/DIY está desligado.', sonoffid: 'o Sonoff não reconheceu o Device ID informado.', sonoffformat: 'resposta inesperada do Sonoff.', tuyamissing: 'faltam as credenciais da Tuya Cloud em /config.', tuyaoffline: 'a tomada está offline na nuvem Tuya (sem Wi-Fi ou sem energia). Confira o app SmartLife.' },
-    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle das tomadas (SmartLife ou Sonoff)\n/bilhete · bilhete de loteria de hoje\n/backup · arquivo de backup da configuração\n/ajuda · esta lista',
+    help: '<b>Comandos</b>\n/status · resumo da fazenda\n/workers · cada worker\n/sorte · medidor de sorte\n/recordes · hall da fama\n/campeonato · ranking da semana\n/conquistas · marcos da fazenda\n/tomada · leitura e controle das tomadas (SmartLife ou Sonoff)\n/reiniciar, /pausar, /retomar bitaxe1 · ações no Bitaxe\n/bilhete · bilhete de loteria de hoje\n/backup · arquivo de backup da configuração\n/ajuda · esta lista',
     backupCaption: (auto) => `💾 ${auto ? 'Backup semanal' : 'Backup'} da fazenda (configuração, recordes e histórico). Para restaurar: ⚙️ Configurações → 💾 Backup → Restaurar.\n⚠️ Ele tem as chaves e senhas salvas (Tuya, MQTT, este bot): não encaminhe para ninguém.`,
     backupFail: (e) => `⚠️ Não consegui mandar o backup: ${e}`,
     ticketCaption: (d, w) => `🎟️ Bilhete de hoje: melhor hash <b>${d}</b> (${w}). Não premiado… ainda!`,
     noTicket: 'Ainda não há bilhete hoje: falta um share de hoje passando pelo proxy ou o hash do último bloco.',
     setup: (id) => `Olá! O id deste chat é <code>${id}</code>.\nColoque <code>TELEGRAM_CHAT_ID=${id}</code> em /etc/mineracao.env e reinicie o painel:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'Pronto! Este chat vai receber os avisos da fazenda. ⛏️\n\n',
-    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Ligar, desligar e reiniciar tomadas'], ['bilhete', 'Bilhete de loteria de hoje'], ['backup', 'Arquivo de backup da configuração'], ['ajuda', 'Comandos']],
+    commands: [['status', 'Resumo da fazenda'], ['workers', 'Cada worker'], ['sorte', 'Medidor de sorte'], ['recordes', 'Hall da fama'], ['campeonato', 'Ranking da semana'], ['conquistas', 'Marcos da fazenda'], ['tomada', 'Ligar, desligar e reiniciar tomadas'], ['reiniciar', 'Reiniciar um Bitaxe'], ['pausar', 'Pausar um Bitaxe'], ['retomar', 'Retomar um Bitaxe'], ['bilhete', 'Bilhete de loteria de hoje'], ['backup', 'Arquivo de backup da configuração'], ['ajuda', 'Comandos']],
     units: ['', ' mil', ' mi', ' bi', ' tri', ' quatri'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
@@ -112,22 +118,28 @@ const STRINGS = {
     bitaxeOff: (n) => `🟥 ${n}: the Bitaxe is not answering`,
     bxOn: {
       offline: (n) => `🟥 <b>${n}</b> stopped answering (3 reads in a row). Check the plug and the Wi-Fi.`,
-      hot: (n, a) => `🌡️ <b>${n}</b>: chip at <b>${a.t} °C</b> (limit ${a.max} °C)`,
-      vrhot: (n, a) => `🌡️ <b>${n}</b>: voltage regulator at <b>${a.t} °C</b> (limit ${a.max} °C)`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip at <b>${a.t}</b> (limit ${a.max})`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: voltage regulator at <b>${a.t}</b> (limit ${a.max})`,
       lowhash: (n, a) => `📉 <b>${n}</b>: hashrate at <b>${a.hr}</b>, ${a.pct}% of expected (${a.exp}), for 10 min`,
       fallback: (n, a) => `🔀 <b>${n}</b> is on the backup pool (${a.url})`,
       fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
     },
     bxOff: {
       offline: (n) => `✅ <b>${n}</b> is answering again`,
-      hot: (n, a) => `✅ <b>${n}</b>: chip back to ${a.t} °C`,
-      vrhot: (n, a) => `✅ <b>${n}</b>: regulator back to ${a.t} °C`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip back to ${a.t}`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulator back to ${a.t}`,
       lowhash: (n, a) => `✅ <b>${n}</b>: hashrate back to normal (${a.hr})`,
       fallback: (n) => `✅ <b>${n}</b> is back on the main pool`,
       fault: (n) => `✅ <b>${n}</b>: no faults`,
     },
     bxFault: { power: 'power fault (check the power supply)', hardware: 'hardware fault', overheat: 'overheated: AxeOS lowered the frequency' },
     bxReboot: (n, why) => `🔄 <b>${n}</b> restarted on its own${why ? ` (${why})` : ''}`,
+    bxUsage: (cmd, list) => `Usage: <code>/${cmd} bitaxe1</code>. Bitaxe: ${list}`,
+    bxNone: 'No Bitaxe registered. Add them in ⚙️ Settings → Miners.',
+    bxNotFound: (q, list) => `Could not find the Bitaxe "${q}". Bitaxe: ${list}`,
+    bxDone: { restart: (n) => `🔄 <b>${n}</b> restarting…`, pause: (n) => `⏸️ <b>${n}</b> paused`, resume: (n) => `▶️ <b>${n}</b> mining again` },
+    bxFail: (n, e) => `⚠️ <b>${n}</b>: ${e}`,
+    bxErrs: { unsupported: 'this firmware does not have that action', offline: 'the Bitaxe did not answer', timeout: 'the Bitaxe did not answer in time', http500: 'the Bitaxe refused the command' },
     bxBlock: (n) => `🎉🎉🎉 <b>${n} FOUND A BLOCK!</b> 🎉🎉🎉`,
     bitaxeBackup: 'on backup',
     poolPing: (ms, sc) => `⚡ Pool ping: <b>${ms} ms</b> (${sc === 'great' ? '🟢 great' : sc === 'good' ? '🟡 good' : '🔴 poor'})`,
@@ -161,24 +173,24 @@ const STRINGS = {
     plugErr: (e) => `⚠️ Smart plug error: ${e}`,
     plugNotFound: (q, list) => `No smart plug named "${q}". Plugs: ${list}`,
     plugErrs: { selfplug: 'this plug powers the dashboard server itself (LOCAL_WORKER). Turning it off from here would take the dashboard down with no way to turn it back on; use the plug\'s app.', sonoffoffline: 'the Sonoff did not answer. Check the IP and that LAN/DIY mode is on.', sonofflan: 'the Sonoff refused the command: LAN/DIY mode is off.', sonoffid: 'the Sonoff did not recognize the Device ID.', sonoffformat: 'unexpected answer from the Sonoff.', tuyamissing: 'Tuya Cloud credentials are missing in /config.', tuyaoffline: 'the plug is offline in the Tuya cloud (no Wi-Fi or no power). Check the SmartLife app.' },
-    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control (SmartLife or Sonoff)\n/ticket · today\'s lottery ticket\n/backup · settings backup file\n/help · this list',
+    help: '<b>Commands</b>\n/status · farm summary\n/workers · each worker\n/luck · luck meter\n/records · hall of fame\n/championship · weekly ranking\n/achievements · farm milestones\n/plug · smart plug reading & control (SmartLife or Sonoff)\n/restart, /pause, /resume bitaxe1 · Bitaxe actions\n/ticket · today\'s lottery ticket\n/backup · settings backup file\n/help · this list',
     backupCaption: (auto) => `💾 ${auto ? 'Weekly backup' : 'Backup'} of the farm (settings, records and history). To restore: ⚙️ Settings → 💾 Backup → Restore.\n⚠️ It contains your saved keys and passwords (Tuya, MQTT, this bot): do not forward it.`,
     backupFail: (e) => `⚠️ Could not send the backup: ${e}`,
     ticketCaption: (d, w) => `🎟️ Today's ticket: best hash <b>${d}</b> (${w}). Not a winner… yet!`,
     noTicket: 'No ticket yet today: it needs a share from today through the proxy and the latest block hash.',
     setup: (id) => `Hi! This chat's id is <code>${id}</code>.\nPut <code>TELEGRAM_CHAT_ID=${id}</code> in /etc/mineracao.env and restart the dashboard:\n<code>sudo systemctl restart mineracao-painel</code>`,
     hello: 'All set! This chat will get the farm alerts. ⛏️\n\n',
-    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Turn smart plugs on, off or reboot'], ['ticket', 'Today\'s lottery ticket'], ['backup', 'Settings backup file'], ['help', 'Commands']],
+    commands: [['status', 'Farm summary'], ['workers', 'Each worker'], ['luck', 'Luck meter'], ['records', 'Hall of fame'], ['championship', 'Weekly ranking'], ['achievements', 'Farm milestones'], ['plug', 'Turn smart plugs on, off or reboot'], ['restart', 'Restart a Bitaxe'], ['pause', 'Pause a Bitaxe'], ['resume', 'Resume a Bitaxe'], ['ticket', 'Today\'s lottery ticket'], ['backup', 'Settings backup file'], ['help', 'Commands']],
     units: ['', 'k', 'M', 'G', 'T', 'P'],
     ago: { s: 's', min: 'min', h: 'h', d: 'd' },
   },
 };
-const ALIASES = { backup: 'backup', sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', tomada: 'plug', plug: 'plug', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
+const ALIASES = { reiniciar: 'bxrestart', restart: 'bxrestart', pausar: 'bxpause', pause: 'bxpause', retomar: 'bxresume', resume: 'bxresume', backup: 'backup', sorte: 'luck', recordes: 'records', campeonato: 'championship', championship: 'championship', conquistas: 'achievements', achievements: 'achievements', tomada: 'plug', plug: 'plug', ajuda: 'help', bilhete: 'ticket', ticket: 'ticket', start: 'start', status: 'status', workers: 'workers', luck: 'luck', records: 'records', help: 'help' };
 
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-function formatter(lang) {
+function formatter(lang, tempUnit) {
   const T = STRINGS[lang] || STRINGS.en;
   const num = (n, d = 2) => Number(n).toLocaleString(T.loc, { maximumFractionDigits: d });
   const diff = (d) => {
@@ -200,7 +212,9 @@ function formatter(lang) {
     if (s < 172800) return num(s / 3600, 1) + ' ' + A.h;
     return Math.round(s / 86400) + ' ' + A.d;
   };
-  return { T, num, diff, hashrate, ago };
+  // °C ou °F (TEMP_UNIT); os valores chegam sempre em °C
+  const temp = (c, d = 0) => (String(tempUnit || '').toUpperCase() === 'F' ? num(c * 9 / 5 + 32, d) + ' °F' : num(c, d) + ' °C');
+  return { T, num, diff, hashrate, ago, temp };
 }
 
 // ---------------------------------------------------------------- o que mudou desde a última olhada
@@ -227,7 +241,7 @@ function digest(snap) {
 
 // Compara dois resumos e devolve os avisos. `down` guarda quem já foi anunciado como parado.
 function diffEvents(prev, cur, opts = {}) {
-  const fm = formatter(opts.lang);
+  const fm = formatter(opts.lang, opts.tempUnit);
   const T = fm.T, out = [];
   const ignore = opts.ignore || [], down = opts.down || new Set(), now = opts.now || Date.now();
   if (!prev || !cur.hasData) return out;
@@ -274,14 +288,14 @@ function diffEvents(prev, cur, opts = {}) {
     for (const k of ['offline', 'hot', 'vrhot', 'lowhash', 'fallback', 'fault']) {
       const a = b.alerts[k], was = p.alerts[k];
       if (a && !was) {
-        const v = k === 'hot' || k === 'vrhot' ? { t: fm.num(a.tempC, 1), max: fm.num(a.max, 0) }
+        const v = k === 'hot' || k === 'vrhot' ? { t: fm.temp(a.tempC, 1), max: fm.temp(a.max, 0) }
           : k === 'lowhash' ? { hr: fm.hashrate(a.hashRate), exp: fm.hashrate(a.expected), pct: a.pct }
           : k === 'fallback' ? { url: escHtml([a.url, a.port].filter(Boolean).join(':') || '–') }
           : k === 'fault' ? { what: ['power', 'hardware', 'overheat'].filter((x) => a[x]).map((x) => T.bxFault[x]).join(' · ') } : {};
         out.push({ type: 'bitaxe_' + k, text: T.bxOn[k](n, v) });
       } else if (!a && was) {
         const t = k === 'vrhot' ? b.vrTempC : b.tempC;
-        out.push({ type: 'bitaxe_' + k + '_ok', text: T.bxOff[k](n, { t: t != null ? fm.num(t, 1) : '–', hr: fm.hashrate(b.hashRate) }) });
+        out.push({ type: 'bitaxe_' + k + '_ok', text: T.bxOff[k](n, { t: t != null ? fm.temp(t, 1) : '–', hr: fm.hashrate(b.hashRate) }) });
       }
     }
     if (b.reboots > p.reboots && !b.alerts.offline) out.push({ type: 'bitaxe_reboot', text: T.bxReboot(n, escHtml(b.lastReset || '')) });
@@ -294,7 +308,7 @@ function diffEvents(prev, cur, opts = {}) {
 
 // ---------------------------------------------------------------- respostas aos comandos
 function statusText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T, f = snap.farm || {};
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T, f = snap.farm || {};
   if (!f.hasData) return T.noData;
   const ws = (f.workers || []).filter((w) => !w.inactive && w.state !== 'unknown');
   const mining = ws.filter((w) => w.state === 'ok' || w.state === 'quiet');
@@ -314,7 +328,7 @@ function statusText(snap, opts = {}) {
   for (const b of snap.bitaxes || []) {
     const d = b.data;
     if (!b.fresh || !d) { lines.push(T.bitaxeOff(escHtml(b.name))); continue; }
-    const parts = [fm.hashrate(d.hashRate10m || d.hashRate), d.tempC != null ? `${fm.num(d.tempC, 0)} °C` : null, d.watts != null ? `${fm.num(d.watts, 1)} W` : null, d.pool && d.pool.fallback ? T.bitaxeBackup : null];
+    const parts = [fm.hashrate(d.hashRate10m || d.hashRate), d.tempC != null ? fm.temp(d.tempC, 0) : null, d.watts != null ? `${fm.num(d.watts, 1)} W` : null, d.pool && d.pool.fallback ? T.bitaxeBackup : null];
     lines.push(`🟧 <b>${escHtml(b.name)}</b> · ${parts.filter(Boolean).join(' · ')}`);
   }
   const pools = (snap.proxy || {}).pools || [];
@@ -327,7 +341,7 @@ function statusText(snap, opts = {}) {
 }
 
 function workersText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T, f = snap.farm || {};
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T, f = snap.farm || {};
   if (!f.hasData) return T.noData;
   const dot = { ok: '🟢', quiet: '🟡', stale: '🔴', unknown: '⚪' };
   const now = opts.now || Date.now();
@@ -338,14 +352,14 @@ function workersText(snap, opts = {}) {
 }
 
 function luckText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ws = (snap.luck || {}).workers || [];
   if (!ws.length) return T.luckTitle + '\n' + T.luckEmpty;
   return [T.luckTitle, ...ws.map((w) => T.luckRow(escHtml(w.name), fm.num(w.factor, 2), Math.round(w.percentile * 100)))].join('\n');
 }
 
 function recordsText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const hall = snap.hall || [];
   if (!hall.length) return T.recordsTitle + '\n' + T.recordsEmpty;
   const medal = ['🥇', '🥈', '🥉', '4.', '5.'];
@@ -354,7 +368,7 @@ function recordsText(snap, opts = {}) {
 }
 
 function championshipText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ch = snap.championship || {}, st = ch.standings || [];
   const medal = ['🏆', '🥈', '🥉', '4.', '5.'];
   const lines = [T.champTitle];
@@ -370,7 +384,7 @@ function championshipText(snap, opts = {}) {
 }
 
 function achievementsText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ach = snap.achievements || {}, list = ach.list || [];
   const isPt = opts.lang === 'pt';
   const lines = [T.achTitle(ach.unlocked || 0, ach.total || list.length)];
@@ -383,7 +397,7 @@ function achievementsText(snap, opts = {}) {
 }
 
 function plugText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const en = (snap && snap.energy) || {};
   const list = Array.isArray(opts.liveList) && opts.liveList.length
     ? opts.liveList
@@ -412,7 +426,7 @@ function plugText(snap, opts = {}) {
 }
 
 function dailyText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const d = new Date(opts.now || Date.now());
   const date = d.toLocaleDateString(T.loc);
   const ld = (snap.championship || {}).leader;
@@ -506,7 +520,7 @@ function start(opts) {
   const chatIds = (opts.chatIds || []).map(String).filter(Boolean);
   const log = opts.log || ((m) => console.log('telegram: ' + m));
   const call = (method, body, t) => apiCall(base, opts.token, method, body, t);
-  const fopts = () => ({ lang, panelUrl: opts.panelUrl, ignore: opts.ignore || [], personal: !!opts.personal });
+  const fopts = () => ({ lang, tempUnit: opts.tempUnit, panelUrl: opts.panelUrl, ignore: opts.ignore || [], personal: !!opts.personal });
 
   let saved = {};
   try { saved = JSON.parse(fs.readFileSync(opts.stateFile, 'utf8')); } catch (_) { /* primeira vez */ }
@@ -550,6 +564,20 @@ function start(opts) {
     const snap = opts.snapshot();
     const o = fopts();
     if (cmd === 'backup') return sendBackup(id, false);
+    if (cmd === 'bxrestart' || cmd === 'bxpause' || cmd === 'bxresume') {
+      const list = (snap.bitaxes || []).map((b) => b.name);
+      if (!opts.bitaxeAction || !list.length) return send(id, T.bxNone);
+      const word = msg.text.trim().split(/\s+/)[0].replace(/^\//, '').replace(/@.*/, '');
+      const q = msg.text.trim().split(/\s+/).slice(1).join(' ').trim();
+      const names = list.map(escHtml).join(', ');
+      if (!q) return send(id, T.bxUsage(escHtml(word), names));
+      // nome errado nunca vira "o primeiro Bitaxe"
+      const b = (snap.bitaxes || []).find((x) => x.name.toLowerCase() === q.toLowerCase() || String(x.worker || '').toLowerCase() === q.toLowerCase());
+      if (!b) return send(id, T.bxNotFound(escHtml(q), names));
+      const action = { bxrestart: 'restart', bxpause: 'pause', bxresume: 'resume' }[cmd];
+      const r = await opts.bitaxeAction(b.name, action, {}, 'telegram');
+      return send(id, r && r.ok ? T.bxDone[action](escHtml(b.name)) : T.bxFail(escHtml(b.name), escHtml(T.bxErrs[(r && r.error) || ''] || (r && r.error) || '?')));
+    }
     if (cmd === 'ticket') {
       const png = await ticketFor(snap), b = todayBest(snap);
       if (!png) return send(id, T.noTicket);

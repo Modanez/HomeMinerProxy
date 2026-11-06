@@ -109,6 +109,7 @@ function normalize(j) {
     fanPct: num(j.fanspeed),
     fanRpm: num(j.fanrpm),
     autoFan: j.autofanspeed != null ? !!Number(j.autofanspeed) : null,
+    tempTarget: num(j.temptarget),
     sharesAccepted: num(j.sharesAccepted),
     sharesRejected: num(j.sharesRejected),
     bestDiff: parseDiff(j.bestDiff),
@@ -132,8 +133,64 @@ async function info(host, timeoutMs) {
   const r = await getJson(host, '/api/system/info', timeoutMs);
   if (!r.ok) return r;
   const d = normalize(r.json);
-  return d && (d.model || d.hashRate != null) ? { ok: true, data: d } : { ok: false, error: 'notbitaxe' };
+  return d && (d.model || d.hashRate != null) ? { ok: true, data: d, raw: r.json } : { ok: false, error: 'notbitaxe' };
 }
+
+// ---------------------------------------------------------------- ações (fase 3)
+// Só uma lista fechada de ações e de campos: overclock (frequência, tensão), firmware e Wi-Fi do Bitaxe ficam de fora.
+function request(host, method, path, body, timeoutMs = 8000) {
+  return new Promise((resolve) => {
+    if (!isPrivateHost(host)) return resolve({ ok: false, error: 'host' });
+    const t = splitHost(host);
+    const data = body != null ? JSON.stringify(body) : '';
+    const req = http.request({ host: t.host, port: t.port, path, method, timeout: timeoutMs,
+      headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } }, (res) => {
+      res.resume();
+      res.on('end', () => resolve(res.statusCode >= 200 && res.statusCode < 300 ? { ok: true }
+        : { ok: false, error: res.statusCode === 404 || res.statusCode === 405 ? 'unsupported' : 'http' + res.statusCode }));
+    });
+    req.on('timeout', () => req.destroy(new Error('timeout')));
+    // reiniciar derruba a conexão antes da resposta: para "restart" isso também é sucesso
+    req.on('error', (e) => resolve(path.endsWith('/restart') && /socket hang up|ECONNRESET/.test(e.message) ? { ok: true } : { ok: false, error: /timeout/.test(e.message) ? 'timeout' : 'offline' }));
+    req.end(data);
+  });
+}
+const SIMPLE = { restart: '/api/system/restart', identify: '/api/system/identify', pause: '/api/system/pause', resume: '/api/system/resume' };
+const simpleAction = (host, action) => (SIMPLE[action] ? request(host, 'POST', SIMPLE[action]) : Promise.resolve({ ok: false, error: 'action' }));
+
+// Fan: automático com temperatura-alvo (50–70 °C) ou velocidade fixa (20–100%)
+function fanPatch(p) {
+  if (p && p.auto) {
+    const t = Number(p.temptarget);
+    return Number.isInteger(t) && t >= 50 && t <= 70 ? { autofanspeed: 1, temptarget: t } : null;
+  }
+  const f = Number(p && p.fanspeed);
+  return Number.isInteger(f) && f >= 20 && f <= 100 ? { autofanspeed: 0, fanspeed: f } : null;
+}
+
+// Pool principal e reserva, no formato da versão: campos stratum* (2.14) ou a lista "pools" (2.15)
+function poolPatch(raw, main, backup) {
+  if (Array.isArray(raw && raw.pools) && raw.pools.length) {
+    const pools = raw.pools.map((p) => ({ ...p }));
+    const pi = num(raw.primaryPoolIndex) ?? 0, si = num(raw.secondaryPoolIndex) ?? (pi === 0 ? 1 : 0);
+    const set = (i, v) => { while (pools.length <= i) pools.push({}); pools[i] = { ...pools[i], url: v.url, port: v.port, user: v.user, password: 'x' }; };
+    set(pi, main); if (backup) set(si, backup);
+    return { pools };
+  }
+  const out = { stratumURL: main.url, stratumPort: main.port, stratumUser: main.user, stratumPassword: 'x' };
+  if (backup) Object.assign(out, { fallbackStratumURL: backup.url, fallbackStratumPort: backup.port, fallbackStratumUser: backup.user, fallbackStratumPassword: 'x' });
+  return out;
+}
+// Confere na releitura se a pool principal ficou como pedimos (o AxeOS ignora chave errada em silêncio)
+function poolMatches(raw, main) {
+  if (!raw) return false;
+  if (Array.isArray(raw.pools) && raw.pools.length) {
+    const p = raw.pools[num(raw.primaryPoolIndex) ?? 0] || {};
+    return (p.url || p.stratumURL) === main.url && Number(p.port ?? p.stratumPort) === main.port && (p.user || p.stratumUser) === main.user;
+  }
+  return raw.stratumURL === main.url && Number(raw.stratumPort) === main.port && raw.stratumUser === main.user;
+}
+const patch = (host, body) => request(host, 'PATCH', '/api/system', body);
 
 // Procura Bitaxe na sub-rede /24 de cada endereço do servidor (até 32 conexões de cada vez)
 async function discover(addresses, { timeoutMs = 1200, concurrency = 32, probe = info } = {}) {
@@ -185,11 +242,15 @@ function evaluate(prev, reading, limits = {}, now = Date.now()) {
   if (low && now - s.lowSince >= L.lowMs) active.lowhash = { hashRate: hr, expected: d.expected, pct: Math.round(hr / d.expected * 100) };
   if (d.pool && d.pool.fallback) active.fallback = { url: d.pool.url, port: d.pool.port };
   if (d.powerFault || d.hardwareFault || d.overheat) active.fault = { power: !!d.powerFault, hardware: !!d.hardwareFault, overheat: !!d.overheat };
-  if (s.uptime != null && d.uptimeS != null && d.uptimeS < s.uptime) { s.reboots++; s.lastReset = d.resetReason || null; }
+  if (s.uptime != null && d.uptimeS != null && d.uptimeS < s.uptime) {
+    // reinício pedido pelo painel (expectRebootUntil) não conta como "reiniciou sozinho"
+    if (s.expectRebootUntil && now <= s.expectRebootUntil) s.expectRebootUntil = null;
+    else { s.reboots++; s.lastReset = d.resetReason || null; }
+  }
   if (d.uptimeS != null) s.uptime = d.uptimeS;
   if (d.blockFound && !s.blockSeen) s.blocks++;
   s.blockSeen = !!d.blockFound;
   return { ...s, active };
 }
 
-module.exports = { LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson };
+module.exports = { simpleAction, fanPatch, poolPatch, poolMatches, patch, request, LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson };

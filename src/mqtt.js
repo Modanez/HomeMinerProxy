@@ -378,7 +378,7 @@ function start(opts = {}) {
         block: 'block_found',
         achievement: 'achievement_unlocked',
       };
-      for (const ev of diffEvents(prev, cur, { lang, ignore: opts.ignore || [], personal: !!opts.personal, down })) {
+      for (const ev of diffEvents(prev, cur, { lang, tempUnit: opts.tempUnit, ignore: opts.ignore || [], personal: !!opts.personal, down })) {
         publish(`${prefix}/event`, { type: EVENT_NAMES[ev.type] || ev.type, text: ev.text.replace(/<[^>]+>/g, ''), at: new Date().toISOString() }, false);
       }
     }

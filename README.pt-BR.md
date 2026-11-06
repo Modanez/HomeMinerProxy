@@ -182,7 +182,17 @@ O `/status` do Telegram ganha uma linha por Bitaxe, e o MQTT / Home Assistant ga
 | Sem resposta | 3 leituras seguidas sem resposta | 90 s |
 | Reiniciou / achou bloco | o tempo ligado voltou a zero / o AxeOS informa um bloco | uma mensagem |
 
-O `ALARM_IGNORE` também silencia um Bitaxe (menos o bloco encontrado). O painel só lê (`GET /api/system/info` a cada 30 s): overclock, firmware e o Wi-Fi do Bitaxe ficam no AxeOS. A API do AxeOS não tem senha e só responde na rede de casa, então nunca exponha um Bitaxe à internet: de fora de casa, abra o painel pelo Tailscale.
+O `ALARM_IGNORE` também silencia um Bitaxe (menos o bloco encontrado).
+
+**Ações** (⚙️ Configurações → Mineradores → *Ações nos Bitaxe*, com o PIN; no Telegram, `/reiniciar`, `/pausar`, `/retomar` + o nome):
+
+- **Reiniciar, identificar** (a tela pisca), **pausar e retomar**.
+- **Fan:** automático com temperatura-alvo (50–70 °C), ou fixo entre 20% e 100%.
+- **Apontar para o proxy:** mostra *hoje → vai ficar* e grava o IP deste servidor na rede de casa, a porta ASIC (atlaspool, senão ckpool), `endereço.nome` e a reserva `solo.ckpool.org:3333`. Depois confere na releitura e reinicia o Bitaxe. Se o servidor tiver mais de uma rede, `BITAXE_SERVER_IP` escolhe o IP.
+
+O cartão do painel mostra a última ação. Overclock, firmware e Wi-Fi do Bitaxe nunca são mexidos por aqui.
+
+**Unidade de temperatura:** ⚙️ Configurações → Fazenda → *Unidade de temperatura* (`TEMP_UNIT=C` ou `F`) passa o painel, o Telegram e os limites de alerta dos Bitaxe (digitados na unidade escolhida) para °F. O MQTT continua em °C, porque o Home Assistant converte sozinho. O painel só lê (`GET /api/system/info` a cada 30 s): overclock, firmware e o Wi-Fi do Bitaxe ficam no AxeOS. A API do AxeOS não tem senha e só responde na rede de casa, então nunca exponha um Bitaxe à internet: de fora de casa, abra o painel pelo Tailscale.
 
 ## Minerando com o cpuminer (passo a passo)
 

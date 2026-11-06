@@ -182,7 +182,17 @@ Telegram `/status` gets one line per Bitaxe, and MQTT / Home Assistant gets hash
 | Not answering | 3 reads in a row with no answer | 90 s |
 | Restarted / block found | uptime went back to zero / AxeOS reports a block | one message |
 
-`ALARM_IGNORE` silences a Bitaxe too (except a found block). The dashboard only reads (`GET /api/system/info` every 30 s): overclocking, firmware and the Bitaxe Wi-Fi stay in AxeOS. The AxeOS API has no password and only answers the home network, so never expose a Bitaxe to the internet: from outside home, open the dashboard through Tailscale.
+`ALARM_IGNORE` silences a Bitaxe too (except a found block).
+
+**Actions** (⚙️ Settings → Miners → *Bitaxe actions*, behind the PIN; Telegram `/restart`, `/pause`, `/resume` + the name):
+
+- **Restart, identify** (the screen blinks), **pause and resume**.
+- **Fan:** automatic with a target temperature (50–70 °C), or fixed at 20–100%.
+- **Point at the proxy:** shows *now → will be*, then saves this server's home IP, the ASIC port (atlaspool, else ckpool), `address.name` and `solo.ckpool.org:3333` as the backup. It reads the result back and restarts the Bitaxe. If the server has more than one network, `BITAXE_SERVER_IP` picks the IP.
+
+The dashboard card shows the last action. Overclock, firmware and the Bitaxe Wi-Fi are never changed from here.
+
+**Temperature unit:** ⚙️ Settings → Farm → *Temperature unit* (`TEMP_UNIT=C` or `F`) switches the dashboard, Telegram and the Bitaxe alert limits (typed in the chosen unit) to °F. MQTT keeps °C, because Home Assistant converts it on its own. The dashboard only reads (`GET /api/system/info` every 30 s): overclocking, firmware and the Bitaxe Wi-Fi stay in AxeOS. The AxeOS API has no password and only answers the home network, so never expose a Bitaxe to the internet: from outside home, open the dashboard through Tailscale.
 
 ## Mining with cpuminer (step by step)
 
