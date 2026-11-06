@@ -8,6 +8,7 @@ const http = require('http');
 const os = require('os');
 const settings = require('./settings');
 const localminer = require('./localminer');
+const hotspot = require('./hotspot');
 
 const PIN_RE = /^\d{6,12}$/;
 const field = (k) => settings.FIELDS.find((f) => f.key === k);
@@ -71,6 +72,12 @@ const S = {
     intro: 'Poucos passos e o painel está pronto. Dá para mudar tudo depois em ⚙️ Configurações.',
     step: 'Passo', of: 'de', next: 'Continuar', back: 'Voltar', finish: 'Concluir',
     s1: 'Idioma', s1h: 'Do painel, do cubo e do bot do Telegram.',
+    sw: 'Wi-Fi de casa', swh: 'Você está na rede de configuração do HomeMiner. Escolha o Wi-Fi da sua casa: o HomeMiner sai desta rede e entra na sua. O resto da configuração continua por lá.',
+    net: 'Rede', other: 'Outra rede (oculta)…', ssid: 'Nome da rede', wpass: 'Senha do Wi-Fi', open: 'aberta', connect: 'Conectar',
+    wfail: 'Não consegui entrar em "%s": %e. Confira e tente de novo.',
+    wgo: 'Conectando o HomeMiner em "%s"…', wgoH: 'Esta rede (HomeMiner-Setup) vai sumir. Volte o celular para o Wi-Fi de casa e abra:',
+    wgoH2: 'Se o HomeMiner não conseguir entrar na sua rede, a rede HomeMiner-Setup volta em um minuto, com o motivo.',
+    werr: { ssid: 'Escolha a rede', wifipass: 'A senha do Wi-Fi tem de 8 a 63 caracteres', wifiauth: 'senha errada', wifinotfound: 'rede não encontrada', wificonnect: 'não conectou' },
     s2: 'Endereço de bitcoin', s2h: 'O endereço público que os seus mineradores usam como usuário (o prêmio do bloco vai para ele). Só o endereço público: nunca digite seed ou chave privada.',
     s3: 'PIN de administração', s3h: 'Protege as configurações, as tomadas e as atualizações. Use de 6 a 12 números.',
     s3env: 'Este servidor já tem um PIN em /etc/mineracao.env (SETTINGS_PIN). Digite esse PIN.',
@@ -90,6 +97,12 @@ const S = {
     intro: 'A few steps and the dashboard is ready. You can change everything later in ⚙️ Settings.',
     step: 'Step', of: 'of', next: 'Continue', back: 'Back', finish: 'Finish',
     s1: 'Language', s1h: 'For the dashboard, the cube and the Telegram bot.',
+    sw: 'Home Wi-Fi', swh: 'You are on the HomeMiner setup network. Pick your home Wi-Fi: HomeMiner leaves this network and joins yours. The rest of the setup continues there.',
+    net: 'Network', other: 'Other network (hidden)…', ssid: 'Network name', wpass: 'Wi-Fi password', open: 'open', connect: 'Connect',
+    wfail: 'Could not join "%s": %e. Check and try again.',
+    wgo: 'Connecting HomeMiner to "%s"…', wgoH: 'This network (HomeMiner-Setup) will disappear. Switch your phone back to your home Wi-Fi and open:',
+    wgoH2: 'If HomeMiner cannot join your network, the HomeMiner-Setup network comes back in a minute, with the reason.',
+    werr: { ssid: 'Pick the network', wifipass: 'The Wi-Fi password has 8 to 63 characters', wifiauth: 'wrong password', wifinotfound: 'network not found', wificonnect: 'did not connect' },
     s2: 'Bitcoin address', s2h: 'The public address your miners use as username (the block reward goes there). Public address only: never type a seed or private key.',
     s3: 'Admin PIN', s3h: 'Protects settings, smart plugs and updates. Use 6 to 12 digits.',
     s3env: 'This server already has a PIN in /etc/mineracao.env (SETTINGS_PIN). Type that PIN.',
@@ -141,6 +154,9 @@ function page(lang, envPin) {
   <div class="stepn" id="stepn"></div>
   <section data-s="1"><h2 data-t="s1"></h2><p class="hint" data-t="s1h"></p>
     <div class="langs"><button type="button" data-lang="pt-BR">🇧🇷 Português</button><button type="button" data-lang="en">🇺🇸 English</button></div></section>
+  <section data-s="w" hidden><h2 data-t="sw"></h2><p class="hint" data-t="swh"></p>
+    <div class="f" data-k="ssid"><label class="l" data-t="net"></label><select id="wnet"></select><input id="wssid" autocomplete="off" autocapitalize="off" spellcheck="false" style="margin-top:8px" hidden><div class="ferr"></div></div>
+    <div class="f" data-k="wifipass"><label class="l" data-t="wpass"></label><input id="wpass" type="password" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="ferr"></div></div></section>
   <section data-s="2" hidden><h2 data-t="s2"></h2><p class="hint" data-t="s2h"></p>
     <div class="f" data-k="BTC_ADDRESS"><input id="addr" class="mono" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="bc1q…"><div class="ferr"></div></div></section>
   <section data-s="3" hidden><h2 data-t="s3"></h2><p class="hint" data-t="${envPin ? 's3env' : 's3h'}"></p>
@@ -157,6 +173,9 @@ function page(lang, envPin) {
   <div id="msg"></div>
   <div class="bar"><button type="button" class="ghost" id="back" data-t="back"></button><button type="button" class="main" id="next"></button></div>
 </div>
+<div class="card" id="wdone" hidden>
+  <div class="ok" id="wgo"></div><p class="hint" data-t="wgoH"></p><p><code id="wurl" style="display:block;margin-top:6px"></code></p><p class="hint" data-t="wgoH2"></p>
+</div>
 <div class="card" id="done" hidden>
   <div class="ok" data-t="done"></div><p class="hint" data-t="doneH"></p>
   <p><span data-t="server"></span>: <code id="srv"></code></p>
@@ -167,7 +186,8 @@ function page(lang, envPin) {
 <script>
 const S = ${JSON.stringify(S)}, ENV_PIN = ${envPin ? 'true' : 'false'};
 let lang = (navigator.language || '').toLowerCase().startsWith('pt') ? 'pt-BR' : '${lang === 'pt' ? 'pt-BR' : 'en'}', pos = 0, info = { hosts: [] }, mine = false;
-const order = () => (info.canMine ? ['1', '2', '3', 'm', '4'] : ['1', '2', '3', '4']);
+const hs = () => info.hotspot && info.hotspot.active;   // na rede de configuração (hotspot): só idioma e Wi-Fi
+const order = () => (hs() ? ['1', 'w'] : info.canMine ? ['1', '2', '3', 'm', '4'] : ['1', '2', '3', '4']);
 const cur = () => order()[pos];
 const $ = (id) => document.getElementById(id);
 const T = () => S[lang === 'en' ? 'en' : 'pt'];
@@ -180,7 +200,8 @@ function render() {
   for (const s of document.querySelectorAll('section[data-s]')) s.hidden = s.dataset.s !== cur();
   $('stepn').textContent = t.step + ' ' + (pos + 1) + ' ' + t.of + ' ' + order().length;
   $('back').style.visibility = pos > 0 ? 'visible' : 'hidden';
-  $('next').textContent = pos < order().length - 1 ? t.next : t.finish;
+  $('next').textContent = cur() === 'w' ? t.connect : pos < order().length - 1 ? t.next : t.finish;
+  if (hs()) { const o = $('wnet').options; if (o.length) o[o.length - 1].textContent = t.other; for (const x of o) if (x.dataset.open) x.textContent = x.value + ' · ' + t.open; }
   for (const b of document.querySelectorAll('[data-mine]')) b.classList.toggle('on', (b.dataset.mine === '1') === mine);
   $('mineopts').hidden = !mine;
   if (!$('kwh').value) $('kwh').value = $('cur').value === 'USD' ? '0.15' : '0.90';
@@ -193,6 +214,15 @@ fetch('/api/setup').then((r) => r.json()).then((j) => {
     sel.value = String(j.defaultThreads);
     $('mworker').value = j.worker || '';
   }
+  if (hs()) {
+    const sel = $('wnet');
+    for (const n of j.hotspot.networks || []) { const o = new Option(n.ssid, n.ssid); if (!n.secure) o.dataset.open = '1'; sel.add(o); }
+    sel.add(new Option('…', ''));
+    if (j.hotspot.lastSsid) { const k = Array.from(sel.options).findIndex((o) => o.value === j.hotspot.lastSsid); if (k >= 0) sel.selectedIndex = k; }
+    const pick = () => { $('wssid').hidden = sel.value !== ''; };
+    sel.addEventListener('change', pick); pick();
+    if (j.hotspot.lastError) { pos = 1; setTimeout(() => { $('msg').textContent = T().wfail.replace('%s', j.hotspot.lastSsid || '').replace('%e', T().werr[j.hotspot.lastError] || j.hotspot.lastError); }, 0); }
+  }
   render();
 }).catch(() => {});
 for (const b of document.querySelectorAll('[data-mine]')) b.addEventListener('click', () => { mine = b.dataset.mine === '1'; render(); });
@@ -200,7 +230,7 @@ for (const b of document.querySelectorAll('[data-lang]')) b.addEventListener('cl
 $('cur').addEventListener('change', () => { $('kwh').value = ''; render(); });
 $('cur').value = lang === 'en' ? 'USD' : 'BRL';
 $('tunit').value = lang === 'en' ? 'F' : 'C';   // inglês começa em USD e °F; dá para trocar
-const showErrors = (errs) => { for (const f of document.querySelectorAll('.f[data-k]')) { const e = errs[f.dataset.k]; f.classList.toggle('bad', !!e); f.querySelector('.ferr').textContent = e ? (T().err[e] || e) : ''; } };
+const showErrors = (errs) => { for (const f of document.querySelectorAll('.f[data-k]')) { const e = errs[f.dataset.k]; f.classList.toggle('bad', !!e); f.querySelector('.ferr').textContent = e ? (T().err[e] || T().werr[e] || e) : ''; } };
 const stepOf = { BTC_ADDRESS: '2', pin: '3', pin2: '3', LOCAL_MINER: 'm', MINER_THREADS: 'm', LOCAL_WORKER: 'm', CURRENCY: '4', POWER_PRICE_KWH: '4', TEMP_UNIT: '4' };
 $('back').addEventListener('click', () => { pos = Math.max(0, pos - 1); $('msg').textContent = ''; render(); });
 $('next').addEventListener('click', async () => {
@@ -209,6 +239,7 @@ $('next').addEventListener('click', async () => {
   if (cur() === '2' && !$('addr').value.trim()) return showErrors({ BTC_ADDRESS: 'address' });
   if (cur() === '3' && !ENV_PIN && $('pin').value !== ($('pin2') || {}).value) return showErrors({ pin2: 'pin2' });
   showErrors({});
+  if (cur() === 'w') return wifi();
   if (pos < order().length - 1) { pos++; render(); return; }
   $('next').disabled = true;
   try {
@@ -220,6 +251,20 @@ $('next').addEventListener('click', async () => {
     done(r.addr || body.BTC_ADDRESS.trim());
   } catch (_) { $('msg').textContent = t.err.net; } finally { $('next').disabled = false; }
 });
+async function wifi() {
+  const t = T(), ssid = $('wnet').value || $('wssid').value.trim(), password = $('wpass').value;
+  if (!ssid) return showErrors({ ssid: 'ssid' });
+  if (password && (password.length < 8 || password.length > 63)) return showErrors({ wifipass: 'wifipass' });
+  showErrors({});
+  $('next').disabled = true;
+  try {
+    const r = await fetch('/api/setup/wifi', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ssid, password, lang }) }).then((x) => x.json());
+    if (r.error) { showErrors({ [r.error === 'ssid' ? 'ssid' : 'wifipass']: r.error }); return; }
+    $('wizard').hidden = true; $('intro').hidden = true; $('wdone').hidden = false;
+    $('wgo').textContent = t.wgo.replace('%s', ssid);
+    $('wurl').textContent = 'http://' + (r.host || 'homeminer') + '.local:' + (r.port || location.port || '3000') + '/';
+  } catch (_) { $('msg').textContent = t.err.net; } finally { $('next').disabled = false; }
+}
 function done(addr) {
   const t = T();
   $('wizard').hidden = true; $('done').hidden = false; $('intro').hidden = true;
@@ -250,8 +295,26 @@ function serve(opts) {
     }
     if (url === '/api/setup' && req.method === 'GET') {
       const canMine = localminer.available();
-      return json(res, 200, { setup: true, hosts: [os.hostname() + '.local', ...lanAddresses()], envPin: !!envPin(),
-        canMine, cores: localminer.cores(), defaultThreads: localminer.defaultThreads(), worker: localminer.workerOf('') });
+      hotspot.status().catch(() => null).then((h) => json(res, 200, { setup: true, hosts: [os.hostname() + '.local', ...lanAddresses()], envPin: !!envPin(),
+        canMine, cores: localminer.cores(), defaultThreads: localminer.defaultThreads(), worker: localminer.workerOf(''), hotspot: h && h.active ? h : null }));
+      return undefined;
+    }
+    if (url === '/api/setup/wifi' && req.method === 'POST') {
+      // rede de configuração: escolhe o Wi-Fi de casa. Responde antes de trocar de rede (o celular vai cair).
+      if (!/^application\/json/.test(req.headers['content-type'] || '')) return json(res, 405, { error: 'option' });
+      let body = '';
+      req.on('data', (c) => { body += c; if (body.length > 4096) req.destroy(); });
+      req.on('end', async () => {
+        let f;
+        try { f = JSON.parse(body) || {}; } catch (_) { return json(res, 400, { error: 'option' }); }
+        const h = await hotspot.status().catch(() => null);
+        if (!h || !h.active) return json(res, 409, { error: 'nohotspot' });
+        const bad = hotspot.checkWifiForm(f.ssid, f.password);
+        if (bad) return json(res, 400, { error: bad });
+        json(res, 200, { ok: true, pending: true, host: os.hostname().split('.')[0], port: opts.port });
+        setTimeout(() => (opts.connectFromAp || hotspot.connectFromAp)(f.ssid, f.password).then((r) => console.log(r.ok ? 'Wi-Fi conectado: ' + f.ssid : 'Wi-Fi falhou (' + r.error + '): hotspot de volta')), 1500);
+      });
+      return undefined;
     }
     if (url === '/api/setup' && req.method === 'POST') {
       if (finished) return json(res, 409, { error: 'done' });

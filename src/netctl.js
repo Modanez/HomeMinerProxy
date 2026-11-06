@@ -182,4 +182,4 @@ async function sshDisable() {
   return { ok: true, status: await sshStatus() };
 }
 
-module.exports = { sshStatus, sshEnable, sshDisable, splitTerse, wifiStatus, wifiScan, wifiConnect, wifiForget, tailscaleStatus, tailscaleConnect, tailscaleDisconnect };
+module.exports = { run, bin: BIN, sshStatus, sshEnable, sshDisable, splitTerse, wifiStatus, wifiScan, wifiConnect, wifiForget, tailscaleStatus, tailscaleConnect, tailscaleDisconnect };

@@ -528,7 +528,7 @@ const T = {
       noAddr: 'SEU_ENDERECO' },
     net: { pinFirst: 'Digite o PIN no fim da página e toque em "Ver estado".', refresh: '↻ Ver estado', none: 'Nada para configurar aqui neste aparelho (sem Wi-Fi gerenciável e sem Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'Sem adaptador Wi-Fi neste aparelho.', wifiOn: (s, ip) => `Conectado em ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi desconectado.', wired: 'O cabo de rede está conectado.',
-      scan: 'Procurar redes', pass: 'Senha do Wi-Fi', connect: 'Conectar', forget: 'Esquecer esta rede', scanning: 'Procurando redes…', connecting: 'Conectando… (até 45 s)', wifiOk: 'Conectado ao Wi-Fi! Pode tirar o cabo; o painel continua em http://homeminer.local:3000.',
+      scan: 'Procurar redes', pass: 'Senha do Wi-Fi', connect: 'Conectar', forget: 'Esquecer esta rede', scanning: 'Procurando redes…', connecting: 'Conectando… (até 45 s)', wifiAp: 'O HomeMiner está saindo da rede de configuração (HomeMiner-Setup) para entrar em "%s". Volte o celular para o Wi-Fi de casa e abra http://homeminer.local:3000. Se não conectar, a HomeMiner-Setup volta em um minuto.', wifiOk: 'Conectado ao Wi-Fi! Pode tirar o cabo; o painel continua em http://homeminer.local:3000.',
       wifiHint: 'Ao trocar de rede com o painel aberto pelo próprio Wi-Fi, a página pode perder a conexão por alguns segundos.',
       ts: 'Acesso de fora de casa (Tailscale)', tsHint: 'Abre o painel de qualquer lugar pela sua conta do Tailscale, sem abrir portas no roteador. Grátis para uso pessoal.',
       tsOff: 'Desligado.', tsLogin: 'Falta autorizar: abra o link, entre na sua conta do Tailscale e aprove este aparelho. Depois toque em "Ver estado".', tsOn: 'Conectado como %n · %i. No celular com o app do Tailscale ligado: http://%h:3000',
@@ -634,7 +634,7 @@ const T = {
       noAddr: 'YOUR_ADDRESS' },
     net: { pinFirst: 'Type the PIN at the bottom of the page and tap "Show status".', refresh: '↻ Show status', none: 'Nothing to set up here on this device (no managed Wi-Fi and no Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'No Wi-Fi adapter on this device.', wifiOn: (s, ip) => `Connected to ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi not connected.', wired: 'The network cable is connected.',
-      scan: 'Find networks', pass: 'Wi-Fi password', connect: 'Connect', forget: 'Forget this network', scanning: 'Searching for networks…', connecting: 'Connecting… (up to 45 s)', wifiOk: 'Connected to Wi-Fi! You can unplug the cable; the dashboard stays at http://homeminer.local:3000.',
+      scan: 'Find networks', pass: 'Wi-Fi password', connect: 'Connect', forget: 'Forget this network', scanning: 'Searching for networks…', connecting: 'Connecting… (up to 45 s)', wifiAp: 'HomeMiner is leaving the setup network (HomeMiner-Setup) to join "%s". Switch your phone back to your home Wi-Fi and open http://homeminer.local:3000. If it does not connect, HomeMiner-Setup comes back in a minute.', wifiOk: 'Connected to Wi-Fi! You can unplug the cable; the dashboard stays at http://homeminer.local:3000.',
       wifiHint: 'If you change networks while the dashboard is open over that same Wi-Fi, the page may lose the connection for a few seconds.',
       ts: 'Access from outside home (Tailscale)', tsHint: 'Opens the dashboard from anywhere through your Tailscale account, without opening router ports. Free for personal use.',
       tsOff: 'Off.', tsLogin: 'Not authorized yet: open the link, sign in to Tailscale and approve this device. Then tap "Show status".', tsOn: 'Connected as %n · %i. On a phone with the Tailscale app on: http://%h:3000',
@@ -1630,6 +1630,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     try {
       const r = await netPost('wifi-connect', { ssid: $('wifi_ssid').value, password: $('wifi_pass').value });
       if (!r.ok) { say(err(r), false); return; }
+      if (r.pending) { $('wifi_form').hidden = true; say(N.wifiAp.replace('%s', $('wifi_ssid').value), true); return; }   // estava no hotspot: a conexão cai agora
       $('wifi_pass').value = ''; $('wifi_form').hidden = true; say(N.wifiOk, true); await refresh();
     } catch (_) { say(N.wifiHint, false); } finally { b.disabled = false; }
   });
@@ -1902,7 +1903,16 @@ function handle(req, res, ctx) {
       if (a === 'status') { const [wifi, tailscale, ssh] = await Promise.all([net.wifiStatus(), net.tailscaleStatus({ withUrl: true }), net.sshStatus()]); return json(200, { wifi, tailscale, ssh }); }
       if (a === 'ssh-enable') return json(200, await net.sshEnable(j.key));
       if (a === 'ssh-disable') return json(200, await net.sshDisable());
-      if (a === 'wifi-scan') return json(200, await net.wifiScan());
+      // no hotspot o rádio está no modo AP: a busca usa a lista guardada e a troca de rede vem depois da resposta
+      const hs = require('./hotspot'), hst = a === 'wifi-scan' || a === 'wifi-connect' ? await hs.status().catch(() => null) : null;
+      if (a === 'wifi-scan') return json(200, hst && hst.active ? { ok: true, networks: hst.networks, hotspot: true } : await net.wifiScan());
+      if (a === 'wifi-connect' && hst && hst.active) {
+        const bad = hs.checkWifiForm(j.ssid, j.password);
+        if (bad) return json(200, { ok: false, error: bad });
+        json(200, { ok: true, pending: true });
+        setTimeout(() => hs.connectFromAp(j.ssid, j.password).catch(() => {}), 1500);
+        return undefined;
+      }
       if (a === 'wifi-connect') return json(200, await net.wifiConnect(j.ssid, j.password));
       if (a === 'wifi-forget') return json(200, await net.wifiForget());
       if (a === 'ts-connect') return json(200, await net.tailscaleConnect());

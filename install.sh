@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/discover.js "$HERE"/src/hotspot.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -95,6 +95,19 @@ if command -v python3 >/dev/null; then
   fi
   unit mineracao-cubo "Mining farm scoreboard on the GeekMagic cube" "$(command -v python3) $APP_DIR/cubo.py" mineracao-painel.service
   services="$services mineracao-cubo"
+fi
+
+# Rede de configuração sem cabo (hotspot): com o NetworkManager, se a placa ligar sem rede e houver um Wi-Fi
+# que aceite o modo ponto de acesso, ela cria a rede "HomeMiner-Setup" para configurar o Wi-Fi pelo celular.
+if command -v nmcli >/dev/null; then
+  if command -v apt-get >/dev/null && ! command -v dnsmasq >/dev/null && [ ! -x /usr/sbin/dnsmasq ]; then
+    apt-get install -y -q dnsmasq-base >/dev/null || m "   aviso: não consegui instalar o dnsmasq-base (hotspot)" "   warning: could not install dnsmasq-base (hotspot)"
+  fi
+  # na rede do hotspot, todo nome aponta para a placa: o celular mostra o aviso "entrar na rede" e abre o painel
+  mkdir -p /etc/NetworkManager/dnsmasq-shared.d
+  printf '%s\n' "# HomeMinerProxy: na rede de configuração (HomeMiner-Setup) todo nome aponta para a placa" "address=/#/10.42.0.1" > /etc/NetworkManager/dnsmasq-shared.d/homeminer-captive.conf
+  unit mineracao-hotspot "HomeMinerProxy setup Wi-Fi (hotspot when there is no network)" "$NODE_BIN $APP_DIR/hotspot.js"
+  services="$services mineracao-hotspot"
 fi
 
 # Minerador local opcional: com o cpuminer instalado (imagens prontas), cria o serviço desligado.
