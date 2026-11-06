@@ -156,4 +156,40 @@ async function discover(addresses, { timeoutMs = 1200, concurrency = 32, probe =
   return found.sort((x, y) => net.isIPv4(x.host) && net.isIPv4(y.host) ? Number(x.host.split('.')[3]) - Number(y.host.split('.')[3]) : 0);
 }
 
-module.exports = { isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson };
+// ---------------------------------------------------------------- alertas (fase 2)
+// Avaliados a cada leitura, com folga para não alarmar por um pico: temperatura acima do limite em 2 leituras
+// seguidas, hashrate baixo por 10 min (e não nos primeiros 15 min depois de ligar), sem resposta em 3 leituras.
+// Também conta reinícios (o uptime voltou) e blocos achados pelo próprio Bitaxe.
+const LIMITS = { tempMax: 68, vrMax: 80, hashMin: 0.7, lowMs: 10 * 60e3, offlineFails: 3, warmupS: 900 };
+const ALERT_KINDS = ['offline', 'hot', 'vrhot', 'lowhash', 'fallback', 'fault'];
+
+function evaluate(prev, reading, limits = {}, now = Date.now()) {
+  const L = { ...LIMITS, ...Object.fromEntries(Object.entries(limits).filter(([, v]) => v != null && Number.isFinite(v))) };
+  const s = { hotN: 0, vrN: 0, lowSince: null, fails: 0, uptime: null, reboots: 0, lastReset: null, blocks: 0, blockSeen: false, ...(prev || {}) };
+  const active = {};
+  if (!reading || !reading.ok) {
+    s.fails++;
+    if (s.fails >= L.offlineFails) active.offline = { error: (reading && reading.error) || null };
+    return { ...s, active };   // sem leitura, os outros alertas ficam sem como saber
+  }
+  const d = reading.data;
+  s.fails = 0;
+  s.hotN = d.tempC != null && d.tempC > L.tempMax ? s.hotN + 1 : 0;
+  if (s.hotN >= 2) active.hot = { tempC: d.tempC, max: L.tempMax };
+  s.vrN = d.vrTempC != null && d.vrTempC > L.vrMax ? s.vrN + 1 : 0;
+  if (s.vrN >= 2) active.vrhot = { tempC: d.vrTempC, max: L.vrMax };
+  const hr = d.hashRate10m ?? d.hashRate;
+  const warming = d.uptimeS != null && d.uptimeS < L.warmupS;
+  const low = !d.paused && !warming && d.expected > 0 && hr != null && hr < L.hashMin * d.expected;
+  s.lowSince = low ? (s.lowSince != null ? s.lowSince : now) : null;
+  if (low && now - s.lowSince >= L.lowMs) active.lowhash = { hashRate: hr, expected: d.expected, pct: Math.round(hr / d.expected * 100) };
+  if (d.pool && d.pool.fallback) active.fallback = { url: d.pool.url, port: d.pool.port };
+  if (d.powerFault || d.hardwareFault || d.overheat) active.fault = { power: !!d.powerFault, hardware: !!d.hardwareFault, overheat: !!d.overheat };
+  if (s.uptime != null && d.uptimeS != null && d.uptimeS < s.uptime) { s.reboots++; s.lastReset = d.resetReason || null; }
+  if (d.uptimeS != null) s.uptime = d.uptimeS;
+  if (d.blockFound && !s.blockSeen) s.blocks++;
+  s.blockSeen = !!d.blockFound;
+  return { ...s, active };
+}
+
+module.exports = { LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson };

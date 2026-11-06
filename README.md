@@ -168,7 +168,21 @@ The dashboard can read each Bitaxe straight from its local AxeOS API (firmware 2
 2. In ⚙️ Settings → Miners → **Bitaxe (AxeOS API)**, type `name=IP` for each one (`bitaxe1=192.168.0.140, bitaxe2=192.168.0.141`), or tap **Find on the network** and **Use these**. **Test** shows model, firmware, hashrate, temperature and watts. Use the worker name (what comes after the dot in the pool user).
 3. Save. The farm screen gets a **Bitaxe** card, the worker row shows temperature and watts, and the measured power replaces the `WATTS` estimate in the energy cost (a plug with a meter still wins).
 
-Telegram `/status` gets one line per Bitaxe, and MQTT / Home Assistant gets hashrate, temperature, power and fan sensors for each one. The dashboard only reads (`GET /api/system/info` every 30 s): overclocking, firmware and the Bitaxe Wi-Fi stay in AxeOS. The AxeOS API has no password and only answers the home network, so never expose a Bitaxe to the internet: from outside home, open the dashboard through Tailscale.
+Telegram `/status` gets one line per Bitaxe, and MQTT / Home Assistant gets hashrate, temperature, power and fan sensors for each one.
+
+**Alerts** (Telegram, once when they start and once when they end; MQTT `binary_sensor` per alert and per Bitaxe):
+
+| Alert | When | Default (Settings → Miners) |
+| --- | --- | --- |
+| Chip hot | chip over the limit in 2 reads in a row | 68 °C (`BITAXE_TEMP_MAX`) |
+| Regulator hot | voltage regulator over the limit in 2 reads | 80 °C (`BITAXE_VR_MAX`) |
+| Low hashrate | 10-min average under a share of the expected hashrate for 10 min (not in the first 15 min after power-on) | 70% (`BITAXE_HASH_MIN`) |
+| On the backup pool | AxeOS switched to the fallback pool | — |
+| Fault | power fault, hardware fault or overheat mode | — |
+| Not answering | 3 reads in a row with no answer | 90 s |
+| Restarted / block found | uptime went back to zero / AxeOS reports a block | one message |
+
+`ALARM_IGNORE` silences a Bitaxe too (except a found block). The dashboard only reads (`GET /api/system/info` every 30 s): overclocking, firmware and the Bitaxe Wi-Fi stay in AxeOS. The AxeOS API has no password and only answers the home network, so never expose a Bitaxe to the internet: from outside home, open the dashboard through Tailscale.
 
 ## Mining with cpuminer (step by step)
 
