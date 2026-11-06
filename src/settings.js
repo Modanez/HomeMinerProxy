@@ -498,13 +498,21 @@ function testTelegram(token, chatIds, text, api = 'https://api.telegram.org') {
 const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
-    groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', net: 'Rede', backup: 'Backup e restauração' },
+    groups: { discover: 'Descobrir mineradores na rede', farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', net: 'Rede', backup: 'Backup e restauração' },
     navGroups: { general: 'Geral', integrations: 'Integrações', system: 'Sistema' },
-    tabDesc: { farm: 'Endereço de bitcoin, idioma, moeda, preço da energia e aparência do painel.', miners: 'Portas do proxy, minerador local, Bitaxe, consumo e hashrate esperado de cada worker.',
+    tabDesc: { discover: 'Procura mineradores na rede de casa e diz quais já mineram pelo proxy.', farm: 'Endereço de bitcoin, idioma, moeda, preço da energia e aparência do painel.', miners: 'Portas do proxy, minerador local, Bitaxe, consumo e hashrate esperado de cada worker.',
       telegram: 'Bot com alertas, resumo diário, backup semanal e comandos.', tuya: 'Tomadas SmartLife/Tuya e Sonoff: consumo real e religar mineradores.',
       mqtt: 'Sensores da fazenda no Home Assistant pelo MQTT.', cube: 'Placar da fazenda no cubo GeekMagic.', net: 'Wi-Fi, acesso de fora de casa (Tailscale) e SSH deste servidor.',
       backup: 'Versão instalada, atualização e cópia de segurança da configuração.' },
-    tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
+    tabs: { discover: '🔍 Descobrir', farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
+    dsc: { help: 'Varre a rede de casa atrás de Bitaxe e NerdQaxe (AxeOS), ASICs com a API do cgminer (porta 4028, como Avalon Nano e Antminer) e placas ESP32 (NerdMiner). Leva até meio minuto. Digite o PIN na barra de baixo antes.',
+      run: 'Procurar na rede', running: 'Procurando na rede (até meio minuto)…', none: 'Nenhum minerador encontrado. Confira se estão na mesma rede (Wi-Fi ou cabo) que este servidor.',
+      docker: 'Rodando em Docker: sem network_mode: host, a busca só enxerga a rede interna do Docker.', count: '%s aparelho(s) encontrado(s).',
+      kinds: { axeos: 'AxeOS', cgminer: 'API cgminer', esp32: 'ESP32', proxy: 'aparelho conectado ao proxy' },
+      via: { proxy: 'minerando pelo proxy', direct: 'minerando direto em %s', unknown: 'não aparece no proxy' }, worker: 'worker',
+      esp: 'Provavelmente um NerdMiner, ou outro aparelho com ESP32 (uma tomada Sonoff, por exemplo).', espHint: 'Se for um NerdMiner, aponte para a porta do NerdMiner do proxy (veja Pools e portas na aba Mineradores).',
+      cgHint: 'Para minerar pelo proxy, troque a pool na página deste ASIC (veja Pools e portas na aba Mineradores).', axeHint: 'Adicione ao painel, salve e use "Apontar para o proxy" em Ações nos Bitaxe.',
+      registered: 'no painel como %s', add: 'Adicionar ao painel', added: 'Adicionado ao campo Bitaxe da aba Mineradores. Salve para começar a monitorar.', open: 'abrir ↗' },
     bx: { title: 'Ações nos Bitaxe', help: 'Reiniciar, identificar (a tela pisca), pausar e retomar, fan e apontar para o proxy. Overclock, firmware e Wi-Fi ficam no AxeOS. Digite o PIN na barra de baixo antes.',
       none: 'Cadastre os Bitaxe no campo acima e salve para aparecerem aqui.', restart: 'Reiniciar', identify: 'Identificar', pause: 'Pausar', resume: 'Retomar', point: 'Apontar para o proxy',
       fanAuto: 'Fan automático, alvo', fanFixed: 'Fan fixo em', apply: 'Aplicar', confirm: 'Confirmar e reiniciar', cancel: 'Cancelar', offline: 'sem resposta', paused: 'pausado',
@@ -596,13 +604,21 @@ const T = {
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
-    groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', net: 'Network', backup: 'Backup and restore' },
+    groups: { discover: 'Discover miners on the network', farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', net: 'Network', backup: 'Backup and restore' },
     navGroups: { general: 'General', integrations: 'Integrations', system: 'System' },
-    tabDesc: { farm: 'Bitcoin address, language, currency, power price and dashboard look.', miners: 'Proxy ports, local miner, Bitaxe, power and expected hashrate of each worker.',
+    tabDesc: { discover: 'Looks for miners on the home network and tells which already mine through the proxy.', farm: 'Bitcoin address, language, currency, power price and dashboard look.', miners: 'Proxy ports, local miner, Bitaxe, power and expected hashrate of each worker.',
       telegram: 'Bot with alerts, daily summary, weekly backup and commands.', tuya: 'SmartLife/Tuya and Sonoff plugs: real power and restarting miners.',
       mqtt: 'Farm sensors in Home Assistant over MQTT.', cube: 'Farm scoreboard on the GeekMagic cube.', net: 'Wi-Fi, access from outside home (Tailscale) and SSH for this server.',
       backup: 'Installed version, updates and settings backup.' },
-    tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
+    tabs: { discover: '🔍 Discover', farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
+    dsc: { help: 'Scans the home network for Bitaxe and NerdQaxe (AxeOS), ASICs with the cgminer API (port 4028, such as Avalon Nano and Antminer) and ESP32 boards (NerdMiner). Takes up to half a minute. Type the PIN in the bottom bar first.',
+      run: 'Scan the network', running: 'Scanning the network (up to half a minute)…', none: 'No miner found. Check that they are on the same network (Wi-Fi or cable) as this server.',
+      docker: 'Running in Docker: without network_mode: host, the scan only sees the Docker internal network.', count: '%s device(s) found.',
+      kinds: { axeos: 'AxeOS', cgminer: 'cgminer API', esp32: 'ESP32', proxy: 'device connected to the proxy' },
+      via: { proxy: 'mining through the proxy', direct: 'mining directly on %s', unknown: 'not seen on the proxy' }, worker: 'worker',
+      esp: 'Probably a NerdMiner, or another ESP32 device (a Sonoff plug, for example).', espHint: 'If it is a NerdMiner, point it at the proxy NerdMiner port (see Pools and ports in the Miners tab).',
+      cgHint: 'To mine through the proxy, change the pool on this ASIC page (see Pools and ports in the Miners tab).', axeHint: 'Add it to the dashboard, save and use "Point at the proxy" in Bitaxe actions.',
+      registered: 'on the dashboard as %s', add: 'Add to dashboard', added: 'Added to the Bitaxe field in the Miners tab. Save to start monitoring.', open: 'open ↗' },
     bx: { title: 'Bitaxe actions', help: 'Restart, identify (the screen blinks), pause and resume, fan and point at the proxy. Overclock, firmware and Wi-Fi stay in AxeOS. Type the PIN in the bar below first.',
       none: 'Register the Bitaxe in the field above and save to see them here.', restart: 'Restart', identify: 'Identify', pause: 'Pause', resume: 'Resume', point: 'Point at the proxy',
       fanAuto: 'Auto fan, target', fanFixed: 'Fixed fan at', apply: 'Apply', confirm: 'Confirm and restart', cancel: 'Cancel', offline: 'no answer', paused: 'paused',
@@ -757,7 +773,7 @@ function page(lang, hasPin, theme) {
     return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><div class="fl"><label>${htmlEsc(label)}</label><div class="hint help"${tdef != null ? ` data-tpl="${htmlEsc(help)}" data-def="${tdef}"` : ''}>${htmlEsc(helpTxt)}</div></div><div class="fc">${input}${test}<div class="ferr"></div></div></div>`;
   };
   // menu lateral no estilo de console de nuvem: grupos, ícone discreto, rótulo; no celular vira uma faixa rolável
-  const navGroups = [['general', ['farm', 'miners']], ['integrations', ['telegram', 'tuya', 'mqtt', 'cube']], ['system', ['net', 'backup']]];
+  const navGroups = [['general', ['farm', 'miners', 'discover']], ['integrations', ['telegram', 'tuya', 'mqtt', 'cube']], ['system', ['net', 'backup']]];
   const splitTab = (t) => { const i = t.indexOf(' '); return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : ['', t]; };
   const tabBar = `<nav class="tabs" id="tabs">` + navGroups.map(([grp, ids]) => `<div class="navsec">${htmlEsc(S.navGroups[grp])}</div>` + ids.map((g) => {
     const [ic, lb] = splitTab(S.tabs[g]);
@@ -773,6 +789,9 @@ function page(lang, hasPin, theme) {
     `<div class="hint">${htmlEsc(P.user)}: <code id="pools_user">–</code> <span class="muted">(${htmlEsc(P.userHint)})</span> · ${htmlEsc(P.pass)}: <code>x</code></div>` +
     `<div class="how"><b>${htmlEsc(P.bitaxe)}</b><div class="hint" id="how_bitaxe"></div><b>${htmlEsc(P.nerd)}</b><div class="hint" id="how_nerd"></div><b>${htmlEsc(P.cpu)}</b><div class="hint"><code id="how_cpu"></code></div></div></div></fieldset>`;
   const fieldGroups = ['farm', 'miners', 'cube', 'telegram', 'mqtt', 'tuya'].map((g) => (g === 'miners' ? poolsGroup : '') + `<fieldset class="tab-pane${g === 'farm' ? ' active' : ''}" data-pane="${g}"><legend>${S.groups[g]}</legend>${FIELDS.filter((f) => f.group === g).map(field).join('')}</fieldset>`).join('');
+  const D = S.dsc;
+  const discoverGroup = `<fieldset class="tab-pane" data-pane="discover"><legend>${htmlEsc(S.groups.discover)}</legend><div class="f"><div class="hint">${htmlEsc(D.help)}</div>` +
+    `<div class="bbar"><button type="button" class="ghost" id="dsc_run">${htmlEsc(D.run)}</button></div><div class="hint" id="dsc_msg"></div><div id="dsc_list" class="pools"></div></div></fieldset>`;
   const N = S.net;
   const netGroup = `<fieldset class="tab-pane" data-pane="net"><legend>${S.groups.net}</legend>` +
     `<div class="f"><div class="hint" id="net_msg">${htmlEsc(N.pinFirst)}</div><div class="bbar"><button type="button" class="ghost" id="net_refresh">${htmlEsc(N.refresh)}</button></div></div>` +
@@ -798,7 +817,7 @@ function page(lang, hasPin, theme) {
     tgOk: S.tgOk, tgFail: S.tgFail('%s'), mqttOk: S.mqttOk, mqttFail: S.mqttFail('%s'),
     tuyaOk: S.tuyaOk('%s'), tuyaFail: S.tuyaFail('%s'), tokenSet: S.tokenSet('%s'),
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
-    bitaxeScanning: S.bitaxeScanning, bitaxeNone: S.bitaxeNone, bitaxeFail: S.bitaxeFail, bitaxeAdd: S.bitaxeAdd,
+    dsc: S.dsc, bitaxeScanning: S.bitaxeScanning, bitaxeNone: S.bitaxeNone, bitaxeFail: S.bitaxeFail, bitaxeAdd: S.bitaxeAdd,
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
     backupOk: S.backupOk, restored: S.restored, err: S.err,
     net: { ...N, wifiOn: N.wifiOn('%s', '%i') },
@@ -992,6 +1011,7 @@ function page(lang, hasPin, theme) {
 ${pageHead}
 ${fieldGroups}
 ${bxGroup}
+${discoverGroup}
 ${netGroup}
 ${backupGroup}
 <fieldset class="pin-card"><legend>${S.pin}</legend>
@@ -1290,7 +1310,7 @@ if (addPlugBtn && newPlugId) {
     const devId = newPlugId.value.trim();
     if (!devId) return;
     const sonoff = newPlugType && newPlugType.value === 'sonoff';
-    if (sonoff ? !/^[a-zA-Z0-9.\-]{1,253}(:\d{2,5})?$/.test(devId) : !/^[a-zA-Z0-9_-]{8,64}$/.test(devId)) { say(sonoff ? M.err.host : M.err.tuyaid, false); return; }
+    if (sonoff ? !/^[a-zA-Z0-9.\\-]{1,253}(:\\d{2,5})?$/.test(devId) : !/^[a-zA-Z0-9_-]{8,64}$/.test(devId)) { say(sonoff ? M.err.host : M.err.tuyaid, false); return; }
     const w = newPlugWorker ? newPlugWorker.value : '';
     const n = (newPlugName ? newPlugName.value.trim() : '') || (w && w !== '*' ? w : 'Tomada ' + ((stateValues.TUYA_PLUGS || []).length + 1));
     const wdRaw = newPlugWd ? newPlugWd.value.trim() : '';
@@ -1693,11 +1713,60 @@ function showBitaxes(list, found) {
     const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'ghost'; btn.textContent = M.bitaxeAdd;
     btn.addEventListener('click', () => {
       const used = new Set();
-      el('BITAXES').value = list.map((b, i) => { let nm = String(b.worker || b.hostname || 'bitaxe' + (i + 1)).replace(/[^\w.\-]/g, '').slice(0, 32) || 'bitaxe' + (i + 1); while (used.has(nm)) nm += 'x'; used.add(nm); return nm + '=' + b.host; }).join(', ');
+      el('BITAXES').value = list.map((b, i) => { let nm = String(b.worker || b.hostname || 'bitaxe' + (i + 1)).replace(/[^\\w.\\-]/g, '').slice(0, 32) || 'bitaxe' + (i + 1); while (used.has(nm)) nm += 'x'; used.add(nm); return nm + '=' + b.host; }).join(', ');
     });
     box.appendChild(btn);
   }
 }
+// ---------- descobrir mineradores na rede
+const dscBtn = document.getElementById('dsc_run');
+function dscRender(list, docker) {
+  const D = M.dsc, box = document.getElementById('dsc_list'), m = document.getElementById('dsc_msg');
+  box.textContent = '';
+  m.textContent = list.length ? D.count.replace('%s', list.length) : D.none + (docker ? ' ' + D.docker : '');
+  for (const d of list) {
+    const row = document.createElement('div'); row.className = 'pool';
+    const h = document.createElement('div'); h.className = 'ph';
+    const n = document.createElement('span'); n.className = 'pname';
+    n.textContent = [d.name || d.worker || d.proxyWorker, d.model || D.kinds[d.kind]].filter(Boolean).join(' · ') + ' · ' + d.ip;
+    h.appendChild(n);
+    if (d.kind === 'axeos') { const a = document.createElement('a'); a.href = 'http://' + d.ip + '/'; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = D.open; a.className = 'muted'; h.appendChild(a); }
+    const st = document.createElement('span'); st.className = 'pst' + (d.via === 'proxy' ? ' muted' : ' bad');
+    st.textContent = (d.via === 'proxy' ? '✓ ' : '⚠️ ') + D.via[d.via].replace('%s', d.pool ? d.pool.url + (d.pool.port ? ':' + d.pool.port : '') : '') + (d.proxyWorker ? ' (' + D.worker + ' ' + d.proxyWorker + ')' : '');
+    h.appendChild(st); row.appendChild(h);
+    const info = [];
+    if (d.hashRate > 0) info.push(fmtHs(d.hashRate));
+    if (d.registered) info.push(D.registered.replace('%s', d.registered));
+    if (d.mac) info.push(d.mac);
+    const hints = [];
+    if (d.kind === 'esp32') hints.push(D.esp);
+    if (d.via !== 'proxy') hints.push(d.kind === 'esp32' ? D.espHint : d.kind === 'cgminer' ? D.cgHint : d.kind === 'axeos' && !d.registered ? D.axeHint : '');
+    let axeTip = null;
+    for (const t of [info.join(' · '), ...hints].filter(Boolean)) { const x = document.createElement('div'); x.className = 'hint'; x.textContent = t; row.appendChild(x); if (t === D.axeHint) axeTip = x; }
+    if (d.kind === 'axeos' && !d.registered) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = D.add; b.style.marginTop = '6px';
+      b.addEventListener('click', () => {
+        const cur = String(el('BITAXES').value || '').trim();
+        const used = new Set(cur.split(',').map((x) => x.split('=')[0].trim()));
+        let nm = String(d.worker || d.name || 'bitaxe').replace(/[^\\w.\\-]/g, '').slice(0, 32) || 'bitaxe';
+        while (used.has(nm)) nm += 'x';
+        el('BITAXES').value = (cur ? cur + ', ' : '') + nm + '=' + d.ip;
+        el('BITAXES').dispatchEvent(new Event('input', { bubbles: true }));
+        d.registered = nm; b.remove(); if (axeTip) axeTip.textContent = D.added; say(D.added, true);
+      });
+      row.appendChild(b);
+    }
+    box.appendChild(row);
+  }
+}
+if (dscBtn) dscBtn.addEventListener('click', async () => {
+  dscBtn.disabled = true; document.getElementById('dsc_msg').textContent = M.dsc.running;
+  try {
+    const r = await post('/api/config/test', { pin: pin(), what: 'discover', values: values() });
+    if (r.error) { document.getElementById('dsc_msg').textContent = ''; say(M.err[r.error] || r.error, false); } else dscRender(r.found || [], r.docker);
+  } catch (_) { document.getElementById('dsc_msg').textContent = ''; }
+  finally { dscBtn.disabled = false; }
+});
 const scanBtn = document.getElementById('bitaxe_scan');
 if (scanBtn) scanBtn.addEventListener('click', async () => {
   scanBtn.disabled = true; say(M.bitaxeScanning, true);
@@ -1856,6 +1925,14 @@ function handle(req, res, ctx) {
             : { name: b.name, host: b.host, ok: false, error: r.error };
         }));
         return json(200, { ok: out.every((x) => x.ok), bitaxes: out });
+      }
+      if (j.what === 'discover') {
+        const p = (ctx.pools && ctx.pools()) || {};
+        const k = (ctx.discoverKnown && ctx.discoverKnown()) || {};
+        const hn = require('os').hostname().split('.')[0];
+        const found = await require('./discover').scan(require('./setup').lanAddresses(), {
+          known: { ourHosts: [...(p.hosts || []), hn], workers: k.workers || {}, bitaxes: require('./bitaxe').parseList(form.BITAXES) || [] } });
+        return json(200, { ok: true, found, docker: fs.existsSync('/.dockerenv') || !!process.env.container });
       }
       if (j.what === 'bitaxe-scan') {
         const found = await require('./bitaxe').discover(require('./setup').lanAddresses());

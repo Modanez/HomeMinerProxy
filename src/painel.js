@@ -1554,11 +1554,11 @@ if (kiosk) {
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
-const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
 const CX_NAV = [
   [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
   [CX.gMining, [['network', '🌐'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
-  [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config', '⚙️', CX.settings]]],
+  [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings]]],
 ];
 const cxPage = () => {
   const id = location.hash.slice(1), el = document.querySelector('.page[data-page="' + id + '"]');
@@ -2554,6 +2554,8 @@ function requestHandler(req, res) {
     bitaxeAction: (name, action, params) => bitaxeAction(name, action, params, 'config'),
     bitaxeList: () => bitaxesView().map((b) => ({ name: b.name, host: b.host, fresh: b.fresh, paused: !!(b.data && b.data.paused), autoFan: b.data ? b.data.autoFan : null,
       tempTarget: b.data ? b.data.tempTarget : null, fanPct: b.data ? b.data.fanPct : null, lastAction: b.lastAction })),
+    // descoberta na rede: IP de cada worker conectado ao proxy (o aparelho que já minera por aqui)
+    discoverKnown: () => ({ workers: Object.fromEntries(Object.entries(proxy.workers || {}).filter(([, w]) => w && w.ip).map(([n, w]) => [String(w.ip).replace(/^::ffff:/, ''), n])) }),
     pools: () => ({ routes: proxy.routes && proxy.routes.length ? proxy.routes : null, hosts: [os.hostname().split('.')[0] + '.local', ...require('./setup').lanAddresses()], address: ADDRESS || null }),
   })) return;
   if (req.url.startsWith('/api/widget')) {
