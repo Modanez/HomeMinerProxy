@@ -216,7 +216,7 @@ test('bot responde só ao chat configurado e manda os avisos', async (t) => {
 
   await waitFor(() => api.calls.some((c) => c.method === 'setMyCommands'));
   const cmds = api.calls.find((c) => c.method === 'setMyCommands').body.commands.map((c) => c.command);
-  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'tomada', 'bilhete', 'backup', 'ajuda']);
+  assert.deepStrictEqual(cmds, ['status', 'workers', 'sorte', 'recordes', 'campeonato', 'conquistas', 'tomada', 'reiniciar', 'pausar', 'retomar', 'bilhete', 'backup', 'ajuda']);
 
   api.push(999, '/status');   // estranho: ignorado
   api.push(42, '/status');
@@ -595,4 +595,23 @@ test('sem a opção, domingo não manda backup (o /backup continua valendo)', as
   api.push(42, '/backup');
   await waitFor(() => api.sent.some((m) => m.document));
   assert.match(api.sent.find((m) => m.document).raw, /do not forward/);
+});
+
+test('/reiniciar, /pausar, /retomar: só com o nome certo, nunca "o primeiro Bitaxe"', async (t) => {
+  const api = await fakeTelegram();
+  const done = [];
+  const s = () => ({ ...snap(), bitaxes: [{ name: 'bitaxe1', worker: 'bitaxe1' }, { name: 'bitaxe2', worker: 'gamma2' }] });
+  const bot = tg.start({ token: 'TOKEN123', chatIds: ['42'], lang: 'pt', snapshot: s, api: api.url, pollS: 0, warmupMs: 1e9, log: () => {},
+    bitaxeAction: async (name, action, params, via) => { done.push([name, action, via]); return name === 'bitaxe2' && action === 'pause' ? { ok: false, error: 'unsupported' } : { ok: true }; } });
+  t.after(() => { bot.stop(); api.server.close(); });
+  const say = async (txt) => { const n = api.sent.length; api.push(42, txt); await waitFor(() => api.sent.length > n); return api.sent.at(-1).text; };
+  assert.match(await say('/reiniciar'), /Uso: <code>\/reiniciar bitaxe1<\/code>\. Bitaxe: bitaxe1, bitaxe2/);
+  assert.match(await say('/reiniciar bitaxe3'), /Não achei o Bitaxe "bitaxe3"/);
+  assert.match(await say('/reiniciar bitaxe1'), /🔄 <b>bitaxe1<\/b> reiniciando/);
+  assert.match(await say('/pausar gamma2'), /⚠️ <b>bitaxe2<\/b>: este firmware não tem essa ação/);   // pelo nome do worker também
+  assert.match(await say('/retomar BITAXE1'), /▶️ <b>bitaxe1<\/b> minerando de novo/);
+  assert.deepStrictEqual(done, [['bitaxe1', 'restart', 'telegram'], ['bitaxe2', 'pause', 'telegram'], ['bitaxe1', 'resume', 'telegram']]);
+  api.push(999, '/reiniciar bitaxe1');   // estranho: nada
+  await new Promise((r) => setTimeout(r, 300));
+  assert.strictEqual(done.length, 3);
 });

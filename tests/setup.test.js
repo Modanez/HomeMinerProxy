@@ -198,7 +198,7 @@ test('Bitaxe: o painel lê a API, usa o hashrate e o consumo do aparelho e avisa
   const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', BITAXES: `bitaxe1=${host}`, BITAXE_ALLOW_LOOPBACK: '1', BITAXE_MS: '300', BITAXE_STALE_MS: '1500', WATTS: '{"bitaxe1":30}' });
   t.after(() => { p.kill(); fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
   const snap = async () => JSON.parse((await req(port, 'GET', '/api/mining')).body);
-  const j = await waitFor(async () => { const s = await snap(); return s.bitaxes && s.bitaxes[0] && s.bitaxes[0].fresh && s; }, 10000);
+  const j = await waitFor(async () => { const s = await snap(); return s.bitaxes && s.bitaxes[0] && s.bitaxes[0].fresh && s; }, 25000);
   assert.strictEqual(j.bitaxes[0].data.model, 'BM1370');
   const w = j.farm.workers.find((x) => x.name === 'bitaxe1');
   assert.ok(w, 'o Bitaxe aparece na lista mesmo sem a pool listar');
@@ -217,7 +217,7 @@ test('Bitaxe: o painel lê a API, usa o hashrate e o consumo do aparelho e avisa
   assert.match((await req(port, 'GET', '/')).body, /id="bxcard"/);
   // o Bitaxe some: depois da janela, "sem resposta" e o worker volta para a estimativa
   fake.close(); fake.closeAllConnections && fake.closeAllConnections();
-  const gone = await waitFor(async () => { const s = await snap(); return s.bitaxes[0].fresh === false && s; }, 10000);
+  const gone = await waitFor(async () => { const s = await snap(); return s.bitaxes[0].fresh === false && s; }, 25000);
   assert.ok(gone.bitaxes[0].error);
   const w2 = gone.farm.workers.find((x) => x.name === 'bitaxe1');
   assert.ok(!w2 || w2.source !== 'bitaxe');
@@ -243,4 +243,57 @@ test('Bitaxe: alertas no painel (chip quente em 2 leituras, sem resposta na 3ª 
   // limites na tela de configurações: fora da faixa é recusado
   const bad = JSON.parse((await req(port, 'POST', '/api/config', { pin: '424242', values: { BITAXE_TEMP_MAX: '150' } })).body);
   assert.strictEqual((bad.errors || {}).BITAXE_TEMP_MAX, 'range');
+});
+
+test('Bitaxe: ações pela tela de configurações (PIN), apontar para o proxy com prévia e conferência', async (t) => {
+  const http = require('http');
+  const state = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'bitaxe-2.14.json'), 'utf8'));
+  state.stratumURL = 'solo.ckpool.org'; state.stratumPort = 3333;   // hoje aponta direto para a pool
+  const calls = [];
+  const fake = http.createServer((q, s) => {
+    let b = ''; q.on('data', (c) => { b += c; });
+    q.on('end', () => {
+      calls.push(q.method + ' ' + q.url);
+      if (q.method === 'GET' && q.url === '/api/system/info') { s.writeHead(200); return s.end(JSON.stringify(state)); }
+      if (q.method === 'PATCH' && q.url === '/api/system') { Object.assign(state, JSON.parse(b || '{}')); s.writeHead(200); return s.end(); }
+      if (q.method === 'POST' && /^\/api\/system\/(restart|pause|resume)$/.test(q.url)) { if (q.url.endsWith('pause')) state.miningPaused = true; if (q.url.endsWith('resume')) state.miningPaused = false; s.writeHead(200); return s.end(); }
+      s.writeHead(404); s.end();
+    });
+  });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bxact-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', BITAXES: `bitaxe1=127.0.0.1:${fake.address().port}`, BITAXE_ALLOW_LOOPBACK: '1', BITAXE_MS: '60000', BITAXE_SERVER_IP: '192.168.0.134' });
+  t.after(() => { p.kill(); fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const act = async (body, pin = '424242') => { const r = await req(port, 'POST', '/api/config/bitaxe-action', { pin, ...body }); return { status: r.status, j: JSON.parse(r.body) }; };
+  await waitFor(() => req(port, 'GET', '/api/config/bitaxes'));
+  assert.strictEqual((await act({ name: 'bitaxe1', action: 'restart' }, '1')).status, 403);          // sem PIN, nada
+  assert.deepStrictEqual((await act({ name: 'bitaxe1', action: 'frequency' })).j, { error: 'action' }); // fora da lista
+  assert.deepStrictEqual((await act({ name: 'bitaxe9', action: 'restart' })).j, { ok: false, error: 'nobitaxe' });
+  assert.deepStrictEqual((await act({ name: 'bitaxe1', action: 'identify' })).j, { ok: false, error: 'unsupported' });
+  assert.strictEqual((await act({ name: 'bitaxe1', action: 'pause' })).j.ok, true);
+  assert.strictEqual(state.miningPaused, true);
+  // fan: grava e confere na releitura; fora da faixa, recusa
+  assert.strictEqual((await act({ name: 'bitaxe1', action: 'fan', params: { auto: true, temptarget: 62 } })).j.ok, true);
+  assert.strictEqual(state.temptarget, 62);
+  assert.deepStrictEqual((await act({ name: 'bitaxe1', action: 'fan', params: { auto: false, fanspeed: 5 } })).j, { ok: false, error: 'fan' });
+  // apontar para o proxy: prévia, depois grava, confere e reinicia
+  const pv = (await act({ name: 'bitaxe1', action: 'point-preview' })).j;
+  assert.strictEqual(pv.ok, true);
+  assert.strictEqual(pv.current.url, 'solo.ckpool.org');
+  assert.strictEqual(pv.next.port, 3338);
+  assert.strictEqual(pv.next.user, `${ADDR}.bitaxe1`);
+  assert.deepStrictEqual(pv.backup, { url: 'solo.ckpool.org', port: 3333, user: `${ADDR}.bitaxe1` });
+  const before = calls.length;
+  const done = (await act({ name: 'bitaxe1', action: 'point' })).j;
+  assert.strictEqual(done.ok, true);
+  assert.strictEqual(state.stratumPort, 3338);
+  assert.strictEqual(state.stratumUser, `${ADDR}.bitaxe1`);
+  assert.strictEqual(state.fallbackStratumURL, 'solo.ckpool.org');
+  assert.deepStrictEqual(calls.slice(before), ['GET /api/system/info', 'PATCH /api/system', 'GET /api/system/info', 'POST /api/system/restart']);
+  assert.strictEqual((await act({ name: 'bitaxe1', action: 'point-preview' })).j.same, true);
+  // nunca: frequência, tensão ou Wi-Fi
+  assert.ok(!('frequency' in JSON.parse(JSON.stringify(state)) && state.frequency !== 525));
+  const list = JSON.parse((await req(port, 'GET', '/api/config/bitaxes')).body).list;
+  assert.strictEqual(list[0].lastAction.action, 'point');
 });

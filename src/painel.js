@@ -84,12 +84,67 @@ async function tickBitaxe() {
     }
   }
 }
+// ---------------------------------------------------------------- ações no Bitaxe (fase 3), sempre atrás do PIN ou do chat autorizado
+// Para onde apontar um Bitaxe: este servidor, a porta ASIC do proxy (atlaspool, senão ckpool), endereço.nome, reserva no ckpool
+function bitaxePointTarget(b) {
+  if (!ADDRESS) return { ok: false, error: 'noaddress' };
+  // só IP da rede de casa (nunca o do Tailscale, 100.x, que o Bitaxe não alcança); BITAXE_SERVER_IP força um
+  const forced = (process.env.BITAXE_SERVER_IP || '').trim();
+  const ip = forced && bitaxe.isPrivateHost(forced) ? forced : require('./setup').lanAddresses().find((a) => bitaxe.isPrivateHost(a) && /^\d+\.\d+\.\d+\.\d+$/.test(a));
+  if (!ip) return { ok: false, error: 'nohost' };
+  const routes = proxy.routes || [];
+  const port = (routes.find((r) => /atlaspool/.test(r.host || '')) || routes.find((r) => /ckpool/.test(r.host || '') && !/eusolo/.test(r.host || '')) || {}).listen || 3338;
+  const user = `${ADDRESS}.${b.name}`;
+  return { ok: true, main: { url: ip, port, user }, backup: { url: 'solo.ckpool.org', port: 3333, user } };
+}
+async function bitaxeAction(name, action, params = {}, via = 'painel') {
+  const b = BITAXES.find((x) => x.name === name || bitaxeWorker(x) === name);
+  if (!b) return { ok: false, error: 'nobitaxe' };
+  if (!bitaxeState.has(b.name)) bitaxeState.set(b.name, { ok: false, at: 0, okAt: 0, error: null, fails: 0, data: null, hist: [] });
+  const st = bitaxeState.get(b.name);
+  let r;
+  if (['restart', 'identify', 'pause', 'resume'].includes(action)) {
+    if (action === 'restart') st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
+    r = await bitaxe.simpleAction(b.host, action);
+  } else if (action === 'fan') {
+    const body = bitaxe.fanPatch(params);
+    if (!body) return { ok: false, error: 'fan' };
+    r = await bitaxe.patch(b.host, body);
+    if (r.ok) {
+      const chk = await bitaxe.info(b.host);
+      const raw = chk.ok ? chk.raw : null;
+      const applied = raw && Number(raw.autofanspeed) === body.autofanspeed && (body.autofanspeed ? Number(raw.temptarget) === body.temptarget : true);
+      if (!applied) r = { ok: false, error: 'notapplied' };
+    }
+  } else if (action === 'point-preview' || action === 'point') {
+    const target = bitaxePointTarget(b);
+    if (!target.ok) return target;
+    const cur = await bitaxe.info(b.host);
+    if (!cur.ok) return cur;
+    const current = { url: cur.data.pool.url, port: cur.data.pool.port, worker: cur.data.worker, fallback: cur.data.pool.fallback };
+    if (action === 'point-preview') return { ok: true, current, next: target.main, backup: target.backup, same: bitaxe.poolMatches(cur.raw, target.main) };
+    r = await bitaxe.patch(b.host, bitaxe.poolPatch(cur.raw, target.main, target.backup));
+    if (r.ok) {
+      const chk = await bitaxe.info(b.host);
+      if (!chk.ok || !bitaxe.poolMatches(chk.raw, target.main)) r = { ok: false, error: 'notapplied' };
+      else {
+        // a pool nova só vale depois de reiniciar
+        st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
+        await bitaxe.simpleAction(b.host, 'restart');
+        r = { ok: true, next: target.main };
+      }
+    }
+  } else return { ok: false, error: 'action' };
+  st.lastAction = { action, via, at: Date.now(), ok: !!r.ok, error: r.error || null };
+  console.log(`bitaxe ${b.name}: ${action} via ${via} → ${r.ok ? 'ok' : r.error}`);
+  return r;
+}
 function bitaxesView() {
   return BITAXES.map((b) => {
     const st = bitaxeState.get(b.name) || {};
     const al = st.alerts || {};
     return { name: b.name, host: b.host, worker: bitaxeWorker(b), ok: !!st.ok, fresh: !!bitaxeFresh(st), okAt: st.okAt || null, error: st.error || null, fails: st.fails || 0, data: st.data || null, hist: st.hist || [],
-      alerts: al.active || {}, reboots: al.reboots || 0, lastReset: al.lastReset || null, blocks: al.blocks || 0 };
+      alerts: al.active || {}, reboots: al.reboots || 0, lastReset: al.lastReset || null, blocks: al.blocks || 0, lastAction: st.lastAction || null };
   });
 }
 let tuyaPlugsState = new Map();
@@ -1520,7 +1575,7 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️' };
 function bxTemp(t) { return t >= 68 ? 'hot' : t >= 60 ? 'warm' : ''; }
 function renderBitaxes(j) {
   const list = j.bitaxes || [];
@@ -1531,7 +1586,7 @@ function renderBitaxes(j) {
     const d = b.data;
     const link = /^[\w.:\-]+$/.test(b.host) ? '<a href="http://' + esc(b.host) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + '</a>' : '';
     const head = '<div class="bxh"><b>' + esc(b.name) + '</b><span class="sub">' + esc([d && d.model, d && d.version, b.host].filter(Boolean).join(' · ')) + '</span>' +
-      (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '</div>';
+      (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '<a href="/config#miners">' + BXT.actions + '</a></div>';
     if (!d) return '<div class="bx">' + head + '</div>';
     const hr = d.hashRate10m || d.hashRate;
     const al = b.alerts || {};
@@ -1548,6 +1603,7 @@ function renderBitaxes(j) {
       st(BXT.best, d.bestSessionDiff != null ? nf(d.bestSessionDiff, 0) : '–') +
       st(BXT.up, d.uptimeS != null ? dur(d.uptimeS * 1000) : '–') +
       (d.rssi != null ? st(BXT.wifi, nf(d.rssi) + ' dBm') : '') +
+      (b.lastAction ? st(BXT.lastAct, (BXT.acts[b.lastAction.action] || esc(b.lastAction.action)) + ' · ' + agoTxt(b.lastAction.at) + (b.lastAction.ok ? '' : ' <b class="hot">' + BXT.actFail + '</b>')) : '') +
       (b.reboots ? st(BXT.reboots, nf(b.reboots) + (b.lastReset ? ' <span>' + esc(b.lastReset) + '</span>' : '')) : '') +
       '</div>' + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
@@ -2300,6 +2356,9 @@ function requestHandler(req, res) {
     onSaved: () => { console.log('configuração salva pela tela; reiniciando'); if (require.main === module) process.exit(0); },
     telegramApi: process.env.TELEGRAM_API,
     tuyaApi: process.env.TUYA_API,
+    bitaxeAction: (name, action, params) => bitaxeAction(name, action, params, 'config'),
+    bitaxeList: () => bitaxesView().map((b) => ({ name: b.name, host: b.host, fresh: b.fresh, paused: !!(b.data && b.data.paused), autoFan: b.data ? b.data.autoFan : null,
+      tempTarget: b.data ? b.data.tempTarget : null, fanPct: b.data ? b.data.fanPct : null, lastAction: b.lastAction })),
     pools: () => ({ routes: proxy.routes && proxy.routes.length ? proxy.routes : null, hosts: [os.hostname().split('.')[0] + '.local', ...require('./setup').lanAddresses()], address: ADDRESS || null }),
   })) return;
   if (req.url.startsWith('/api/widget')) {
@@ -2422,6 +2481,7 @@ function startTelegram() {
   const hour = (process.env.TELEGRAM_DAILY ?? '21').trim();
   return require('./telegram').start({
     token,
+    bitaxeAction: BITAXES.length ? (name, action, params, via) => bitaxeAction(name, action, params, via) : null,
     chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
     lang: LANGUAGE || 'en',
     snapshot: () => snapshot(true),
