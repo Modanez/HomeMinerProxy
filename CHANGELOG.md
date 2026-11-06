@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Bitaxe alerts:** chip or regulator over the limit, low hashrate for 10 min, on the backup pool, power/hardware fault, not answering, restarted and block found. Telegram announces each one when it starts and when it ends; MQTT gets a `binary_sensor` per alert and per Bitaxe; the dashboard card shows the active ones. Limits in ⚙️ Settings → Miners (`BITAXE_TEMP_MAX`, `BITAXE_VR_MAX`, `BITAXE_HASH_MIN`).
 - **Wi-Fi on the Orange Pi and Odroid images:** they now ship NetworkManager handling only the Wi-Fi (the cable keeps the image's own setup), so 🌐 Network → Wi-Fi works with a USB or onboard adapter. The cable shows as connected even when NetworkManager does not manage it.
 - **Docker:** new `minerador` profile (`docker compose --profile minerador up -d`) with cpuminer pointed at the proxy, and the 🌐 Network tab now explains how to set up Tailscale, Wi-Fi and SSH on the host instead of disappearing.
 - **Pools and ports guide** in ⚙️ Settings → Miners: every proxy port with its pool, backup, live status and ping, who it is for, and how to point a Bitaxe, a NerdMiner or cpuminer (server address and user filled in).
@@ -13,6 +14,7 @@
 - **`health.localMiner`** in `/api/mining` shows how the local miner log is being read (running, hashrate, last line, last read, error).
 
 ### Português
+- **Alertas do Bitaxe:** chip ou regulador acima do limite, hashrate baixo por 10 min, na pool reserva, falha de energia ou hardware, sem resposta, reiniciou e achou bloco. O Telegram avisa cada um quando começa e quando termina; o MQTT ganha um `binary_sensor` por alerta e por Bitaxe; o cartão do painel mostra os ativos. Limites em ⚙️ Configurações → Mineradores (`BITAXE_TEMP_MAX`, `BITAXE_VR_MAX`, `BITAXE_HASH_MIN`).
 - **Wi-Fi nas imagens do Orange Pi e do Odroid:** agora vêm com o NetworkManager cuidando só do Wi-Fi (o cabo continua com a configuração da imagem), então 🌐 Rede → Wi-Fi funciona com adaptador USB ou da placa. O cabo aparece como conectado mesmo sem o NetworkManager cuidar dele.
 - **Docker:** novo perfil `minerador` (`docker compose --profile minerador up -d`) com o cpuminer apontado para o proxy, e a aba 🌐 Rede passa a explicar como configurar Tailscale, Wi-Fi e SSH no host em vez de sumir.
 - **Guia "Pools e portas"** em ⚙️ Configurações → Mineradores: cada porta do proxy com a pool, a reserva, o status e o ping ao vivo, para quem serve, e como apontar um Bitaxe, um NerdMiner ou o cpuminer (com o endereço do servidor e o usuário preenchidos).

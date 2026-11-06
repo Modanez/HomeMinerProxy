@@ -111,7 +111,13 @@ test('MQTT: sensores por Bitaxe no discovery e no estado', () => {
   assert.match(p.value_template, /value_json\.bitaxes\.bitaxe1\.temp/);
   const d = bx.normalize(fx('2.14'));
   const st = mqtt.statePayload({ farm: {}, bitaxes: [{ name: 'bitaxe1', fresh: true, data: d }, { name: 'bitaxe2', fresh: false, data: null }] });
-  assert.deepStrictEqual(st.bitaxes.bitaxe1, { hashrate: 1188400000000, temp: 61.5, power: 17.8, fan: 55, online: 'ON' });
+  assert.deepStrictEqual(st.bitaxes.bitaxe1, { hashrate: 1188400000000, temp: 61.5, power: 17.8, fan: 55, online: 'ON',
+    alert_offline: 'OFF', alert_hot: 'OFF', alert_vrhot: 'OFF', alert_lowhash: 'OFF', alert_fallback: 'OFF', alert_fault: 'OFF' });
+  const hot = mqtt.statePayload({ farm: {}, bitaxes: [{ name: 'bitaxe1', fresh: true, data: d, alerts: { hot: { tempC: 70, max: 68 } } }] });
+  assert.strictEqual(hot.bitaxes.bitaxe1.alert_hot, 'ON');
+  const bin = cfgs.find((c) => c.topic === 'homeassistant/binary_sensor/homeminerproxy/bitaxe_bitaxe1_hot/config');
+  assert.strictEqual(JSON.parse(bin.payload).device_class, 'heat');
+  assert.strictEqual(JSON.parse(bin.payload).name, 'bitaxe1 chip quente');
   assert.strictEqual(st.bitaxes.bitaxe2.online, 'OFF');
   assert.strictEqual(mqtt.statePayload({ farm: {} }).bitaxes, undefined);
 });
@@ -123,4 +129,73 @@ test('Telegram /status: uma linha por Bitaxe, e aviso quando não responde', () 
     bitaxes: [{ name: 'bitaxe2', fresh: true, data: d }, { name: 'bitaxe1', fresh: false, data: null }] }, { lang: 'pt' });
   assert.match(txt, /🟧 <b>bitaxe2<\/b> · 1,17 TH\/s · 69 °C · 18,4 W · na reserva/);
   assert.match(txt, /bitaxe1: o Bitaxe não responde/);
+});
+
+// ---------------------------------------------------------------- fase 2: alertas
+const read = (over = {}) => ({ ok: true, data: { ...bx.normalize(fx('2.14')), ...over } });
+
+test('alertas: temperatura só com 2 leituras seguidas acima do limite; volta ao normal', () => {
+  let s = bx.evaluate(null, read({ tempC: 70 }), {}, 0);
+  assert.deepStrictEqual(s.active, {});                       // uma leitura: ainda não
+  s = bx.evaluate(s, read({ tempC: 71 }), {}, 30e3);
+  assert.deepStrictEqual(s.active.hot, { tempC: 71, max: 68 });
+  s = bx.evaluate(s, read({ tempC: 60 }), {}, 60e3);
+  assert.ok(!s.active.hot);
+  s = bx.evaluate(bx.evaluate(null, read({ tempC: 62 }), { tempMax: 60 }), read({ tempC: 62 }), { tempMax: 60 });
+  assert.strictEqual(s.active.hot.max, 60);                   // limite configurado
+  s = bx.evaluate(bx.evaluate(null, read({ vrTempC: 85 })), read({ vrTempC: 85 }));
+  assert.deepStrictEqual(s.active.vrhot, { tempC: 85, max: 80 });
+});
+
+test('alertas: hashrate baixo só depois de 10 min, fora do aquecimento e sem pausa', () => {
+  const low = { hashRate10m: 600e9, expected: 1200e9, uptimeS: 7200 };
+  let s = bx.evaluate(null, read(low), {}, 0);
+  s = bx.evaluate(s, read(low), {}, 9 * 60e3);
+  assert.ok(!s.active.lowhash);
+  s = bx.evaluate(s, read(low), {}, 10 * 60e3);
+  assert.deepStrictEqual(s.active.lowhash, { hashRate: 600e9, expected: 1200e9, pct: 50 });
+  s = bx.evaluate(s, read({ ...low, hashRate10m: 1150e9 }), {}, 11 * 60e3);
+  assert.ok(!s.active.lowhash && s.lowSince === null);
+  let w = bx.evaluate(null, read({ ...low, uptimeS: 300 }), {}, 0);   // acabou de ligar
+  w = bx.evaluate(w, read({ ...low, uptimeS: 900 - 1 }), {}, 20 * 60e3);
+  assert.ok(!w.active.lowhash);
+  let p = bx.evaluate(null, read({ ...low, paused: true }), {}, 0);
+  p = bx.evaluate(p, read({ ...low, paused: true }), {}, 20 * 60e3);
+  assert.ok(!p.active.lowhash);
+});
+
+test('alertas: sem resposta na 3ª falha; reserva, falhas, reinício e bloco', () => {
+  let s = bx.evaluate(null, read(), {}, 0);
+  s = bx.evaluate(s, { ok: false, error: 'timeout' }); s = bx.evaluate(s, { ok: false, error: 'timeout' });
+  assert.ok(!s.active.offline);
+  s = bx.evaluate(s, { ok: false, error: 'offline' });
+  assert.deepStrictEqual(s.active, { offline: { error: 'offline' } });
+  s = bx.evaluate(s, read({ uptimeS: 40, resetReason: 'Brownout reset' }));   // voltou, e reiniciou
+  assert.deepStrictEqual(s.active, {});
+  assert.strictEqual(s.reboots, 1);
+  assert.strictEqual(s.lastReset, 'Brownout reset');
+  s = bx.evaluate(s, read({ uptimeS: 70, pool: { url: 'solo.ckpool.org', port: 3333, fallback: true }, powerFault: true }));
+  assert.deepStrictEqual(s.active.fallback, { url: 'solo.ckpool.org', port: 3333 });
+  assert.deepStrictEqual(s.active.fault, { power: true, hardware: false, overheat: false });
+  assert.strictEqual(s.reboots, 1);
+  s = bx.evaluate(s, read({ uptimeS: 100, blockFound: true }));
+  s = bx.evaluate(s, read({ uptimeS: 130, blockFound: true }));
+  assert.strictEqual(s.blocks, 1);                              // conta uma vez
+});
+
+test('Telegram: avisa quando o alerta começa e quando termina; ALARM_IGNORE silencia; bloco sempre', () => {
+  const tg = require('../src/telegram');
+  const base = (alerts, extra = {}) => tg.digest({ farm: { hasData: true, workers: [] }, bitaxes: [{ name: 'bitaxe1', worker: 'bitaxe1', alerts, reboots: 0, blocks: 0,
+    data: { tempC: 59.2, hashRate10m: 1.19e12 }, ...extra }] });
+  const ev = (a, b, o = {}) => tg.diffEvents(a, b, { lang: 'pt', ...o }).map((e) => e.text);
+  const on = ev(base({}), base({ hot: { tempC: 70.4, max: 68 }, lowhash: { hashRate: 6e11, expected: 1.2e12, pct: 50 }, fallback: { url: 'solo.ckpool.org', port: 3333 } }));
+  assert.deepStrictEqual(on, ['🌡️ <b>bitaxe1</b>: chip a <b>70,4 °C</b> (limite 68 °C)', '📉 <b>bitaxe1</b>: hashrate em <b>600 GH/s</b>, 50% do esperado (1,2 TH/s), há 10 min',
+    '🔀 <b>bitaxe1</b> está na pool reserva (solo.ckpool.org:3333)']);
+  const off = ev(base({ hot: { tempC: 70.4, max: 68 } }), base({}));
+  assert.deepStrictEqual(off, ['✅ <b>bitaxe1</b>: chip de volta a 59,2 °C']);
+  assert.deepStrictEqual(ev(base({}), base({ offline: {} }), { ignore: ['bitaxe1'] }), []);
+  assert.match(ev(base({}), base({}, { blocks: 1 }), { ignore: ['bitaxe1'] })[0], /ENCONTROU UM BLOCO/);
+  assert.deepStrictEqual(ev(base({}), base({}, { reboots: 1, lastReset: 'Brownout reset' })), ['🔄 <b>bitaxe1</b> reiniciou sozinho (Brownout reset)']);
+  assert.deepStrictEqual(ev(base({}), base({ fault: { power: true, hardware: false, overheat: true } })), ['⚠️ <b>bitaxe1</b>: falha de energia (confira a fonte) · superaquecido: o AxeOS baixou a frequência']);
+  assert.deepStrictEqual(ev(null, base({ hot: { tempC: 70, max: 68 } })), []);   // primeira olhada não avisa
 });

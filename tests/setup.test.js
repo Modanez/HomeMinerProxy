@@ -222,3 +222,25 @@ test('Bitaxe: o painel lê a API, usa o hashrate e o consumo do aparelho e avisa
   const w2 = gone.farm.workers.find((x) => x.name === 'bitaxe1');
   assert.ok(!w2 || w2.source !== 'bitaxe');
 });
+
+test('Bitaxe: alertas no painel (chip quente em 2 leituras, sem resposta na 3ª falha) e limites validados', async (t) => {
+  const http = require('http');
+  const info = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'bitaxe-2.14.json'), 'utf8'));
+  info.temp = 66;   // acima do limite configurado (64), abaixo do padrão (68)
+  let up = true;
+  const fake = http.createServer((q, s) => { if (!up) return q.socket.destroy(); s.writeHead(200, { 'Content-Type': 'application/json' }); s.end(JSON.stringify(info)); });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'bxal-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', BITAXES: `bitaxe1=127.0.0.1:${fake.address().port}`, BITAXE_ALLOW_LOOPBACK: '1', BITAXE_MS: '250', BITAXE_TEMP_MAX: '64' });
+  t.after(() => { p.kill(); fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const bxOf = async () => (JSON.parse((await req(port, 'GET', '/api/mining')).body).bitaxes || [])[0];
+  const hot = await waitFor(async () => { const b = await bxOf(); return b && b.alerts && b.alerts.hot && b; }, 10000);
+  assert.deepStrictEqual(hot.alerts.hot, { tempC: 66, max: 64 });
+  up = false;
+  const off = await waitFor(async () => { const b = await bxOf(); return b && b.alerts.offline && b; }, 10000);
+  assert.ok(!off.alerts.hot);
+  // limites na tela de configurações: fora da faixa é recusado
+  const bad = JSON.parse((await req(port, 'POST', '/api/config', { pin: '424242', values: { BITAXE_TEMP_MAX: '150' } })).body);
+  assert.strictEqual((bad.errors || {}).BITAXE_TEMP_MAX, 'range');
+});

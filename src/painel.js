@@ -54,7 +54,10 @@ let tuyaClient = null;
 const bitaxe = require('./bitaxe');
 const BITAXES = bitaxe.parseList(process.env.BITAXES) || [];
 const BITAXE_MS = Number(process.env.BITAXE_MS || 30e3);
-const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist }
+const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist, alerts }
+const numEnv = (k) => (process.env[k] != null && process.env[k] !== '' && Number.isFinite(Number(process.env[k])) ? Number(process.env[k]) : null);
+const BITAXE_LIMITS = { tempMax: numEnv('BITAXE_TEMP_MAX'), vrMax: numEnv('BITAXE_VR_MAX'), hashMin: numEnv('BITAXE_HASH_MIN') != null ? numEnv('BITAXE_HASH_MIN') / 100 : null,
+  lowMs: numEnv('BITAXE_LOW_MS') };
 const BITAXE_STALE_MS = Number(process.env.BITAXE_STALE_MS || Math.max(3 * BITAXE_MS, 120e3));   // sem leitura há mais que isso = sem resposta
 const bitaxeFresh = (st) => st && st.data && st.okAt && Date.now() - st.okAt < BITAXE_STALE_MS;
 // o worker de cada Bitaxe: o nome depois do ponto no usuário da pool, ou o nome cadastrado
@@ -70,6 +73,7 @@ async function tickBitaxe() {
     bitaxeState.set(b.name, st);
     const r = await bitaxe.info(b.host);
     st.at = Date.now();
+    st.alerts = bitaxe.evaluate(st.alerts, r, BITAXE_LIMITS, st.at);
     if (!r.ok) { st.ok = false; st.error = r.error; st.fails++; continue; }
     Object.assign(st, { ok: true, okAt: st.at, error: null, fails: 0, data: r.data });
     // histórico curto para o gráfico: um ponto a cada 5 min, 24 h
@@ -83,7 +87,9 @@ async function tickBitaxe() {
 function bitaxesView() {
   return BITAXES.map((b) => {
     const st = bitaxeState.get(b.name) || {};
-    return { name: b.name, host: b.host, worker: bitaxeWorker(b), ok: !!st.ok, fresh: !!bitaxeFresh(st), okAt: st.okAt || null, error: st.error || null, fails: st.fails || 0, data: st.data || null, hist: st.hist || [] };
+    const al = st.alerts || {};
+    return { name: b.name, host: b.host, worker: bitaxeWorker(b), ok: !!st.ok, fresh: !!bitaxeFresh(st), okAt: st.okAt || null, error: st.error || null, fails: st.fails || 0, data: st.data || null, hist: st.hist || [],
+      alerts: al.active || {}, reboots: al.reboots || 0, lastReset: al.lastReset || null, blocks: al.blocks || 0 };
   });
 }
 let tuyaPlugsState = new Map();
@@ -1514,7 +1520,7 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios' };
 function bxTemp(t) { return t >= 68 ? 'hot' : t >= 60 ? 'warm' : ''; }
 function renderBitaxes(j) {
   const list = j.bitaxes || [];
@@ -1528,7 +1534,9 @@ function renderBitaxes(j) {
       (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '</div>';
     if (!d) return '<div class="bx">' + head + '</div>';
     const hr = d.hashRate10m || d.hashRate;
-    const warn = [d.paused && BXT.paused, d.overheat && BXT.overheat, d.powerFault && BXT.powerFault, d.hardwareFault && BXT.hwFault].filter(Boolean);
+    const al = b.alerts || {};
+    const warn = [al.hot && BXT.hot, al.vrhot && BXT.vrhot, al.lowhash && BXT.lowhash + ' (' + al.lowhash.pct + '%)', al.fallback && BXT.onBackup,
+      d.paused && BXT.paused, d.overheat && BXT.overheat, d.powerFault && BXT.powerFault, d.hardwareFault && BXT.hwFault].filter(Boolean);
     return '<div class="bx">' + head + '<div class="bxg">' +
       st(BXT.hash, fmtHash(hr) + (d.expected ? ' <span>' + BXT.of + ' ' + fmtHash(d.expected) + ' ' + BXT.expected + '</span>' : '')) +
       st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + nf(d.tempC, 1) + ' °C</b>' : '–') +
@@ -1540,6 +1548,7 @@ function renderBitaxes(j) {
       st(BXT.best, d.bestSessionDiff != null ? nf(d.bestSessionDiff, 0) : '–') +
       st(BXT.up, d.uptimeS != null ? dur(d.uptimeS * 1000) : '–') +
       (d.rssi != null ? st(BXT.wifi, nf(d.rssi) + ' dBm') : '') +
+      (b.reboots ? st(BXT.reboots, nf(b.reboots) + (b.lastReset ? ' <span>' + esc(b.lastReset) + '</span>' : '')) : '') +
       '</div>' + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
 }

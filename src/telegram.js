@@ -30,6 +30,25 @@ const STRINGS = {
     farmRecord: (d, w) => `Recorde da fazenda: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Mais sortudo: ${w} (${f}×)`,
     bitaxeOff: (n) => `🟥 ${n}: o Bitaxe não responde`,
+    bxOn: {
+      offline: (n) => `🟥 <b>${n}</b> parou de responder (3 leituras seguidas). Confira a tomada e o Wi-Fi.`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip a <b>${a.t} °C</b> (limite ${a.max} °C)`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: regulador de tensão a <b>${a.t} °C</b> (limite ${a.max} °C)`,
+      lowhash: (n, a) => `📉 <b>${n}</b>: hashrate em <b>${a.hr}</b>, ${a.pct}% do esperado (${a.exp}), há 10 min`,
+      fallback: (n, a) => `🔀 <b>${n}</b> está na pool reserva (${a.url})`,
+      fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
+    },
+    bxOff: {
+      offline: (n) => `✅ <b>${n}</b> voltou a responder`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip de volta a ${a.t} °C`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulador de volta a ${a.t} °C`,
+      lowhash: (n, a) => `✅ <b>${n}</b>: hashrate normal de novo (${a.hr})`,
+      fallback: (n) => `✅ <b>${n}</b> voltou para a pool principal`,
+      fault: (n) => `✅ <b>${n}</b>: sem falhas`,
+    },
+    bxFault: { power: 'falha de energia (confira a fonte)', hardware: 'falha de hardware', overheat: 'superaquecido: o AxeOS baixou a frequência' },
+    bxReboot: (n, why) => `🔄 <b>${n}</b> reiniciou sozinho${why ? ` (${why})` : ''}`,
+    bxBlock: (n) => `🎉🎉🎉 <b>${n} ENCONTROU UM BLOCO!</b> 🎉🎉🎉`,
     bitaxeBackup: 'na reserva',
     poolPing: (ms, sc) => `⚡ Ping da pool: <b>${ms} ms</b> (${sc === 'great' ? '🟢 ótimo' : sc === 'good' ? '🟡 bom' : '🔴 ruim'})`,
     failoverNow: (port, primary, active) => `⚠️ porta ${port}: ${primary} fora, usando ${active || '–'}`,
@@ -91,6 +110,25 @@ const STRINGS = {
     farmRecord: (d, w) => `Farm record: <b>${d}</b> (${w})`,
     luckiest: (w, f) => `Luckiest: ${w} (${f}×)`,
     bitaxeOff: (n) => `🟥 ${n}: the Bitaxe is not answering`,
+    bxOn: {
+      offline: (n) => `🟥 <b>${n}</b> stopped answering (3 reads in a row). Check the plug and the Wi-Fi.`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip at <b>${a.t} °C</b> (limit ${a.max} °C)`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: voltage regulator at <b>${a.t} °C</b> (limit ${a.max} °C)`,
+      lowhash: (n, a) => `📉 <b>${n}</b>: hashrate at <b>${a.hr}</b>, ${a.pct}% of expected (${a.exp}), for 10 min`,
+      fallback: (n, a) => `🔀 <b>${n}</b> is on the backup pool (${a.url})`,
+      fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
+    },
+    bxOff: {
+      offline: (n) => `✅ <b>${n}</b> is answering again`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip back to ${a.t} °C`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulator back to ${a.t} °C`,
+      lowhash: (n, a) => `✅ <b>${n}</b>: hashrate back to normal (${a.hr})`,
+      fallback: (n) => `✅ <b>${n}</b> is back on the main pool`,
+      fault: (n) => `✅ <b>${n}</b>: no faults`,
+    },
+    bxFault: { power: 'power fault (check the power supply)', hardware: 'hardware fault', overheat: 'overheated: AxeOS lowered the frequency' },
+    bxReboot: (n, why) => `🔄 <b>${n}</b> restarted on its own${why ? ` (${why})` : ''}`,
+    bxBlock: (n) => `🎉🎉🎉 <b>${n} FOUND A BLOCK!</b> 🎉🎉🎉`,
     bitaxeBackup: 'on backup',
     poolPing: (ms, sc) => `⚡ Pool ping: <b>${ms} ms</b> (${sc === 'great' ? '🟢 great' : sc === 'good' ? '🟡 good' : '🔴 poor'})`,
     failoverNow: (port, primary, active) => `⚠️ port ${port}: ${primary} down, using ${active || '–'}`,
@@ -182,6 +220,8 @@ function digest(snap) {
     achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
     plugReboots: plugs.reduce((s, p) => s + (Number(p && p.rebootCount) || 0), 0),
     plugWorker: lastRb.worker || lastRb.name || '',
+    bitaxes: (snap.bitaxes || []).map((b) => ({ name: b.name, worker: b.worker, alerts: b.alerts || {}, reboots: b.reboots || 0, lastReset: b.lastReset || null, blocks: b.blocks || 0,
+      tempC: b.data && b.data.tempC, vrTempC: b.data && b.data.vrTempC, hashRate: b.data && (b.data.hashRate10m || b.data.hashRate) })),
   };
 }
 
@@ -222,6 +262,29 @@ function diffEvents(prev, cur, opts = {}) {
       const pair = (opts.lang === 'pt' ? a.pt : a.en) || a.pt || [a.id, ''];
       out.push({ type: 'achievement', text: T.achievement(a.icon || '🎖️', escHtml(pair[0]), escHtml(pair[1]), a.worker ? escHtml(a.worker) : '') });
     }
+  }
+  // Bitaxe: cada alerta avisa ao começar e ao terminar; reinício e bloco avisam uma vez
+  const prevBx = new Map((prev.bitaxes || []).map((b) => [b.name, b]));
+  for (const b of cur.bitaxes || []) {
+    const p = prevBx.get(b.name);
+    if (!p) continue;
+    if (b.blocks > p.blocks) out.push({ type: 'block', text: T.bxBlock(escHtml(b.name)) });
+    if (ignore.includes(b.name) || ignore.includes(b.worker)) continue;
+    const n = escHtml(b.name);
+    for (const k of ['offline', 'hot', 'vrhot', 'lowhash', 'fallback', 'fault']) {
+      const a = b.alerts[k], was = p.alerts[k];
+      if (a && !was) {
+        const v = k === 'hot' || k === 'vrhot' ? { t: fm.num(a.tempC, 1), max: fm.num(a.max, 0) }
+          : k === 'lowhash' ? { hr: fm.hashrate(a.hashRate), exp: fm.hashrate(a.expected), pct: a.pct }
+          : k === 'fallback' ? { url: escHtml([a.url, a.port].filter(Boolean).join(':') || '–') }
+          : k === 'fault' ? { what: ['power', 'hardware', 'overheat'].filter((x) => a[x]).map((x) => T.bxFault[x]).join(' · ') } : {};
+        out.push({ type: 'bitaxe_' + k, text: T.bxOn[k](n, v) });
+      } else if (!a && was) {
+        const t = k === 'vrhot' ? b.vrTempC : b.tempC;
+        out.push({ type: 'bitaxe_' + k + '_ok', text: T.bxOff[k](n, { t: t != null ? fm.num(t, 1) : '–', hr: fm.hashrate(b.hashRate) }) });
+      }
+    }
+    if (b.reboots > p.reboots && !b.alerts.offline) out.push({ type: 'bitaxe_reboot', text: T.bxReboot(n, escHtml(b.lastReset || '')) });
   }
   if ((cur.plugReboots || 0) > (prev.plugReboots || 0)) {
     out.push({ type: 'plug_reboot', text: T.plugReboot(escHtml(cur.plugWorker || '')) });

@@ -168,7 +168,21 @@ O painel lê cada Bitaxe direto da API local do AxeOS (firmware 2.14 e 2.15): ha
 2. Em ⚙️ Configurações → Mineradores → **Bitaxe (API do AxeOS)**, escreva `nome=IP` de cada um (`bitaxe1=192.168.0.140, bitaxe2=192.168.0.141`), ou toque em **Procurar na rede** e **Usar estes**. **Testar** mostra modelo, firmware, hashrate, temperatura e watts. Use o nome do worker (o que vem depois do ponto no usuário da pool).
 3. Salve. A tela da fazenda ganha um cartão **Bitaxe**, a linha do worker mostra temperatura e watts, e o consumo medido substitui a estimativa do `WATTS` no custo de energia (uma tomada com medidor continua tendo prioridade).
 
-O `/status` do Telegram ganha uma linha por Bitaxe, e o MQTT / Home Assistant ganha sensores de hashrate, temperatura, consumo e fan de cada um. O painel só lê (`GET /api/system/info` a cada 30 s): overclock, firmware e o Wi-Fi do Bitaxe ficam no AxeOS. A API do AxeOS não tem senha e só responde na rede de casa, então nunca exponha um Bitaxe à internet: de fora de casa, abra o painel pelo Tailscale.
+O `/status` do Telegram ganha uma linha por Bitaxe, e o MQTT / Home Assistant ganha sensores de hashrate, temperatura, consumo e fan de cada um.
+
+**Alertas** (Telegram, uma vez quando começam e outra quando terminam; MQTT, um `binary_sensor` por alerta e por Bitaxe):
+
+| Alerta | Quando | Padrão (Configurações → Mineradores) |
+| --- | --- | --- |
+| Chip quente | chip acima do limite em 2 leituras seguidas | 68 °C (`BITAXE_TEMP_MAX`) |
+| Regulador quente | regulador de tensão acima do limite em 2 leituras | 80 °C (`BITAXE_VR_MAX`) |
+| Hashrate baixo | média de 10 min abaixo de uma fração do esperado por 10 min (fora os primeiros 15 min depois de ligar) | 70% (`BITAXE_HASH_MIN`) |
+| Na pool reserva | o AxeOS passou para a pool de fallback | — |
+| Falha | falha de energia, de hardware ou modo de superaquecimento | — |
+| Sem resposta | 3 leituras seguidas sem resposta | 90 s |
+| Reiniciou / achou bloco | o tempo ligado voltou a zero / o AxeOS informa um bloco | uma mensagem |
+
+O `ALARM_IGNORE` também silencia um Bitaxe (menos o bloco encontrado). O painel só lê (`GET /api/system/info` a cada 30 s): overclock, firmware e o Wi-Fi do Bitaxe ficam no AxeOS. A API do AxeOS não tem senha e só responde na rede de casa, então nunca exponha um Bitaxe à internet: de fora de casa, abra o painel pelo Tailscale.
 
 ## Minerando com o cpuminer (passo a passo)
 

@@ -122,6 +122,14 @@ const LABELS = {
 };
 
 const bxSlug = (n) => String(n).toLowerCase().replace(/[^a-z0-9_]/g, '_').slice(0, 32);
+const BX_ALERTS = [
+  { id: 'offline', device_class: 'problem', pt: 'sem resposta', en: 'not answering' },
+  { id: 'hot', device_class: 'heat', pt: 'chip quente', en: 'chip hot' },
+  { id: 'vrhot', device_class: 'heat', pt: 'regulador quente', en: 'regulator hot' },
+  { id: 'lowhash', device_class: 'problem', pt: 'hashrate baixo', en: 'low hashrate' },
+  { id: 'fallback', device_class: 'problem', pt: 'na pool reserva', en: 'on backup pool' },
+  { id: 'fault', device_class: 'problem', pt: 'falha', en: 'fault' },
+];
 const BX_SENSORS = [
   { id: 'hashrate', unit: 'H/s', icon: 'mdi:pickaxe', state_class: 'measurement', pt: 'hashrate', en: 'hashrate' },
   { id: 'temp', unit: '°C', device_class: 'temperature', state_class: 'measurement', pt: 'temperatura do chip', en: 'chip temperature' },
@@ -200,6 +208,23 @@ function discoveryConfigs(prefix = 'homeminerproxy', lang = 'en', currency = 'US
       if (s.state_class) cfg.state_class = s.state_class;
       out.push({ topic: `homeassistant/sensor/${nodeId}/bitaxe_${slug}_${s.id}/config`, payload: JSON.stringify(cfg) });
     }
+    // alertas do Bitaxe (fase 2): um binary_sensor por alerta, para automações (ex.: desligar a tomada se esquentar)
+    for (const a of BX_ALERTS) {
+      out.push({
+        topic: `homeassistant/binary_sensor/${nodeId}/bitaxe_${slug}_${a.id}/config`,
+        payload: JSON.stringify({
+          name: `${name} ${a[lang] || a.en}`,
+          unique_id: `${nodeId}_bitaxe_${slug}_${a.id}`,
+          state_topic: stateTopic,
+          availability_topic: availTopic,
+          value_template: `{{ value_json.bitaxes.${slug}.alert_${a.id} if value_json.bitaxes is defined and value_json.bitaxes.${slug} is defined else 'OFF' }}`,
+          payload_on: 'ON',
+          payload_off: 'OFF',
+          device_class: a.device_class,
+          device,
+        }),
+      });
+    }
   }
   return out;
 }
@@ -243,9 +268,12 @@ function statePayload(snap) {
     out.bitaxes = {};
     for (const b of bxs) {
       const d = b.fresh && b.data;
-      out.bitaxes[bxSlug(b.name)] = d
-        ? { hashrate: Math.round(d.hashRate10m || d.hashRate || 0), temp: d.tempC, power: d.watts != null ? Number(d.watts.toFixed(1)) : null, fan: d.fanPct, online: 'ON' }
-        : { hashrate: null, temp: null, power: null, fan: null, online: 'OFF' };
+      const al = b.alerts || {};
+      out.bitaxes[bxSlug(b.name)] = {
+        ...(d ? { hashrate: Math.round(d.hashRate10m || d.hashRate || 0), temp: d.tempC, power: d.watts != null ? Number(d.watts.toFixed(1)) : null, fan: d.fanPct, online: 'ON' }
+          : { hashrate: null, temp: null, power: null, fan: null, online: 'OFF' }),
+        ...Object.fromEntries(BX_ALERTS.map((a) => ['alert_' + a.id, al[a.id] ? 'ON' : 'OFF'])),
+      };
     }
   }
   return out;
