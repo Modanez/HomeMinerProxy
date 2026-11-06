@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## v0.5.1 — 2026-11-06
+
 ### English
 - **Power-loss-safe state files:** records, history, achievements, worker list, proxy stats and the Telegram bot state are written atomically (temporary file + fsync + rename) and keep the previous version as `.bak`. If the power drops mid-write (a smart plug, a restart from Telegram), the file is never left cut in half; when reading, a missing or damaged file falls back to the `.bak` and the log says so.
 - **Console-style dashboard:** outside kiosk mode the dashboard now has a top bar (active workers or proxy down, pool ping, version, PT | EN, ⚙️ settings) and a side menu grouped into Farm, Mining and Operations, showing one screen at a time. The screen is kept in the address (`#network`, `#luck`…), so it survives a reload and can be bookmarked. Bitaxe gets its own screen, listed only when a Bitaxe is registered, with the count and a warning mark on active alerts. On phones the menu becomes a horizontal strip and the ⚙️ stays visible. Kiosk mode (`?kiosk`) is unchanged; a button on each screen opens it. The content uses the full width and is enlarged on big screens (2K/4K), with chart tooltips still following the mouse.
