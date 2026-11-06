@@ -1027,6 +1027,64 @@ const PAGE = `<!doctype html>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:16px; min-height:100vh; transition:background .2s, color .2s; }
   body.kiosk { cursor:none; overflow:hidden; user-select:none; }
+  .page[hidden] { display:none !important; }
+  /* ---------- console (fora do quiosque): barra superior, menu lateral, uma tela por vez ---------- */
+  .cx-top, .cx-side, .cx-head { display:none; }
+  body.console { padding:0; --cxside:232px; --cxtop:52px; }
+  body.console > .cx-top { position:sticky; top:0; z-index:40; height:var(--cxtop); display:flex; align-items:center; gap:10px; padding:0 20px; background:var(--card); border-bottom:1px solid var(--line); font-size:14px; }
+  .cx-brand { display:flex; align-items:center; gap:9px; color:var(--txt); text-decoration:none; font-size:15px; }
+  .cx-brand b { font-weight:650; letter-spacing:-.01em; }
+  .cx-logo { width:26px; height:26px; border-radius:6px; background:var(--gold); color:var(--on-gold, #111); display:grid; place-items:center; font-size:14px; }
+  .cx-sep { color:var(--line); font-size:18px; } .cx-crumb { color:var(--dim); } .cx-grow { flex:1; }
+  .cx-pill { display:flex; align-items:center; gap:6px; font-size:12px; border:1px solid var(--line); border-radius:999px; padding:4px 10px; color:var(--txt); white-space:nowrap; }
+  .cx-pill i { width:8px; height:8px; border-radius:50%; background:var(--ok, #3fb950); display:inline-block; }
+  .cx-pill.bad i { background:var(--warn); }
+  .cx-badge { font:11px/1 ui-monospace, Menlo, monospace; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+  .cx-btn, body.console .cx-top .langsw { font-size:13px; border:1px solid var(--line); border-radius:6px; padding:6px 11px; color:var(--txt); text-decoration:none; white-space:nowrap; background:transparent; }
+  .cx-btn:hover { border-color:var(--gold); color:var(--gold); }
+  body.console .cx-shell { display:grid; grid-template-columns:var(--cxside) minmax(0, 1fr); min-height:calc(100vh - var(--cxtop)); }
+  body.console .cx-side { display:block; position:sticky; top:var(--cxtop); align-self:start; height:calc(100vh - var(--cxtop)); overflow-y:auto; background:var(--card); border-right:1px solid var(--line); padding:10px 10px 24px; }
+  .cx-sec { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); padding:16px 10px 6px; }
+  .cx-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:14px; color:var(--txt); text-decoration:none; }
+  .cx-item .ic { width:20px; text-align:center; filter:grayscale(1); opacity:.65; }
+  .cx-item:hover { background:var(--gold-soft); }
+  .cx-item.on { background:var(--gold-soft); color:var(--gold); font-weight:600; box-shadow:inset 3px 0 0 var(--gold); }
+  .cx-item.on .ic { filter:none; opacity:1; }
+  .cx-item .n:not(:empty) { margin-left:auto; font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:0 7px; }
+  .cx-item .n.warn:not(:empty) { color:var(--warn); border-color:var(--warn); }
+  .cx-item[hidden] { display:none; }
+  body.console .cx-main { padding:24px 32px 48px; min-width:0; max-width:1400px; }
+  body.console .cx-head { display:flex; align-items:flex-end; gap:16px; padding-bottom:16px; margin-bottom:18px; border-bottom:1px solid var(--line); }
+  .cx-head h2 { font-size:22px; font-weight:600; margin:0; letter-spacing:-.01em; }
+  .cx-head p { margin:4px 0 0; color:var(--dim); font-size:14px; }
+  .cx-head .narr { margin-top:6px; }
+  .cx-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .cx-actions .ticket-btn { margin:0; }
+  .cx-actions .ticket-btn.offpage { display:none !important; }
+  body.console header { display:none; }
+  body.console h2.sect { display:none; }
+  body.console #pages .page { display:none; }
+  body.console #pages .page.cur { display:block; }
+  body.console .card { border-radius:8px; box-shadow:none; }
+  @media (max-width:899px) {
+    body.console > .cx-top { padding:0 12px; gap:8px; }
+    body.console .cx-sep, body.console .cx-crumb, body.console #cxPing, body.console .cx-badge { display:none; }
+    body.console .cx-shell { grid-template-columns:minmax(0, 1fr); }
+    body.console .cx-side { position:sticky; top:var(--cxtop); z-index:30; height:auto; border-right:0; border-bottom:1px solid var(--line); padding:6px 10px; }
+    body.console #cxNav { display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; }
+    body.console .cx-sec { display:none; }
+    body.console .cx-item { white-space:nowrap; padding:7px 10px; }
+    body.console .cx-item.on { box-shadow:inset 0 -2px 0 var(--gold); }
+    body.console .cx-item .n:not(:empty) { margin-left:4px; }
+    body.console .cx-main { padding:16px; }
+    body.console .cx-head { flex-wrap:wrap; align-items:flex-start; gap:8px; }
+    body.console .cx-grow + .cx-actions:empty { display:none; }
+  }
+  @media (max-width:599px) {
+    body.console .cx-brand b { display:none; }   /* no celular fica só o logo: o ⚙️ precisa caber */
+    body.console .cx-actions .cx-btn[href="?kiosk"] { display:none; }
+  }
+  body.console #bxcard > .label { display:none; }   /* o título da tela já diz Bitaxe */
   header { display:flex; justify-content:space-between; align-items:center; gap:12px; margin-bottom:14px; }
   h1 { font-size:22px; } h1 span { color:var(--gold); }
   .upd { color:var(--dim); font-size:13px; white-space:nowrap; }
@@ -1239,6 +1297,9 @@ const PAGE = `<!doctype html>
 </style>
 </head>
 <body data-theme="obsidian">
+<div class="cx-top" id="cxTop"><a class="cx-brand" href="#overview"><span class="cx-logo">⛏</span><b>HomeMinerProxy</b></a><span class="cx-sep">/</span><span class="cx-crumb" id="cxCrumb"></span><span class="cx-grow"></span><span class="cx-pill" id="cxWorkers"></span><span class="cx-pill" id="cxPing" hidden></span><span class="cx-badge" id="cxVer" hidden></span><span id="cxLangSlot"></span><a class="cx-btn cx-gear" href="/config" id="cxGear">⚙️</a></div>
+<div class="cx-shell"><aside class="cx-side"><nav id="cxNav"></nav></aside><div class="cx-main">
+<div class="cx-head"><div><h2 id="cxTitle"></h2><p id="cxDesc"></p></div><span class="cx-grow"></span><div class="cx-actions" id="cxActions"></div></div>
 <header>
   <h1>⛏️ Fazenda de <span>Mineração</span></h1>
   <div class="narr" id="narr"></div>
@@ -1251,7 +1312,7 @@ const PAGE = `<!doctype html>
 <main id="pages">
 
 <!-- Tela 1: a fazenda -->
-<section class="page">
+<section class="page" data-page="overview">
   <h2 class="sect">Fazenda</h2>
   <div class="grid">
     <div class="card"><div class="label">Recorde (Best Difficulty)</div><div class="big gold" id="best">–</div><div class="sub" id="dist">–</div></div>
@@ -1277,10 +1338,6 @@ const PAGE = `<!doctype html>
       <ul class="sub" id="evs" style="list-style:none;margin:6px 0 0;padding:0;max-height:180px;overflow:auto"></ul>
     </details>
   </div>
-  <div class="card" id="bxcard" hidden>
-    <div class="label" style="margin-bottom:6px">Bitaxe</div>
-    <div class="bxlist" id="bxlist"></div>
-  </div>
   <div class="card wallet">
     <div><div class="label">Carteira</div><div class="big gold" id="wbtc">–</div><div class="sub" id="wsats">–</div></div>
     <div><div class="label">Valor</div><div class="big" id="wfiat">–</div><div class="sub" id="wprice">–</div></div>
@@ -1290,7 +1347,15 @@ const PAGE = `<!doctype html>
 </section>
 
 <!-- Tela 2: a rede Bitcoin -->
-<section class="page">
+<section class="page" data-page="bitaxe" hidden>
+  <h2 class="sect">Bitaxe</h2>
+  <div class="card" id="bxcard" hidden>
+    <div class="label" style="margin-bottom:6px">Bitaxe</div>
+    <div class="bxlist" id="bxlist"></div>
+  </div>
+</section>
+
+<section class="page" data-page="network">
   <h2 class="sect">Rede Bitcoin</h2>
   <div class="grid">
     <div class="card"><div class="label">Último bloco</div><div class="big" id="tipH">–</div><div class="sub" id="tipS">–</div></div>
@@ -1317,7 +1382,7 @@ const PAGE = `<!doctype html>
 </section>
 
 <!-- Tela 3: histórico, servidor e energia -->
-<section class="page">
+<section class="page" data-page="history">
   <h2 class="sect">Histórico</h2>
   <div class="p3">
     <div class="card chart-card"><div class="label">Hashrate da fazenda · últimas 24 h</div><div class="chart" id="chHr"></div></div>
@@ -1344,7 +1409,7 @@ const PAGE = `<!doctype html>
 </section>
 
 <!-- Tela 4: quase bloco -->
-<section class="page">
+<section class="page" data-page="near">
   <h2 class="sect">Quase bloco <a class="ticket-btn" id="ticketBtn" href="#">🎟️ Bilhete do dia</a></h2>
   <div class="card hexcard">
     <div class="hexrow"><div class="label" id="qbL1">Hash do último bloco</div><div class="hex" id="qbH1">–</div></div>
@@ -1362,7 +1427,7 @@ const PAGE = `<!doctype html>
 </section>
 
 <!-- Tela 5: sorte -->
-<section class="page">
+<section class="page" data-page="luck">
   <h2 class="sect">Sorte</h2>
   <div class="duo luck-duo">
     <div class="card">
@@ -1393,6 +1458,7 @@ const PAGE = `<!doctype html>
 </section>
 
 </main>
+</div></div>
 <div class="tooltip" id="tip"></div>
 <div class="ticket" id="ticket">
   <img id="ticketImg" alt="">
@@ -1464,7 +1530,7 @@ function odds(hashrate, D) {
 
 // ------------------------------------------------ rotação das telas (só no kiosk)
 let page = 0, rotT = null, rotS = 20;
-const pages = () => Array.from(document.querySelectorAll('.page'));
+const pages = () => Array.from(document.querySelectorAll('.page')).filter((p) => !p.hidden);
 function show(i) {
   const ps = pages();
   page = (i + ps.length) % ps.length;
@@ -1481,6 +1547,66 @@ if (kiosk) {
   $('dots').innerHTML = pages().map(() => '<i></i>').join('');
   show(0); schedule(); fitPages();
   document.addEventListener('click', () => { show(page + 1); schedule(); });
+}
+
+// ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX_NAV = [
+  [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
+  [CX.gMining, [['network', '🌐'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
+  [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config', '⚙️', CX.settings]]],
+];
+const cxPage = () => {
+  const id = location.hash.slice(1), el = document.querySelector('.page[data-page="' + id + '"]');
+  return el && !el.hidden ? id : 'overview';
+};
+function cxShow(scroll) {
+  const id = cxPage();
+  document.querySelectorAll('#pages .page').forEach((p) => p.classList.toggle('cur', p.dataset.page === id));
+  document.querySelectorAll('#cxNav .cx-item').forEach((a) => a.classList.toggle('on', a.dataset.page === id));
+  set('cxCrumb', CX[id]); set('cxTitle', CX[id]); set('cxDesc', CX[id + 'D']);
+  $('ticketBtn').classList.toggle('offpage', id !== 'near');   // o bilhete do dia é da tela "Quase bloco"
+  if (scroll) window.scrollTo(0, 0);
+  setTimeout(() => { if (lastData) window.dispatchEvent(new Event('resize')); }, 0);   // gráficos medem a largura ao aparecer
+}
+if (!kiosk) {
+  document.body.classList.add('console');
+  $('cxNav').innerHTML = CX_NAV.map(([g, items]) => '<div class="cx-sec">' + g + '</div>' + items.map(([id, ic, label]) =>
+    id[0] === '/'
+      ? '<a class="cx-item" href="' + id + '"><span class="ic">' + ic + '</span>' + label + '</a>'
+      : '<a class="cx-item" href="#' + id + '" data-page="' + id + '"' + (id === 'bitaxe' ? ' id="cxNavBx" hidden' : '') + '><span class="ic">' + ic + '</span>' + CX[id] + '<span class="n" id="' + (id === 'bitaxe' ? 'cxBxN' : '') + '"></span></a>').join('')).join('');
+  // os elementos existentes mudam de lugar (os eventos vão junto)
+  $('cxLangSlot').replaceWith($('langsw'));
+  const head = document.querySelector('.cx-head > div');
+  head.appendChild($('narr')); head.appendChild($('upd'));
+  $('cxActions').innerHTML = '<a class="cx-btn" href="?kiosk">📺 ' + CX.kiosk + '</a>';
+  $('cxActions').appendChild($('ticketBtn'));
+  $('cxGear').title = CX.settings;
+  fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { set('cxVer', 'v' + v.version); $('cxVer').hidden = false; } }).catch(() => {});
+  window.addEventListener('hashchange', () => cxShow(true));
+  cxShow(false);
+}
+// barra superior: workers ativos, proxy e ping
+function renderConsole(j) {
+  if (kiosk) return;
+  const ws = (j.farm && j.farm.workers) || [];
+  const act = ws.filter((w) => !w.inactive && (w.state === 'ok' || w.state === 'quiet')).length;
+  const down = j.proxy && j.proxy.up === false;
+  const pill = $('cxWorkers');
+  pill.classList.toggle('bad', !!down);
+  pill.innerHTML = '<i></i>' + (down ? CX.proxyDown : act + ' ' + CX.workers);
+  const ping = j.proxy && j.proxy.pingMs;
+  $('cxPing').hidden = ping == null;
+  if (ping != null) set('cxPing', CX.ping + ' ' + ping + ' ms');
+  // tela Bitaxe só com Bitaxe cadastrado; o número e o alerta aparecem no menu
+  const bx = j.bitaxes || [];
+  const sec = document.querySelector('.page[data-page="bitaxe"]');
+  const wasHidden = sec.hidden;
+  sec.hidden = !bx.length; $('cxNavBx').hidden = !bx.length;
+  const alert = bx.some((b) => b.alerts && Object.keys(b.alerts).length);
+  set('cxBxN', bx.length ? (alert ? '⚠ ' : '') + bx.length : '');
+  $('cxBxN').classList.toggle('warn', alert);
+  if (wasHidden !== sec.hidden && location.hash === '#bitaxe') cxShow(false);
 }
 
 // ------------------------------------------------ gráfico de linha em SVG (uma série)
@@ -1639,6 +1765,8 @@ function bxTemp(t) { return t >= 68 ? 'hot' : t >= 60 ? 'warm' : ''; }
 function renderBitaxes(j) {
   const list = j.bitaxes || [];
   $('bxcard').hidden = !list.length;
+  const sec = $('bxcard').closest('.page');
+  if (kiosk && sec.hidden !== !list.length) { sec.hidden = !list.length; $('dots').innerHTML = pages().map(() => '<i></i>').join(''); show(page); }
   if (!list.length) return;
   const st = (label, val) => '<div><span>' + label + '</span>' + val + '</div>';
   $('bxlist').innerHTML = list.map((b) => {
@@ -1670,7 +1798,7 @@ function renderBitaxes(j) {
 function renderFarm(j) {
   const f = j.farm, a = f.accounting || {}, D = f.difficulty;
   if (!f.hasData) return;
-  set('best', nf(f.best, 2));
+  set('best', f.best >= 1e7 ? fmtBig(f.best) : nf(f.best, 2));   // recordes enormes não cabem no cartão
   set('dist', f.best > 0 ? 'faltam ' + fmtBig(D / f.best) + ' de vezes' : '–');
   set('hash', fmtHash(f.hashrate));
   const av = f.hashrateAvg;
@@ -2346,6 +2474,7 @@ async function load() {
     renderWallet(j.wallet);
     renderFarm(j);
     renderBitaxes(j);
+    renderConsole(j);
     renderNet(j);
     renderHistory(j);
     renderNear(j);
