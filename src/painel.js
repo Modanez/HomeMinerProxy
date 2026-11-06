@@ -54,6 +54,7 @@ let tuyaClient = null;
 const bitaxe = require('./bitaxe');
 const BITAXES = bitaxe.parseList(process.env.BITAXES) || [];
 const BITAXE_MS = Number(process.env.BITAXE_MS || 30e3);
+const BITAXE_HIST_MS = Number(process.env.BITAXE_HIST_MS || 5 * 60e3);   // um ponto do gráfico de 24 h a cada 5 min
 const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist, alerts }
 const numEnv = (k) => (process.env[k] != null && process.env[k] !== '' && Number.isFinite(Number(process.env[k])) ? Number(process.env[k]) : null);
 // °C ou °F na tela e no Telegram (TEMP_UNIT); internamente tudo é °C, e os limites digitados em °F são convertidos
@@ -81,7 +82,7 @@ async function tickBitaxe() {
     Object.assign(st, { ok: true, okAt: st.at, error: null, fails: 0, data: r.data });
     // histórico curto para o gráfico: um ponto a cada 5 min, 24 h
     const last = st.hist.at(-1);
-    if (!last || st.at - last.t >= 5 * 60e3) {
+    if (!last || st.at - last.t >= BITAXE_HIST_MS) {
       st.hist.push({ t: st.at, hr: r.data.hashRate10m ?? r.data.hashRate, temp: r.data.tempC, w: r.data.watts });
       if (st.hist.length > 288) st.hist.shift();
     }
@@ -1107,6 +1108,13 @@ const PAGE = `<!doctype html>
   .bxg span { display:block; font-size:11px; color:var(--dim); }
   .bxg .warm { color:var(--gold); } .bxg .hot { color:var(--warn); }
   .bxwarn { color:var(--warn); font-size:13px; margin-top:6px; }
+  .bxcharts { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:12px; margin-top:12px; }
+  .bxc { position:relative; }
+  .bxc .bxct { display:flex; justify-content:space-between; gap:6px; font-size:11px; color:var(--dim); margin-bottom:2px; }
+  .bxc .bxct b { color:var(--txt); font-weight:600; }
+  .bxc svg { display:block; width:100%; height:64px; overflow:visible; touch-action:pan-y; }
+  .bxc .tip { position:absolute; top:0; transform:translate(-50%, 0); background:var(--card); border:1px solid var(--line); border-radius:6px; padding:3px 7px; font-size:11px; color:var(--txt); white-space:nowrap; pointer-events:none; box-shadow:0 2px 8px rgba(0,0,0,.25); }
+  @media (max-width:520px) { .bxcharts { grid-template-columns:minmax(0, 1fr); } }
   .legend { float:right; text-transform:none; letter-spacing:0; }
   .legend .dot { width:7px; height:7px; margin:0 4px 0 10px; }
   .err { color:var(--warn); margin-top:8px; font-size:13px; }
@@ -1581,7 +1589,50 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras' };
+// Gráficos de 24 h do Bitaxe: dois pequenos lado a lado (hashrate e chip), cada um com o seu eixo, nunca dois eixos no mesmo
+const BXCH = {};   // id do gráfico → pontos, para o tooltip
+function bxChart(id, title, pts, fmt) {
+  if (pts.length < 2) return '';
+  const W = 300, H = 64, pad = 3;
+  const t0 = pts[0].t, t1 = pts[pts.length - 1].t, vs = pts.map((p) => p.v);
+  let lo = Math.min(...vs), hi = Math.max(...vs);
+  if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
+  const X = (t) => (t1 === t0 ? W : ((t - t0) / (t1 - t0)) * W), Y = (v) => H - pad - ((v - lo) / (hi - lo)) * (H - 2 * pad);
+  const line = pts.map((p, i) => (i ? 'L' : 'M') + X(p.t).toFixed(1) + ' ' + Y(p.v).toFixed(1)).join('');
+  BXCH[id] = { pts, X, Y, fmt, W };
+  const last = pts[pts.length - 1].v;
+  return '<div class="bxc" data-ch="' + id + '"><div class="bxct"><span>' + title + '</span><span>' + fmt(Math.min(...vs)) + ' – ' + fmt(Math.max(...vs)) + ' · <b>' + fmt(last) + '</b></span></div>' +
+    '<svg viewBox="0 0 ' + W + ' ' + H + '" preserveAspectRatio="none" role="img" aria-label="' + title + ': ' + fmt(last) + '">' +
+    '<line x1="0" x2="' + W + '" y1="' + (H - 0.5) + '" y2="' + (H - 0.5) + '" stroke="var(--line)" stroke-width="1" vector-effect="non-scaling-stroke"/>' +
+    '<path d="' + line + '" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/>' +
+    '<line class="cx" x1="0" x2="0" y1="0" y2="' + H + '" stroke="var(--dim)" stroke-width="1" vector-effect="non-scaling-stroke" visibility="hidden"/></svg></div>';
+}
+function bxCharts(b) {
+  const h = (b.hist || []).filter((p) => p && p.t);
+  const hr = h.filter((p) => p.hr > 0).map((p) => ({ t: p.t, v: p.hr }));
+  const tp = h.filter((p) => p.temp != null).map((p) => ({ t: p.t, v: TUNIT === 'F' ? p.temp * 9 / 5 + 32 : p.temp }));
+  const c1 = bxChart('h-' + b.name, BXT.chHash, hr, fmtHash), c2 = bxChart('t-' + b.name, BXT.chTemp, tp, (v) => nf(v, 1) + (TUNIT === 'F' ? ' °F' : ' °C'));
+  return c1 || c2 ? '<div class="bxcharts">' + c1 + c2 + '</div>' : '<div class="sub" style="margin-top:8px">' + BXT.chWait + '</div>';
+}
+// tooltip: linha vertical + hora e valor do ponto mais perto (mouse e toque)
+function bxHover(ev) {
+  const box = ev.target.closest && ev.target.closest('.bxc');
+  for (const c of document.querySelectorAll('.bxc')) if (c !== box) { const t = c.querySelector('.tip'); if (t) t.remove(); const cx = c.querySelector('.cx'); if (cx) cx.setAttribute('visibility', 'hidden'); }
+  if (!box) return;
+  const ch = BXCH[box.dataset.ch]; if (!ch) return;
+  const svg = box.querySelector('svg'), r = svg.getBoundingClientRect();
+  const x = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width * ch.W;
+  let best = ch.pts[0];
+  for (const p of ch.pts) if (Math.abs(ch.X(p.t) - x) < Math.abs(ch.X(best.t) - x)) best = p;
+  const px = ch.X(best.t);
+  const cx = svg.querySelector('.cx'); cx.setAttribute('x1', px); cx.setAttribute('x2', px); cx.setAttribute('visibility', 'visible');
+  let tip = box.querySelector('.tip'); if (!tip) { tip = document.createElement('div'); tip.className = 'tip'; box.appendChild(tip); }
+  tip.textContent = new Date(best.t).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }) + ' · ' + ch.fmt(best.v);
+  tip.style.left = Math.min(Math.max(px / ch.W * r.width, 40), r.width - 40) + 'px';
+  tip.style.top = (svg.offsetTop + 2) + 'px';   // dentro do gráfico, sem cobrir os números de cima
+}
+if (typeof document !== 'undefined') { document.addEventListener('mousemove', bxHover); document.addEventListener('touchstart', bxHover, { passive: true }); }
 function bxTemp(t) { return t >= 68 ? 'hot' : t >= 60 ? 'warm' : ''; }
 function renderBitaxes(j) {
   const list = j.bitaxes || [];
@@ -1611,7 +1662,7 @@ function renderBitaxes(j) {
       (d.rssi != null ? st(BXT.wifi, nf(d.rssi) + ' dBm') : '') +
       (b.lastAction ? st(BXT.lastAct, (BXT.acts[b.lastAction.action] || esc(b.lastAction.action)) + ' · ' + agoTxt(b.lastAction.at) + (b.lastAction.ok ? '' : ' <b class="hot">' + BXT.actFail + '</b>')) : '') +
       (b.reboots ? st(BXT.reboots, nf(b.reboots) + (b.lastReset ? ' <span>' + esc(b.lastReset) + '</span>' : '')) : '') +
-      '</div>' + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
+      '</div>' + bxCharts(b) + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
 }
 function renderFarm(j) {

@@ -32,7 +32,7 @@ const FIELDS = [
   { key: 'THEME', group: 'farm', type: 'theme', options: ['', 'obsidian', 'ocean', 'latte'] },
   { key: 'LANGUAGE', group: 'farm', type: 'select', options: ['', 'pt-BR', 'en'] },
   { key: 'CURRENCY', group: 'farm', type: 'select', options: ['', 'BRL', 'USD'] },
-  { key: 'TEMP_UNIT', group: 'farm', type: 'select', options: ['', 'C', 'F'], labels: { C: '°C (Celsius)', F: '°F (Fahrenheit)' } },
+  { key: 'TEMP_UNIT', group: 'farm', type: 'select', options: ['', 'C', 'F'], hideEmpty: true, labels: { C: '°C (Celsius)', F: '°F (Fahrenheit)' } },   // vazio = °C
   { key: 'POWER_PRICE_KWH', group: 'farm', type: 'price', alias: 'TARIFA_KWH' },
   { key: 'SHOW_WALLET', group: 'farm', type: 'bool', unset: '1' },
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
@@ -546,8 +546,8 @@ const T = {
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
     SHOW_WALLET: ['Mostrar a carteira', 'Saldo, valor e movimentação na tela da fazenda. Desligue se a tela fica à vista de visitas ou se o painel é aberto de fora de casa. A cotação continua aparecendo, e o aviso de dinheiro entrando continua chegando no Telegram.'],
     BITAXES: ['Bitaxe (API do AxeOS)', 'nome=IP de cada Bitaxe, separados por vírgula (ex.: bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). O painel lê hashrate, temperatura, consumo e fan direto do aparelho. Use o mesmo nome do worker (o que vem depois do ponto no usuário da pool) e reserve um IP fixo no roteador.'],
-    BITAXE_TEMP_MAX: ['Bitaxe: limite do chip', 'Alerta no Telegram e no MQTT quando o chip passa disso em 2 leituras seguidas, na unidade escolhida na aba Fazenda. Vazio = 68 °C (154 °F).'],
-    BITAXE_VR_MAX: ['Bitaxe: limite do regulador', 'O regulador de tensão é o que mais esquenta no Gamma. Na unidade escolhida. Vazio = 80 °C (176 °F).'],
+    BITAXE_TEMP_MAX: ['Bitaxe: limite do chip', 'Alerta no Telegram e no MQTT quando o chip passa disso em 2 leituras seguidas, na unidade escolhida na aba Fazenda. Vazio = {def}.'],
+    BITAXE_VR_MAX: ['Bitaxe: limite do regulador', 'O regulador de tensão é o que mais esquenta no Gamma. Na unidade escolhida. Vazio = {def}.'],
     BITAXE_HASH_MIN: ['Bitaxe: hashrate mínimo (% do esperado)', 'Alerta quando a média de 10 min fica abaixo disso por 10 minutos (não conta os primeiros 15 min depois de ligar). Vazio = 70%.'],
     LOCAL_WORKER: ['Minerador nesta máquina', 'Worker do cpuminer que roda neste servidor (serviço minerd). O painel lê o hashrate do log e mostra a temperatura da CPU.'],
     LOCAL_MINER: ['Minerar também com este servidor', 'Liga o cpuminer deste aparelho, apontado para o próprio proxy, com o nome do campo acima (ou o nome do aparelho). Esquenta a placa: use dissipador.'],
@@ -592,7 +592,7 @@ const T = {
     tgOk: 'Mensagem enviada. Confira o Telegram.', tgFail: (e) => `Não enviou: ${e}`, tgTest: '✅ Teste do painel da fazenda: o bot está funcionando!',
     mqttOk: 'Conectado ao broker MQTT!', mqttFail: (e) => `Falha no MQTT: ${e}`,
     tuyaOk: (s) => `Tomada respondeu: ${s}`, tuyaFail: (e) => `Falha na tomada: ${e}`,
-    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', threads: 'Use de 1 a 256 núcleos', nobitaxe: 'Bitaxe não cadastrado', unsupported: 'Este firmware não tem essa ação', notapplied: 'O Bitaxe aceitou, mas a releitura não confirmou: ajuste no AxeOS', fan: 'Fan: alvo de 50 a 70 °C ou velocidade de 20 a 100%', noaddress: 'Falta o endereço de bitcoin', nohost: 'Não achei o IP deste servidor na rede', offline: 'O Bitaxe não respondeu', timeout: 'O Bitaxe não respondeu a tempo', action: 'Ação inválida', bitaxes: 'Use nome=IP da rede de casa, separados por vírgula (ex.: bitaxe1=192.168.0.140)', range: 'Número fora da faixa permitida', ssid: 'Escolha uma rede', wifipass: 'A senha do Wi-Fi tem de 8 a 63 caracteres', wifiauth: 'Senha do Wi-Fi errada', wifinotfound: 'Rede não encontrada', wificonnect: 'Não conectou ao Wi-Fi', wifiscan: 'Não consegui procurar redes', notailscale: 'Tailscale não instalado', sshkey: 'Cole uma chave pública SSH (ssh-ed25519 AAAA…), não a chave privada', nossh: 'SSH não disponível neste aparelho', sshstart: 'O SSH não subiu', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', sonoffoffline: 'O Sonoff não respondeu nesse IP (confira o IP e se o modo LAN/DIY está ligado)', sonofflan: 'O Sonoff recusou: o modo LAN/DIY está desligado', sonoffid: 'O Sonoff não reconheceu esse Device ID', sonoffformat: 'Resposta inesperada do Sonoff', selfplug: 'Essa tomada alimenta o próprio servidor', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
+    err: { address: 'Endereço inválido', option: 'Opção inválida', price: 'Use um número entre 0 e 100', watts: 'Use watts entre 0 e 100000', threads: 'Use de 1 a 256 núcleos', nobitaxe: 'Bitaxe não cadastrado', unsupported: 'Este firmware não tem essa ação', notapplied: 'O Bitaxe aceitou, mas a releitura não confirmou: ajuste no AxeOS', fan: 'Fan: velocidade de 20 a 100%', fanT: 'Fan: alvo de {lo} a {hi} ou velocidade de 20 a 100%', rangeT: 'Use de {lo} a {hi}', noaddress: 'Falta o endereço de bitcoin', nohost: 'Não achei o IP deste servidor na rede', offline: 'O Bitaxe não respondeu', timeout: 'O Bitaxe não respondeu a tempo', action: 'Ação inválida', bitaxes: 'Use nome=IP da rede de casa, separados por vírgula (ex.: bitaxe1=192.168.0.140)', range: 'Número fora da faixa permitida', ssid: 'Escolha uma rede', wifipass: 'A senha do Wi-Fi tem de 8 a 63 caracteres', wifiauth: 'Senha do Wi-Fi errada', wifinotfound: 'Rede não encontrada', wificonnect: 'Não conectou ao Wi-Fi', wifiscan: 'Não consegui procurar redes', notailscale: 'Tailscale não instalado', sshkey: 'Cole uma chave pública SSH (ssh-ed25519 AAAA…), não a chave privada', nossh: 'SSH não disponível neste aparelho', sshstart: 'O SSH não subiu', expected: 'Hashrate inválido (ex.: 1.2 TH/s ou 350 kH/s)', backup: 'Arquivo de backup inválido', name: 'Nome inválido', host: 'IP inválido', token: 'Não parece um token do Telegram. Toque em 👁 para conferir: o certo tem só o token, assim: 1234567890:AAH… (números, dois-pontos e uns 35 caracteres). O navegador pode ter preenchido uma senha salva no lugar.', chatid: 'O id do chat é um número (ex.: 8983008026), não o nome do bot. Mande /start para o bot: ele responde com o número.', nochat: 'o Telegram não achou esse chat. Abra o bot no Telegram e toque em Iniciar (/start): bots só escrevem para quem já falou com eles. Confira também se o id é o número que o bot respondeu.', hour: 'Hora de 0 a 23', url: 'Comece com http:// ou https://', mqtturl: 'Use mqtt://host:1883 ou mqtts://host:8883', mqtttopic: 'Prefixo inválido (use letras, números, _, - ou /)', mqttauth: 'Usuário ou senha recusados pelo broker', tuyaid: 'ID inválido (use letras e números de 8 a 64 caracteres)', tuyasecret: 'Access Secret inválido', tuyaplugs: 'Lista de tomadas inválida', tuyamissing: 'Preencha Access ID, Access Secret e Device ID', tuyaauth: 'Credenciais recusadas pela Tuya Cloud', sonoffoffline: 'O Sonoff não respondeu nesse IP (confira o IP e se o modo LAN/DIY está ligado)', sonofflan: 'O Sonoff recusou: o modo LAN/DIY está desligado', sonoffid: 'O Sonoff não reconheceu esse Device ID', sonoffformat: 'Resposta inesperada do Sonoff', selfplug: 'Essa tomada alimenta o próprio servidor', watchdog: 'Use de 5 a 1440 minutos (ou vazio para desligar)', wrong: 'PIN errado', locked: 'Muitas tentativas erradas. Espere 15 minutos.', nopin: 'SETTINGS_PIN não definido', missing: 'Preencha o token e o id do chat', fix: 'Corrija os campos marcados.' },
   },
   en: {
     title: 'Settings', back: '← Back to the dashboard',
@@ -644,8 +644,8 @@ const T = {
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
     SHOW_WALLET: ['Show the wallet', 'Balance, value and activity on the farm screen. Turn it off if the screen is in view of visitors or the dashboard is opened from outside your home. The BTC price still shows, and Telegram still alerts when money arrives.'],
     BITAXES: ['Bitaxe (AxeOS API)', 'name=IP of each Bitaxe, comma separated (e.g. bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). The dashboard reads hashrate, temperature, power and fan straight from the device. Use the worker name (what comes after the dot in the pool user) and reserve a fixed IP in your router.'],
-    BITAXE_TEMP_MAX: ['Bitaxe: chip limit', 'Alert on Telegram and MQTT when the chip goes over this in 2 reads in a row, in the unit chosen in the Farm tab. Empty = 68 °C (154 °F).'],
-    BITAXE_VR_MAX: ['Bitaxe: regulator limit', 'The voltage regulator is what runs hottest on the Gamma. In the chosen unit. Empty = 80 °C (176 °F).'],
+    BITAXE_TEMP_MAX: ['Bitaxe: chip limit', 'Alert on Telegram and MQTT when the chip goes over this in 2 reads in a row, in the unit chosen in the Farm tab. Empty = {def}.'],
+    BITAXE_VR_MAX: ['Bitaxe: regulator limit', 'The voltage regulator is what runs hottest on the Gamma. In the chosen unit. Empty = {def}.'],
     BITAXE_HASH_MIN: ['Bitaxe: minimum hashrate (% of expected)', 'Alert when the 10-min average stays below this for 10 minutes (not in the first 15 min after power-on). Empty = 70%.'],
     LOCAL_WORKER: ['Miner on this machine', 'The cpuminer worker running on this server (minerd service). The dashboard reads its hashrate from the log and shows the CPU temperature.'],
     LOCAL_MINER: ['Also mine with this server', 'Turns on this device\'s cpuminer, pointed at its own proxy, with the name above (or the device name). It heats the board: use a heatsink.'],
@@ -690,7 +690,7 @@ const T = {
     tgOk: 'Message sent. Check Telegram.', tgFail: (e) => `Not sent: ${e}`, tgTest: '✅ Mining farm dashboard test: the bot is working!',
     mqttOk: 'Connected to the MQTT broker!', mqttFail: (e) => `MQTT failed: ${e}`,
     tuyaOk: (s) => `Plug answered: ${s}`, tuyaFail: (e) => `Plug failed: ${e}`,
-    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', threads: 'Use 1 to 256 cores', nobitaxe: 'Bitaxe not registered', unsupported: 'This firmware does not have that action', notapplied: 'The Bitaxe accepted it, but reading it back did not confirm: set it in AxeOS', fan: 'Fan: target 50 to 70 °C or speed 20 to 100%', noaddress: 'The bitcoin address is missing', nohost: 'Could not find this server\'s IP on the network', offline: 'The Bitaxe did not answer', timeout: 'The Bitaxe did not answer in time', action: 'Invalid action', bitaxes: 'Use name=IP on your home network, comma separated (e.g. bitaxe1=192.168.0.140)', range: 'Number out of the allowed range', ssid: 'Pick a network', wifipass: 'The Wi-Fi password has 8 to 63 characters', wifiauth: 'Wrong Wi-Fi password', wifinotfound: 'Network not found', wificonnect: 'Could not connect to Wi-Fi', wifiscan: 'Could not search for networks', notailscale: 'Tailscale is not installed', sshkey: 'Paste an SSH public key (ssh-ed25519 AAAA…), not the private key', nossh: 'SSH is not available on this device', sshstart: 'SSH did not start', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', sonoffoffline: 'The Sonoff did not answer at that IP (check the IP and that LAN/DIY mode is on)', sonofflan: 'The Sonoff refused: LAN/DIY mode is off', sonoffid: 'The Sonoff did not recognize that Device ID', sonoffformat: 'Unexpected answer from the Sonoff', selfplug: 'This plug powers the server itself', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
+    err: { address: 'Invalid address', option: 'Invalid option', price: 'Use a number from 0 to 100', watts: 'Use watts from 0 to 100000', threads: 'Use 1 to 256 cores', nobitaxe: 'Bitaxe not registered', unsupported: 'This firmware does not have that action', notapplied: 'The Bitaxe accepted it, but reading it back did not confirm: set it in AxeOS', fan: 'Fan: speed 20 to 100%', fanT: 'Fan: target {lo} to {hi} or speed 20 to 100%', rangeT: 'Use {lo} to {hi}', noaddress: 'The bitcoin address is missing', nohost: 'Could not find this server\'s IP on the network', offline: 'The Bitaxe did not answer', timeout: 'The Bitaxe did not answer in time', action: 'Invalid action', bitaxes: 'Use name=IP on your home network, comma separated (e.g. bitaxe1=192.168.0.140)', range: 'Number out of the allowed range', ssid: 'Pick a network', wifipass: 'The Wi-Fi password has 8 to 63 characters', wifiauth: 'Wrong Wi-Fi password', wifinotfound: 'Network not found', wificonnect: 'Could not connect to Wi-Fi', wifiscan: 'Could not search for networks', notailscale: 'Tailscale is not installed', sshkey: 'Paste an SSH public key (ssh-ed25519 AAAA…), not the private key', nossh: 'SSH is not available on this device', sshstart: 'SSH did not start', expected: 'Invalid hashrate (e.g. 1.2 TH/s or 350 kH/s)', backup: 'Invalid backup file', name: 'Invalid name', host: 'Invalid IP', token: 'This does not look like a Telegram token. Tap 👁 to check it: it should be just the token, like 1234567890:AAH… (digits, a colon and about 35 characters). The browser may have filled in a saved password instead.', chatid: 'The chat id is a number (e.g. 8983008026), not the bot name. Send /start to the bot: it replies with the number.', nochat: 'Telegram could not find that chat. Open the bot in Telegram and tap Start (/start): bots can only write to people who talked to them first. Also check that the id is the number the bot replied with.', hour: 'Hour from 0 to 23', url: 'Start with http:// or https://', mqtturl: 'Use mqtt://host:1883 or mqtts://host:8883', mqtttopic: 'Invalid prefix (use letters, digits, _, - or /)', mqttauth: 'Username or password rejected by broker', tuyaid: 'Invalid ID (8 to 64 alphanumeric chars)', tuyasecret: 'Invalid Access Secret', tuyaplugs: 'Invalid smart plug list', tuyamissing: 'Fill in Access ID, Access Secret and Device ID', tuyaauth: 'Credentials rejected by Tuya Cloud', sonoffoffline: 'The Sonoff did not answer at that IP (check the IP and that LAN/DIY mode is on)', sonofflan: 'The Sonoff refused: LAN/DIY mode is off', sonoffid: 'The Sonoff did not recognize that Device ID', sonoffformat: 'Unexpected answer from the Sonoff', selfplug: 'This plug powers the server itself', watchdog: 'Use 5 to 1440 minutes (or empty to disable)', wrong: 'Wrong PIN', locked: 'Too many wrong tries. Wait 15 minutes.', nopin: 'SETTINGS_PIN is not set', missing: 'Fill in the token and the chat id', fix: 'Fix the highlighted fields.' },
   },
 };
 
@@ -710,7 +710,7 @@ function page(lang, hasPin, theme) {
             `<span class="tswatch">${dots}</span><span class="tname">${htmlEsc(t.name)}</span><span class="tsub">${htmlEsc(t.sub)}</span></button>`;
         }).join('') + `</div>`;
     } else if (f.type === 'select') {
-      input = `<select name="${f.key}">` + f.options.map((o) => `<option value="${o}">${o === '' ? (f.key === 'TEMP_UNIT' ? S.auto + ' (°C)' : S.auto) : (f.labels && f.labels[o]) || o}</option>`).join('') + '</select>';
+      input = `<select name="${f.key}">` + f.options.filter((o) => !(f.hideEmpty && o === '')).map((o) => `<option value="${o}">${o === '' ? S.auto : (f.labels && f.labels[o]) || o}</option>`).join('') + '</select>';
     } else if (f.type === 'worker') {
       input = `<select name="${f.key}" data-workers="1"><option value="">${S.none}</option></select>`;
     } else if (f.type === 'tuyaworker') {
@@ -751,7 +751,10 @@ function page(lang, hasPin, theme) {
     const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
-    return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><div class="fl"><label>${htmlEsc(label)}</label><div class="hint help">${htmlEsc(help)}</div></div><div class="fc">${input}${test}<div class="ferr"></div></div></div>`;
+    const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80 }[f.key]) : null;
+    const isF = String(process.env.TEMP_UNIT || '').toUpperCase() === 'F';
+    const helpTxt = tdef != null ? help.replace('{def}', isF ? Math.round(tdef * 9 / 5 + 32) + ' °F' : tdef + ' °C') : help;
+    return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><div class="fl"><label>${htmlEsc(label)}</label><div class="hint help"${tdef != null ? ` data-tpl="${htmlEsc(help)}" data-def="${tdef}"` : ''}>${htmlEsc(helpTxt)}</div></div><div class="fc">${input}${test}<div class="ferr"></div></div></div>`;
   };
   // menu lateral no estilo de console de nuvem: grupos, ícone discreto, rótulo; no celular vira uma faixa rolável
   const navGroups = [['general', ['farm', 'miners']], ['integrations', ['telegram', 'tuya', 'mqtt', 'cube']], ['system', ['net', 'backup']]];
@@ -1022,6 +1025,8 @@ fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.vers
 
 // °C ou °F: os limites de temperatura dos Bitaxe seguem a unidade; ao trocar, os números são convertidos
 let tempUnitNow = 'C';
+const TRANGE = { BITAXE_TEMP_MAX: [40, 90], BITAXE_VR_MAX: [50, 110] };   // em °C, como o servidor valida
+const tUnit = (c) => (tempUnitNow === 'F' ? Math.round(c * 9 / 5 + 32) + ' °F' : c + ' °C');
 function tempUnitUI(from, to) {
   const u = String(to || '').toUpperCase() === 'F' ? 'F' : 'C';
   for (const inp of form.querySelectorAll('input[data-temp]')) {
@@ -1033,6 +1038,7 @@ function tempUnitUI(from, to) {
     }
   }
   tempUnitNow = u;
+  for (const h of form.querySelectorAll('.help[data-tpl]')) h.textContent = h.dataset.tpl.replace('{def}', tUnit(Number(h.dataset.def)));
   if (typeof window !== 'undefined' && typeof window.__bxReload === 'function') window.__bxReload();
 }
 if (el('TEMP_UNIT')) el('TEMP_UNIT').addEventListener('change', () => tempUnitUI(tempUnitNow, el('TEMP_UNIT').value));
@@ -1265,6 +1271,7 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
     else e.value = v;
   }
   setThemeUI(c.values && c.values.THEME);
+  if (el('TEMP_UNIT') && !el('TEMP_UNIT').value) el('TEMP_UNIT').value = 'C';   // vazio = °C
   tempUnitUI(null, (c.values && c.values.TEMP_UNIT) || '');
   // minerador local: só aparece onde existe (imagens prontas com cpuminer)
   const lm = c.localMiner || {};
@@ -1392,7 +1399,8 @@ function showErrors(errs) {
   for (const f of form.querySelectorAll('.f[data-key]')) {
     const e = errs[f.dataset.key];
     f.classList.toggle('bad', !!e);
-    f.querySelector('.ferr').textContent = e ? M.err[e] || e : '';
+    const ti = e === 'range' && f.querySelector('input[data-temp]');
+    f.querySelector('.ferr').textContent = !e ? '' : ti ? M.err.rangeT.replace('{lo}', tUnit(TRANGE[ti.name][0])).replace('{hi}', tUnit(TRANGE[ti.name][1])) : M.err[e] || e;
     if (e && !firstErrPane) {
       const pane = f.closest('.tab-pane[data-pane]');
       if (pane) firstErrPane = pane.dataset.pane;
@@ -1455,7 +1463,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   const btn = (txt, fn) => { const b = mk('button', 'ghost', txt); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }); return b; };
   const act = async (name, action, params) => {
     const r = await post('/api/config/bitaxe-action', { pin: pin(), name, action, params });
-    if (r.error || r.ok === false) { say(M.err[r.error] || r.error || '?', false); return null; }
+    if (r.error || r.ok === false) { say(r.error === 'fan' ? M.err.fanT.replace('{lo}', tUnit(50)).replace('{hi}', tUnit(70)) : M.err[r.error] || r.error || '?', false); return null; }
     return r;
   };
   function render(list) {
@@ -1678,7 +1686,7 @@ function showBitaxes(list, found) {
     const h = document.createElement('div'); h.className = 'ph';
     const n = document.createElement('span'); n.className = 'pname'; n.textContent = (b.name || b.worker || b.hostname || '?') + ' · ' + b.host; h.appendChild(n);
     const st = document.createElement('span'); st.className = 'pst' + (b.ok === false ? ' bad' : ' muted');
-    st.textContent = b.ok === false ? '⚠️ ' + M.bitaxeFail : '✓ ' + [b.model, b.version, fmtHs(b.hashRate), b.tempC != null ? b.tempC + ' °C' : null, b.watts != null ? b.watts.toFixed(1) + ' W' : null].filter(Boolean).join(' · ');
+    st.textContent = b.ok === false ? '⚠️ ' + M.bitaxeFail : '✓ ' + [b.model, b.version, fmtHs(b.hashRate), b.tempC != null ? tUnit(b.tempC) : null, b.watts != null ? b.watts.toFixed(1) + ' W' : null].filter(Boolean).join(' · ');
     h.appendChild(st); row.appendChild(h); box.appendChild(row);
   }
   if (found) {

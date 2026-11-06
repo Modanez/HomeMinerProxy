@@ -26,6 +26,10 @@ function validate(form, envPin, pinState, canMine = localminer.available()) {
   const errors = {}, values = {};
   const lang = form.LANGUAGE === 'en' ? 'en' : form.LANGUAGE === 'pt-BR' ? 'pt-BR' : null;
   if (!lang) errors.LANGUAGE = 'option'; else values.LANGUAGE = lang;
+  // unidade de temperatura: só C ou F (o painel e o Telegram usam a escolhida)
+  if (form.TEMP_UNIT != null && form.TEMP_UNIT !== '') {
+    if (form.TEMP_UNIT === 'C' || form.TEMP_UNIT === 'F') values.TEMP_UNIT = form.TEMP_UNIT; else errors.TEMP_UNIT = 'option';
+  }
   for (const k of ['BTC_ADDRESS', 'CURRENCY', 'POWER_PRICE_KWH']) {
     const r = settings.clean(field(k), form[k]);
     if (r.error) errors[k] = r.error; else if (r.value !== '') values[k] = r.value;
@@ -74,7 +78,7 @@ const S = {
     s4: 'Conta de luz', s4h: 'Para estimar quanto a fazenda gasta. Pode deixar o padrão.',
     sm: 'Minerar também com este aparelho?', smh: 'Além de servidor, ele pode minerar com a própria CPU. São poucos MH/s (loteria pura) e a placa esquenta: use dissipador. Dá para mudar depois em ⚙️ Configurações.',
     mineNo: 'Não, só servidor', mineYes: 'Sim, minerar também', threads: 'Núcleos', worker: 'Nome no painel',
-    currency: 'Moeda', kwh: 'Preço do kWh', auto: 'Automática',
+    currency: 'Moeda', kwh: 'Preço do kWh', tunit: 'Temperatura', auto: 'Automática',
     done: 'Pronto! Reiniciando o painel…', doneH: 'Enquanto isso, aponte os seus mineradores para este servidor:',
     user: 'Usuário em cada minerador', userH: 'troque "nome" pelo nome que vai aparecer no painel; senha: x',
     ports: [['3333', 'cpuminer (PC, celular, Raspberry)'], ['3335', 'NerdMiner e placas ESP32'], ['3334', 'Bitaxe (ckpool solo)'], ['3338', 'Bitaxe (AtlasPool)']],
@@ -93,7 +97,7 @@ const S = {
     s4: 'Power bill', s4h: 'To estimate what the farm costs. The defaults are fine.',
     sm: 'Also mine with this device?', smh: 'Besides being the server, it can mine with its own CPU. It is a few MH/s (pure lottery) and the board gets hot: use a heatsink. You can change it later in ⚙️ Settings.',
     mineNo: 'No, server only', mineYes: 'Yes, mine too', threads: 'Cores', worker: 'Name on the dashboard',
-    currency: 'Currency', kwh: 'Price per kWh', auto: 'Automatic',
+    currency: 'Currency', kwh: 'Price per kWh', tunit: 'Temperature', auto: 'Automatic',
     done: 'Done! Restarting the dashboard…', doneH: 'Meanwhile, point your miners to this server:',
     user: 'Username on each miner', userH: 'replace "name" with the name to show on the dashboard; password: x',
     ports: [['3333', 'cpuminer (PC, phone, Raspberry)'], ['3335', 'NerdMiner and ESP32 boards'], ['3334', 'Bitaxe (ckpool solo)'], ['3338', 'Bitaxe (AtlasPool)']],
@@ -148,7 +152,8 @@ function page(lang, envPin) {
     <div class="f" data-k="LOCAL_WORKER"><label class="l" data-t="worker"></label><input id="mworker" autocomplete="off" autocapitalize="off" spellcheck="false"><div class="ferr"></div></div></div></section>
   <section data-s="4" hidden><h2 data-t="s4"></h2><p class="hint" data-t="s4h"></p>
     <div class="row2"><div class="f" data-k="CURRENCY"><label class="l" data-t="currency"></label><select id="cur"><option value="BRL">BRL (R$)</option><option value="USD">USD (US$)</option></select><div class="ferr"></div></div>
-    <div class="f" data-k="POWER_PRICE_KWH"><label class="l" data-t="kwh"></label><input id="kwh" inputmode="decimal"><div class="ferr"></div></div></div></section>
+    <div class="f" data-k="POWER_PRICE_KWH"><label class="l" data-t="kwh"></label><input id="kwh" inputmode="decimal"><div class="ferr"></div></div></div>
+    <div class="f" data-k="TEMP_UNIT"><label class="l" data-t="tunit"></label><select id="tunit"><option value="C">°C (Celsius)</option><option value="F">°F (Fahrenheit)</option></select><div class="ferr"></div></div></section>
   <div id="msg"></div>
   <div class="bar"><button type="button" class="ghost" id="back" data-t="back"></button><button type="button" class="main" id="next"></button></div>
 </div>
@@ -191,10 +196,12 @@ fetch('/api/setup').then((r) => r.json()).then((j) => {
   render();
 }).catch(() => {});
 for (const b of document.querySelectorAll('[data-mine]')) b.addEventListener('click', () => { mine = b.dataset.mine === '1'; render(); });
-for (const b of document.querySelectorAll('[data-lang]')) b.addEventListener('click', () => { lang = b.dataset.lang; $('cur').value = lang === 'en' ? 'USD' : 'BRL'; $('kwh').value = ''; render(); });
+for (const b of document.querySelectorAll('[data-lang]')) b.addEventListener('click', () => { lang = b.dataset.lang; $('cur').value = lang === 'en' ? 'USD' : 'BRL'; $('tunit').value = lang === 'en' ? 'F' : 'C'; $('kwh').value = ''; render(); });
 $('cur').addEventListener('change', () => { $('kwh').value = ''; render(); });
+$('cur').value = lang === 'en' ? 'USD' : 'BRL';
+$('tunit').value = lang === 'en' ? 'F' : 'C';   // inglês começa em USD e °F; dá para trocar
 const showErrors = (errs) => { for (const f of document.querySelectorAll('.f[data-k]')) { const e = errs[f.dataset.k]; f.classList.toggle('bad', !!e); f.querySelector('.ferr').textContent = e ? (T().err[e] || e) : ''; } };
-const stepOf = { BTC_ADDRESS: '2', pin: '3', pin2: '3', LOCAL_MINER: 'm', MINER_THREADS: 'm', LOCAL_WORKER: 'm', CURRENCY: '4', POWER_PRICE_KWH: '4' };
+const stepOf = { BTC_ADDRESS: '2', pin: '3', pin2: '3', LOCAL_MINER: 'm', MINER_THREADS: 'm', LOCAL_WORKER: 'm', CURRENCY: '4', POWER_PRICE_KWH: '4', TEMP_UNIT: '4' };
 $('back').addEventListener('click', () => { pos = Math.max(0, pos - 1); $('msg').textContent = ''; render(); });
 $('next').addEventListener('click', async () => {
   const t = T();
@@ -205,7 +212,7 @@ $('next').addEventListener('click', async () => {
   if (pos < order().length - 1) { pos++; render(); return; }
   $('next').disabled = true;
   try {
-    const body = { LANGUAGE: lang, BTC_ADDRESS: $('addr').value, pin: $('pin').value, pin2: ($('pin2') || {}).value, CURRENCY: $('cur').value, POWER_PRICE_KWH: $('kwh').value,
+    const body = { LANGUAGE: lang, BTC_ADDRESS: $('addr').value, pin: $('pin').value, pin2: ($('pin2') || {}).value, CURRENCY: $('cur').value, POWER_PRICE_KWH: $('kwh').value, TEMP_UNIT: $('tunit').value,
       LOCAL_MINER: info.canMine && mine ? '1' : '0', MINER_THREADS: $('threads').value, LOCAL_WORKER: $('mworker').value };
     const r = await fetch('/api/setup', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json());
     if (r.errors) { showErrors(r.errors); pos = Math.min(...Object.keys(r.errors).map((k) => Math.max(0, order().indexOf(stepOf[k] || '4')))); render(); $('msg').textContent = t.err.fix; return; }

@@ -35,6 +35,9 @@ test('validação do assistente', () => {
   assert.deepStrictEqual(setup.validate({ LANGUAGE: 'fr', BTC_ADDRESS: 'xyz', pin: '12', pin2: '12', CURRENCY: 'EUR', POWER_PRICE_KWH: '-1' }, '').errors,
     { LANGUAGE: 'option', BTC_ADDRESS: 'address', CURRENCY: 'option', POWER_PRICE_KWH: 'price', pin: 'pin' });
   assert.deepStrictEqual(setup.validate({ LANGUAGE: 'en', BTC_ADDRESS: ADDR, pin: '424242', pin2: '424243' }, '').errors, { pin2: 'pin2' });
+  // unidade de temperatura no assistente: só C ou F
+  assert.strictEqual(setup.validate({ LANGUAGE: 'en', BTC_ADDRESS: ADDR, pin: '424242', pin2: '424242', TEMP_UNIT: 'F' }, '').values.TEMP_UNIT, 'F');
+  assert.deepStrictEqual(setup.validate({ LANGUAGE: 'en', BTC_ADDRESS: ADDR, pin: '424242', pin2: '424242', TEMP_UNIT: 'K' }, '').errors, { TEMP_UNIT: 'option' });
   assert.strictEqual(setup.validate({ LANGUAGE: 'en', BTC_ADDRESS: ADDR, pin: '424242' }, '999999', 'wrong').errors.pin, 'wrong');   // PIN do .env
   assert.match(setup.page('pt', false), /Primeira configuração/);
   assert.match(setup.page('en', true), /s3env/);
@@ -316,4 +319,8 @@ test('°F: limites digitados em Fahrenheit, validados e convertidos; o painel av
   assert.ok(!ok.errors || !ok.errors.BITAXE_TEMP_MAX);
   const bad = JSON.parse((await req(port, 'POST', '/api/config', { pin: '424242', values: { TEMP_UNIT: 'F', BITAXE_TEMP_MAX: '60' } })).body);
   assert.strictEqual(bad.errors.BITAXE_TEMP_MAX, 'range');
+  // a ajuda dos limites só fala em °F
+  const page = (await waitFor(() => req(port, 'GET', '/config'), 15000)).body;
+  assert.match(page, /154 °F/);
+  assert.doesNotMatch(page, /68 °C \(154 °F\)/);
 });
