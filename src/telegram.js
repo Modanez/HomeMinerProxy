@@ -523,9 +523,9 @@ function start(opts) {
   const fopts = () => ({ lang, tempUnit: opts.tempUnit, panelUrl: opts.panelUrl, ignore: opts.ignore || [], personal: !!opts.personal });
 
   let saved = {};
-  try { saved = JSON.parse(fs.readFileSync(opts.stateFile, 'utf8')); } catch (_) { /* primeira vez */ }
+  if (opts.stateFile) saved = require('./store').readJson(opts.stateFile, {});   // com .bak, à prova de queda de energia
   const state = { offset: saved.offset || 0, lastDaily: saved.lastDaily || null, lastBackup: saved.lastBackup || null };
-  const save = () => { if (opts.stateFile) try { fs.writeFileSync(opts.stateFile, JSON.stringify(state)); } catch (_) { /* segue */ } };
+  const save = () => { if (opts.stateFile) try { require('./store').writeJson(opts.stateFile, state); } catch (_) { /* segue */ } };
 
   let stopped = false;
   const timers = [];
