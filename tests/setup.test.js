@@ -297,3 +297,23 @@ test('Bitaxe: ações pela tela de configurações (PIN), apontar para o proxy c
   const list = JSON.parse((await req(port, 'GET', '/api/config/bitaxes')).body).list;
   assert.strictEqual(list[0].lastAction.action, 'point');
 });
+
+test('°F: limites digitados em Fahrenheit, validados e convertidos; o painel avisa a unidade', async (t) => {
+  const http = require('http');
+  const info = JSON.parse(fs.readFileSync(path.join(__dirname, 'fixtures', 'bitaxe-2.14.json'), 'utf8'));
+  info.temp = 66;   // 150,8 °F: acima de 147 °F (63,9 °C)
+  const fake = http.createServer((q, s) => { s.writeHead(200); s.end(JSON.stringify(info)); });
+  await new Promise((r) => fake.listen(0, '127.0.0.1', r));
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'tf-'));
+  const p = painel(port, dir, { BTC_ADDRESS: ADDR, SETTINGS_PIN: '424242', TEMP_UNIT: 'F', BITAXES: `bitaxe1=127.0.0.1:${fake.address().port}`, BITAXE_ALLOW_LOOPBACK: '1', BITAXE_MS: '250', BITAXE_TEMP_MAX: '147' });
+  t.after(() => { p.kill(); fake.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const b = await waitFor(async () => { const j = JSON.parse((await req(port, 'GET', '/api/mining')).body); return j.bitaxes && j.bitaxes[0] && j.bitaxes[0].alerts.hot && j; }, 15000);
+  assert.strictEqual(b.tempUnit, 'F');
+  assert.ok(Math.abs(b.bitaxes[0].alerts.hot.max - 63.89) < 0.01);
+  // em °F a faixa vale em °F: 154 passa, 60 (que seria °C) é recusado
+  const ok = JSON.parse((await req(port, 'POST', '/api/config', { pin: '424242', values: { TEMP_UNIT: 'F', BITAXE_TEMP_MAX: '154' } })).body);
+  assert.ok(!ok.errors || !ok.errors.BITAXE_TEMP_MAX);
+  const bad = JSON.parse((await req(port, 'POST', '/api/config', { pin: '424242', values: { TEMP_UNIT: 'F', BITAXE_TEMP_MAX: '60' } })).body);
+  assert.strictEqual(bad.errors.BITAXE_TEMP_MAX, 'range');
+});

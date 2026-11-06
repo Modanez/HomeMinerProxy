@@ -255,3 +255,14 @@ test('reinício pedido pelo painel não vira "reiniciou sozinho"', () => {
   s = bx.evaluate(s, read({ uptimeS: 10 }), {}, 90e3);   // o próximo, sem pedir, conta
   assert.strictEqual(s.reboots, 1);
 });
+
+test('°F: Telegram mostra temperaturas e limites em Fahrenheit', () => {
+  const tg = require('../src/telegram');
+  const base = (alerts) => tg.digest({ farm: { hasData: true, workers: [] }, bitaxes: [{ name: 'bitaxe1', worker: 'bitaxe1', alerts, reboots: 0, blocks: 0, data: { tempC: 59.2 } }] });
+  const on = tg.diffEvents(base({}), base({ hot: { tempC: 70.4, max: 68 } }), { lang: 'en', tempUnit: 'F' }).map((e) => e.text);
+  assert.deepStrictEqual(on, ['🌡️ <b>bitaxe1</b>: chip at <b>158.7 °F</b> (limit 154 °F)']);
+  const off = tg.diffEvents(base({ hot: { tempC: 70.4, max: 68 } }), base({}), { lang: 'pt', tempUnit: 'F' }).map((e) => e.text);
+  assert.deepStrictEqual(off, ['✅ <b>bitaxe1</b>: chip de volta a 138,6 °F']);
+  const txt = tg.statusText({ farm: { hasData: true, hashrate: 1e12, workers: [], shares: { today: 1 } }, bitaxes: [{ name: 'bitaxe1', fresh: true, data: bx.normalize(fx('2.14')) }] }, { lang: 'en', tempUnit: 'F' });
+  assert.match(txt, /143 °F/);   // 61,5 °C
+});

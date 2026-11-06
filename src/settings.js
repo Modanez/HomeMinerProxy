@@ -32,6 +32,7 @@ const FIELDS = [
   { key: 'THEME', group: 'farm', type: 'theme', options: ['', 'obsidian', 'ocean', 'latte'] },
   { key: 'LANGUAGE', group: 'farm', type: 'select', options: ['', 'pt-BR', 'en'] },
   { key: 'CURRENCY', group: 'farm', type: 'select', options: ['', 'BRL', 'USD'] },
+  { key: 'TEMP_UNIT', group: 'farm', type: 'select', options: ['', 'C', 'F'], labels: { C: '°C (Celsius)', F: '°F (Fahrenheit)' } },
   { key: 'POWER_PRICE_KWH', group: 'farm', type: 'price', alias: 'TARIFA_KWH' },
   { key: 'SHOW_WALLET', group: 'farm', type: 'bool', unset: '1' },
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
@@ -41,8 +42,8 @@ const FIELDS = [
   { key: 'WATTS', group: 'miners', type: 'watts' },
   { key: 'EXPECTED', group: 'miners', type: 'expected' },
   { key: 'BITAXES', group: 'miners', type: 'bitaxes' },
-  { key: 'BITAXE_TEMP_MAX', group: 'miners', type: 'range', min: 40, max: 90 },
-  { key: 'BITAXE_VR_MAX', group: 'miners', type: 'range', min: 50, max: 110 },
+  { key: 'BITAXE_TEMP_MAX', group: 'miners', type: 'range', min: 40, max: 90, temp: true },
+  { key: 'BITAXE_VR_MAX', group: 'miners', type: 'range', min: 50, max: 110, temp: true },
   { key: 'BITAXE_HASH_MIN', group: 'miners', type: 'range', min: 10, max: 100 },
   { key: 'CUBE_IP', group: 'cube', type: 'host' },
   { key: 'TELEGRAM_BOT_TOKEN', group: 'telegram', type: 'secret' },
@@ -172,7 +173,7 @@ function cleanMap(raw, kind) {
 }
 
 // Normaliza e valida um valor vindo do formulário. Devolve { value } ou { error: códigoDoErro }.
-function clean(field, raw) {
+function clean(field, raw, opts = {}) {
   if (field.type === 'watts' || field.type === 'expected') return cleanMap(raw, field.type);
   if (field.type === 'tuyaplugs') {
     const r = normalizePlugs(raw);
@@ -226,7 +227,10 @@ function clean(field, raw) {
     case 'range': {
       if (v === '') return { value: '' };
       const n = Number(String(v).replace(',', '.'));
-      return Number.isFinite(n) && n >= field.min && n <= field.max ? { value: String(n) } : { error: 'range' };
+      // limites de temperatura valem na unidade escolhida (TEMP_UNIT): a faixa em °C vira °F
+      const f = field.temp && String(opts.tempUnit || '').toUpperCase() === 'F';
+      const lo = f ? field.min * 9 / 5 + 32 : field.min, hi = f ? field.max * 9 / 5 + 32 : field.max;
+      return Number.isFinite(n) && n >= lo && n <= hi ? { value: String(n) } : { error: 'range' };
     }
     case 'threads': {
       if (v === '') return { value: '' };
@@ -294,7 +298,7 @@ function merge(dataDir, form, env = process.env) {
       if (form[f.key + '_clear']) { set(f, ''); continue; }
       if (typeof form[f.key] !== 'string' || form[f.key].trim() === '') continue;   // vazio = manter o valor atual
     }
-    const r = clean(f, form[f.key]);
+    const r = clean(f, form[f.key], { tempUnit: 'TEMP_UNIT' in form ? form.TEMP_UNIT : (ov.TEMP_UNIT ?? env.TEMP_UNIT) });
     if (r.error) { errors[f.key] = r.error; continue; }
     set(f, r.value);
   }
@@ -353,7 +357,7 @@ function validateBackupData(raw) {
       const f = FIELDS.find((x) => x.key === k);
       if (!f) continue;
       if (f.type === 'hour' && v === 'off') { cleanSettings[k] = 'off'; continue; }
-      const r = clean(f, v);
+      const r = clean(f, v, { tempUnit: d.settings.TEMP_UNIT });
       if (r.error) return { error: 'backup' };
       cleanSettings[k] = r.value;
     }
@@ -538,11 +542,12 @@ const T = {
     ],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
+    TEMP_UNIT: ['Unidade de temperatura', 'Celsius ou Fahrenheit no painel, no Telegram e nos limites de alerta dos Bitaxe. O Home Assistant converte sozinho.'],
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
     SHOW_WALLET: ['Mostrar a carteira', 'Saldo, valor e movimentação na tela da fazenda. Desligue se a tela fica à vista de visitas ou se o painel é aberto de fora de casa. A cotação continua aparecendo, e o aviso de dinheiro entrando continua chegando no Telegram.'],
     BITAXES: ['Bitaxe (API do AxeOS)', 'nome=IP de cada Bitaxe, separados por vírgula (ex.: bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). O painel lê hashrate, temperatura, consumo e fan direto do aparelho. Use o mesmo nome do worker (o que vem depois do ponto no usuário da pool) e reserve um IP fixo no roteador.'],
-    BITAXE_TEMP_MAX: ['Bitaxe: limite do chip (°C)', 'Alerta no Telegram e no MQTT quando o chip passa disso em 2 leituras seguidas. Vazio = 68 °C.'],
-    BITAXE_VR_MAX: ['Bitaxe: limite do regulador (°C)', 'O regulador de tensão é o que mais esquenta no Gamma. Vazio = 80 °C.'],
+    BITAXE_TEMP_MAX: ['Bitaxe: limite do chip', 'Alerta no Telegram e no MQTT quando o chip passa disso em 2 leituras seguidas, na unidade escolhida na aba Fazenda. Vazio = 68 °C (154 °F).'],
+    BITAXE_VR_MAX: ['Bitaxe: limite do regulador', 'O regulador de tensão é o que mais esquenta no Gamma. Na unidade escolhida. Vazio = 80 °C (176 °F).'],
     BITAXE_HASH_MIN: ['Bitaxe: hashrate mínimo (% do esperado)', 'Alerta quando a média de 10 min fica abaixo disso por 10 minutos (não conta os primeiros 15 min depois de ligar). Vazio = 70%.'],
     LOCAL_WORKER: ['Minerador nesta máquina', 'Worker do cpuminer que roda neste servidor (serviço minerd). O painel lê o hashrate do log e mostra a temperatura da CPU.'],
     LOCAL_MINER: ['Minerar também com este servidor', 'Liga o cpuminer deste aparelho, apontado para o próprio proxy, com o nome do campo acima (ou o nome do aparelho). Esquenta a placa: use dissipador.'],
@@ -635,11 +640,12 @@ const T = {
     ],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
+    TEMP_UNIT: ['Temperature unit', 'Celsius or Fahrenheit on the dashboard, on Telegram and in the Bitaxe alert limits. Home Assistant converts on its own.'],
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
     SHOW_WALLET: ['Show the wallet', 'Balance, value and activity on the farm screen. Turn it off if the screen is in view of visitors or the dashboard is opened from outside your home. The BTC price still shows, and Telegram still alerts when money arrives.'],
     BITAXES: ['Bitaxe (AxeOS API)', 'name=IP of each Bitaxe, comma separated (e.g. bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). The dashboard reads hashrate, temperature, power and fan straight from the device. Use the worker name (what comes after the dot in the pool user) and reserve a fixed IP in your router.'],
-    BITAXE_TEMP_MAX: ['Bitaxe: chip limit (°C)', 'Alert on Telegram and MQTT when the chip goes over this in 2 reads in a row. Empty = 68 °C.'],
-    BITAXE_VR_MAX: ['Bitaxe: regulator limit (°C)', 'The voltage regulator is what runs hottest on the Gamma. Empty = 80 °C.'],
+    BITAXE_TEMP_MAX: ['Bitaxe: chip limit', 'Alert on Telegram and MQTT when the chip goes over this in 2 reads in a row, in the unit chosen in the Farm tab. Empty = 68 °C (154 °F).'],
+    BITAXE_VR_MAX: ['Bitaxe: regulator limit', 'The voltage regulator is what runs hottest on the Gamma. In the chosen unit. Empty = 80 °C (176 °F).'],
     BITAXE_HASH_MIN: ['Bitaxe: minimum hashrate (% of expected)', 'Alert when the 10-min average stays below this for 10 minutes (not in the first 15 min after power-on). Empty = 70%.'],
     LOCAL_WORKER: ['Miner on this machine', 'The cpuminer worker running on this server (minerd service). The dashboard reads its hashrate from the log and shows the CPU temperature.'],
     LOCAL_MINER: ['Also mine with this server', 'Turns on this device\'s cpuminer, pointed at its own proxy, with the name above (or the device name). It heats the board: use a heatsink.'],
@@ -704,7 +710,7 @@ function page(lang, hasPin, theme) {
             `<span class="tswatch">${dots}</span><span class="tname">${htmlEsc(t.name)}</span><span class="tsub">${htmlEsc(t.sub)}</span></button>`;
         }).join('') + `</div>`;
     } else if (f.type === 'select') {
-      input = `<select name="${f.key}">` + f.options.map((o) => `<option value="${o}">${o === '' ? S.auto : o}</option>`).join('') + '</select>';
+      input = `<select name="${f.key}">` + f.options.map((o) => `<option value="${o}">${o === '' ? (f.key === 'TEMP_UNIT' ? S.auto + ' (°C)' : S.auto) : (f.labels && f.labels[o]) || o}</option>`).join('') + '</select>';
     } else if (f.type === 'worker') {
       input = `<select name="${f.key}" data-workers="1"><option value="">${S.none}</option></select>`;
     } else if (f.type === 'tuyaworker') {
@@ -734,7 +740,7 @@ function page(lang, hasPin, theme) {
       input = `<div class="pw"><input type="password" name="${f.key}" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="ghost eye" data-eye="${f.key}">👁</button></div><div class="hint" id="${f.key}_state"></div>` +
         `<label class="inline" id="${f.key}_clearbox" hidden><input type="checkbox" name="${f.key}_clear"> ${S.tokenClear}</label>`;
     } else {
-      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'watchdog' ? ' inputmode="numeric" maxlength="4" placeholder="10"' : f.type === 'threads' ? ' inputmode="numeric" maxlength="3"' : f.type === 'bitaxes' ? ' placeholder="bitaxe1=192.168.0.140, bitaxe2=192.168.0.141"' : f.type === 'range' ? ` inputmode="decimal" maxlength="5" placeholder="${{ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80, BITAXE_HASH_MIN: 70 }[f.key] || ''}"` : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
+      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'watchdog' ? ' inputmode="numeric" maxlength="4" placeholder="10"' : f.type === 'threads' ? ' inputmode="numeric" maxlength="3"' : f.type === 'bitaxes' ? ' placeholder="bitaxe1=192.168.0.140, bitaxe2=192.168.0.141"' : f.type === 'range' ? ` inputmode="decimal" maxlength="5" placeholder="${{ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80, BITAXE_HASH_MIN: 70 }[f.key] || ''}"${f.temp ? ' data-temp="1"' : ''}` : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
       input = `<input name="${f.key}"${extra} autocomplete="off" spellcheck="false">`;
     }
     const test = f.key === 'CUBE_IP' ? ` <button type="button" class="ghost" data-test="cube">${S.testCube}</button>`
@@ -1014,6 +1020,22 @@ for (const b of form.querySelectorAll('.tab[data-tab]')) {
 if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.slice(1));
 fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { const b = document.getElementById('tb_ver'); b.textContent = 'v' + v.version; b.hidden = false; } }).catch(() => {});
 
+// °C ou °F: os limites de temperatura dos Bitaxe seguem a unidade; ao trocar, os números são convertidos
+let tempUnitNow = 'C';
+function tempUnitUI(from, to) {
+  const u = String(to || '').toUpperCase() === 'F' ? 'F' : 'C';
+  for (const inp of form.querySelectorAll('input[data-temp]')) {
+    const base = { BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80 }[inp.name];
+    inp.placeholder = u === 'F' ? String(Math.round(base * 9 / 5 + 32)) : String(base);
+    if (from && from !== u && inp.value.trim() !== '' && Number.isFinite(Number(inp.value.replace(',', '.')))) {
+      const n = Number(inp.value.replace(',', '.'));
+      inp.value = String(Math.round(u === 'F' ? n * 9 / 5 + 32 : (n - 32) * 5 / 9));
+    }
+  }
+  tempUnitNow = u;
+  if (typeof window !== 'undefined' && typeof window.__bxReload === 'function') window.__bxReload();
+}
+if (el('TEMP_UNIT')) el('TEMP_UNIT').addEventListener('change', () => tempUnitUI(tempUnitNow, el('TEMP_UNIT').value));
 function setThemeUI(val) {
   const th = ['obsidian', 'ocean', 'latte'].includes(val) ? val : 'obsidian';
   const sel = el('THEME');
@@ -1243,6 +1265,7 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
     else e.value = v;
   }
   setThemeUI(c.values && c.values.THEME);
+  tempUnitUI(null, (c.values && c.values.TEMP_UNIT) || '');
   // minerador local: só aparece onde existe (imagens prontas com cpuminer)
   const lm = c.localMiner || {};
   for (const k of ['LOCAL_MINER', 'MINER_THREADS']) { const f = form.querySelector('.f[data-key="' + k + '"]'); if (f) f.hidden = !lm.available; }
@@ -1467,18 +1490,21 @@ if (updBtn) updBtn.addEventListener('click', async () => {
       mode.value = b.autoFan === false ? 'fixed' : 'auto';
       const val = mk('input'); val.inputMode = 'numeric'; val.maxLength = 3; val.style.maxWidth = '90px';
       const unit = mk('span', 'muted');
-      const sync = () => { const auto = mode.value === 'auto'; unit.textContent = auto ? '°C' : '%'; val.placeholder = auto ? '60' : '70'; };
-      val.value = b.autoFan === false ? (b.fanPct ?? '') : (b.tempTarget ?? ''); sync();
+      // o AxeOS guarda o alvo em °C; a tela mostra na unidade escolhida e converte ao gravar
+      const F = () => tempUnitNow === 'F', toU = (c) => (F() ? Math.round(c * 9 / 5 + 32) : c), toC = (v) => (F() ? Math.round((v - 32) * 5 / 9) : v);
+      const sync = () => { const auto = mode.value === 'auto'; unit.textContent = auto ? (F() ? '°F' : '°C') : '%'; val.placeholder = auto ? String(toU(60)) : '70'; };
+      val.value = b.autoFan === false ? (b.fanPct ?? '') : (b.tempTarget != null ? toU(b.tempTarget) : ''); sync();
       mode.addEventListener('change', () => { val.value = ''; sync(); });
       fan.append(mode, val, unit, btn(B.apply, async () => {
         const n = Number(val.value || val.placeholder);
-        if (await act(b.name, 'fan', mode.value === 'auto' ? { auto: true, temptarget: n } : { auto: false, fanspeed: n })) say(B.done, true);
+        if (await act(b.name, 'fan', mode.value === 'auto' ? { auto: true, temptarget: toC(n) } : { auto: false, fanspeed: n })) say(B.done, true);
       }));
       row.appendChild(fan);
       if (b.lastAction) row.appendChild(mk('div', 'hint', B.last + ': ' + b.lastAction.action + ' · ' + new Date(b.lastAction.at).toLocaleTimeString() + (b.lastAction.ok ? '' : ' · ' + (M.err[b.lastAction.error] || b.lastAction.error))));
       box.appendChild(row);
     }
   }
+  if (typeof window !== 'undefined') window.__bxReload = () => load();
   function load() { fetch('/api/config/bitaxes').then((r) => r.json()).then((d) => render(d.list || [])).catch((e) => console.error('bitaxe actions', e)); }
   load();
 })();

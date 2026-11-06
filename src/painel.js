@@ -56,7 +56,10 @@ const BITAXES = bitaxe.parseList(process.env.BITAXES) || [];
 const BITAXE_MS = Number(process.env.BITAXE_MS || 30e3);
 const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist, alerts }
 const numEnv = (k) => (process.env[k] != null && process.env[k] !== '' && Number.isFinite(Number(process.env[k])) ? Number(process.env[k]) : null);
-const BITAXE_LIMITS = { tempMax: numEnv('BITAXE_TEMP_MAX'), vrMax: numEnv('BITAXE_VR_MAX'), hashMin: numEnv('BITAXE_HASH_MIN') != null ? numEnv('BITAXE_HASH_MIN') / 100 : null,
+// °C ou °F na tela e no Telegram (TEMP_UNIT); internamente tudo é °C, e os limites digitados em °F são convertidos
+const TEMP_UNIT = String(process.env.TEMP_UNIT || '').toUpperCase() === 'F' ? 'F' : 'C';
+const toC = (v) => (v != null && TEMP_UNIT === 'F' ? (v - 32) * 5 / 9 : v);
+const BITAXE_LIMITS = { tempMax: toC(numEnv('BITAXE_TEMP_MAX')), vrMax: toC(numEnv('BITAXE_VR_MAX')), hashMin: numEnv('BITAXE_HASH_MIN') != null ? numEnv('BITAXE_HASH_MIN') / 100 : null,
   lowMs: numEnv('BITAXE_LOW_MS') };
 const BITAXE_STALE_MS = Number(process.env.BITAXE_STALE_MS || Math.max(3 * BITAXE_MS, 120e3));   // sem leitura há mais que isso = sem resposta
 const bitaxeFresh = (st) => st && st.data && st.okAt && Date.now() - st.okAt < BITAXE_STALE_MS;
@@ -911,6 +914,7 @@ function snapshot(internal = false) {
   for (const r of steps) if (r.value > run) { run = r.value; recordSteps.push({ t: new Date(r.at).getTime(), v: r.value, worker: r.worker }); }
   return {
     boot: BOOT,
+    tempUnit: TEMP_UNIT,
     clock: clockState,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
@@ -1412,6 +1416,8 @@ const set = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
 // nomes de worker vêm do usuário do minerador (qualquer um na rede pode escolher): sempre escapar antes de ir para HTML
 const esc = (v) => String(v == null ? '' : v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const nf = (n, d = 0) => Number(n).toLocaleString(LOC, { maximumFractionDigits: d });
+let TUNIT = 'C';   // vem do /api/mining (TEMP_UNIT)
+const tmp = (c, d = 0) => (TUNIT === 'F' ? nf(c * 9 / 5 + 32, d) + ' °F' : nf(c, d) + ' °C');
 const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov','dez'];
 const mesAno = (ms) => { const d = new Date(ms); return MESES[d.getMonth()] + '/' + d.getFullYear(); };
 const diaMes = (ms) => new Date(ms).toLocaleDateString(LOC, { day: '2-digit', month: '2-digit' });
@@ -1594,8 +1600,8 @@ function renderBitaxes(j) {
       d.paused && BXT.paused, d.overheat && BXT.overheat, d.powerFault && BXT.powerFault, d.hardwareFault && BXT.hwFault].filter(Boolean);
     return '<div class="bx">' + head + '<div class="bxg">' +
       st(BXT.hash, fmtHash(hr) + (d.expected ? ' <span>' + BXT.of + ' ' + fmtHash(d.expected) + ' ' + BXT.expected + '</span>' : '')) +
-      st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + nf(d.tempC, 1) + ' °C</b>' : '–') +
-      (d.vrTempC != null ? st(BXT.vr, nf(d.vrTempC, 1) + ' °C') : '') +
+      st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + tmp(d.tempC, 1) + '</b>' : '–') +
+      (d.vrTempC != null ? st(BXT.vr, tmp(d.vrTempC, 1)) : '') +
       st(BXT.power, (d.watts != null ? nf(d.watts, 1) + ' W' : '–') + (d.jth ? ' · ' + nf(d.jth, 1) + ' J/TH' : '')) +
       st(BXT.fan, (d.fanPct != null ? nf(d.fanPct) + '%' : '–') + (d.fanRpm ? ' · ' + nf(d.fanRpm) + ' RPM' : '')) +
       st(BXT.freq, (d.freqMhz != null ? nf(d.freqMhz) + ' MHz' : '–') + (d.coreMv ? ' · ' + nf(d.coreMv) + ' mV' : '')) +
@@ -1640,11 +1646,11 @@ function renderFarm(j) {
     const dim = w.state === 'ok' ? '' : ' class="dim"';
     let temp = '';
     if (h.tempC != null && w.name === h.worker) {
-      temp = ' <span class="temp ' + (h.tempC >= 75 ? 'hot' : h.tempC >= 60 ? 'warm' : '') + '">' + nf(h.tempC) + ' °C</span>';
+      temp = ' <span class="temp ' + (h.tempC >= 75 ? 'hot' : h.tempC >= 60 ? 'warm' : '') + '">' + tmp(h.tempC) + '</span>';
     }
     if (w.bitaxe) {
       const bx = w.bitaxe;
-      temp = ' <span class="temp ' + bxTemp(bx.tempC) + '">' + [bx.tempC != null ? nf(bx.tempC) + ' °C' : null, bx.watts != null ? nf(bx.watts, 1) + ' W' : null, bx.fallback ? BXT.backup : null, bx.paused ? BXT.paused : null].filter(Boolean).join(' · ') + '</span>';
+      temp = ' <span class="temp ' + bxTemp(bx.tempC) + '">' + [bx.tempC != null ? tmp(bx.tempC) : null, bx.watts != null ? nf(bx.watts, 1) + ' W' : null, bx.fallback ? BXT.backup : null, bx.paused ? BXT.paused : null].filter(Boolean).join(' · ') + '</span>';
     }
     const hr = (w.state === 'unknown' || w.approx ? '~' : '') + fmtHash(Number(w.hashRate));
     let best = Number(w.bestDifficulty) > 0 ? nf(Number(w.bestDifficulty), 2) : '–';
@@ -2048,7 +2054,7 @@ function renderHistory(j) {
 
   const h = j.health || {};
   set('hLabel', (h.worker || 'Máquina') + ' · saúde');
-  set('hTemp', h.tempC != null ? nf(h.tempC) + ' °C' : '–');
+  set('hTemp', h.tempC != null ? tmp(h.tempC) : '–');
   set('hCpu', h.cpuPct != null ? nf(h.cpuPct) + '%' : '–');
   set('hMem', h.mem && h.mem.total ? nf(100 * h.mem.used / h.mem.total) + '%' : '–');
   set('hUp', h.uptimeS ? dur(h.uptimeS * 1000) : '–');
@@ -2164,8 +2170,8 @@ function narrate(j) {
   const tm = j.timeMachine;
   if (tm && !tm.now) out.push('Em ' + mesAno(tm.from * 1000) + ' a gente seria milionário. Erramos de década.');
   if (h.tempC != null) {
-    if (h.tempC < 50) out.push((h.worker || 'O servidor') + ' a ' + nf(h.tempC) + ' °C. O cooler merece um aumento.');
-    else if (h.tempC >= 70) out.push((h.worker || 'O servidor') + ' a ' + nf(h.tempC) + ' °C. Alguém traz um ventilador?');
+    if (h.tempC < 50) out.push((h.worker || 'O servidor') + ' a ' + tmp(h.tempC) + '. O cooler merece um aumento.');
+    else if (h.tempC >= 70) out.push((h.worker || 'O servidor') + ' a ' + tmp(h.tempC) + '. Alguém traz um ventilador?');
   }
   const sh = (f.accounting || {}).acceptedSharesLastDay;
   if (sh > 0) out.push('Já foram ' + nf(sh) + ' shares hoje. Nenhum virou bloco. Ainda.');
@@ -2266,6 +2272,7 @@ async function load() {
   try {
     const r = await fetch('/api/mining');
     const j = await r.json();
+    TUNIT = j.tempUnit === 'F' ? 'F' : 'C';
     if (bootSeen && j.boot && j.boot !== bootSeen) return location.reload();   // painel reiniciou (configuração nova)
     bootSeen = j.boot;
     if (j.theme) document.body.dataset.theme = j.theme;
@@ -2482,6 +2489,7 @@ function startTelegram() {
   return require('./telegram').start({
     token,
     bitaxeAction: BITAXES.length ? (name, action, params, via) => bitaxeAction(name, action, params, via) : null,
+    tempUnit: TEMP_UNIT,
     chatIds: (process.env.TELEGRAM_CHAT_ID || '').split(',').map((v) => v.trim()).filter(Boolean),
     lang: LANGUAGE || 'en',
     snapshot: () => snapshot(true),
@@ -2514,6 +2522,7 @@ function startMqtt() {
     ignore: ALARM_IGNORE,
     personal: process.env.TELEGRAM_PERSONAL === '1',
     bitaxes: BITAXES.map((b) => b.name),
+    tempUnit: TEMP_UNIT,
   });
 }
 

@@ -32,16 +32,16 @@ const STRINGS = {
     bitaxeOff: (n) => `🟥 ${n}: o Bitaxe não responde`,
     bxOn: {
       offline: (n) => `🟥 <b>${n}</b> parou de responder (3 leituras seguidas). Confira a tomada e o Wi-Fi.`,
-      hot: (n, a) => `🌡️ <b>${n}</b>: chip a <b>${a.t} °C</b> (limite ${a.max} °C)`,
-      vrhot: (n, a) => `🌡️ <b>${n}</b>: regulador de tensão a <b>${a.t} °C</b> (limite ${a.max} °C)`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip a <b>${a.t}</b> (limite ${a.max})`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: regulador de tensão a <b>${a.t}</b> (limite ${a.max})`,
       lowhash: (n, a) => `📉 <b>${n}</b>: hashrate em <b>${a.hr}</b>, ${a.pct}% do esperado (${a.exp}), há 10 min`,
       fallback: (n, a) => `🔀 <b>${n}</b> está na pool reserva (${a.url})`,
       fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
     },
     bxOff: {
       offline: (n) => `✅ <b>${n}</b> voltou a responder`,
-      hot: (n, a) => `✅ <b>${n}</b>: chip de volta a ${a.t} °C`,
-      vrhot: (n, a) => `✅ <b>${n}</b>: regulador de volta a ${a.t} °C`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip de volta a ${a.t}`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulador de volta a ${a.t}`,
       lowhash: (n, a) => `✅ <b>${n}</b>: hashrate normal de novo (${a.hr})`,
       fallback: (n) => `✅ <b>${n}</b> voltou para a pool principal`,
       fault: (n) => `✅ <b>${n}</b>: sem falhas`,
@@ -118,16 +118,16 @@ const STRINGS = {
     bitaxeOff: (n) => `🟥 ${n}: the Bitaxe is not answering`,
     bxOn: {
       offline: (n) => `🟥 <b>${n}</b> stopped answering (3 reads in a row). Check the plug and the Wi-Fi.`,
-      hot: (n, a) => `🌡️ <b>${n}</b>: chip at <b>${a.t} °C</b> (limit ${a.max} °C)`,
-      vrhot: (n, a) => `🌡️ <b>${n}</b>: voltage regulator at <b>${a.t} °C</b> (limit ${a.max} °C)`,
+      hot: (n, a) => `🌡️ <b>${n}</b>: chip at <b>${a.t}</b> (limit ${a.max})`,
+      vrhot: (n, a) => `🌡️ <b>${n}</b>: voltage regulator at <b>${a.t}</b> (limit ${a.max})`,
       lowhash: (n, a) => `📉 <b>${n}</b>: hashrate at <b>${a.hr}</b>, ${a.pct}% of expected (${a.exp}), for 10 min`,
       fallback: (n, a) => `🔀 <b>${n}</b> is on the backup pool (${a.url})`,
       fault: (n, a) => `⚠️ <b>${n}</b>: ${a.what}`,
     },
     bxOff: {
       offline: (n) => `✅ <b>${n}</b> is answering again`,
-      hot: (n, a) => `✅ <b>${n}</b>: chip back to ${a.t} °C`,
-      vrhot: (n, a) => `✅ <b>${n}</b>: regulator back to ${a.t} °C`,
+      hot: (n, a) => `✅ <b>${n}</b>: chip back to ${a.t}`,
+      vrhot: (n, a) => `✅ <b>${n}</b>: regulator back to ${a.t}`,
       lowhash: (n, a) => `✅ <b>${n}</b>: hashrate back to normal (${a.hr})`,
       fallback: (n) => `✅ <b>${n}</b> is back on the main pool`,
       fault: (n) => `✅ <b>${n}</b>: no faults`,
@@ -190,7 +190,7 @@ const ALIASES = { reiniciar: 'bxrestart', restart: 'bxrestart', pausar: 'bxpause
 // ---------------------------------------------------------------- formatação
 const escHtml = (v) => String(v == null ? '' : v).replace(/[&<>]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]));
 
-function formatter(lang) {
+function formatter(lang, tempUnit) {
   const T = STRINGS[lang] || STRINGS.en;
   const num = (n, d = 2) => Number(n).toLocaleString(T.loc, { maximumFractionDigits: d });
   const diff = (d) => {
@@ -212,7 +212,9 @@ function formatter(lang) {
     if (s < 172800) return num(s / 3600, 1) + ' ' + A.h;
     return Math.round(s / 86400) + ' ' + A.d;
   };
-  return { T, num, diff, hashrate, ago };
+  // °C ou °F (TEMP_UNIT); os valores chegam sempre em °C
+  const temp = (c, d = 0) => (String(tempUnit || '').toUpperCase() === 'F' ? num(c * 9 / 5 + 32, d) + ' °F' : num(c, d) + ' °C');
+  return { T, num, diff, hashrate, ago, temp };
 }
 
 // ---------------------------------------------------------------- o que mudou desde a última olhada
@@ -239,7 +241,7 @@ function digest(snap) {
 
 // Compara dois resumos e devolve os avisos. `down` guarda quem já foi anunciado como parado.
 function diffEvents(prev, cur, opts = {}) {
-  const fm = formatter(opts.lang);
+  const fm = formatter(opts.lang, opts.tempUnit);
   const T = fm.T, out = [];
   const ignore = opts.ignore || [], down = opts.down || new Set(), now = opts.now || Date.now();
   if (!prev || !cur.hasData) return out;
@@ -286,14 +288,14 @@ function diffEvents(prev, cur, opts = {}) {
     for (const k of ['offline', 'hot', 'vrhot', 'lowhash', 'fallback', 'fault']) {
       const a = b.alerts[k], was = p.alerts[k];
       if (a && !was) {
-        const v = k === 'hot' || k === 'vrhot' ? { t: fm.num(a.tempC, 1), max: fm.num(a.max, 0) }
+        const v = k === 'hot' || k === 'vrhot' ? { t: fm.temp(a.tempC, 1), max: fm.temp(a.max, 0) }
           : k === 'lowhash' ? { hr: fm.hashrate(a.hashRate), exp: fm.hashrate(a.expected), pct: a.pct }
           : k === 'fallback' ? { url: escHtml([a.url, a.port].filter(Boolean).join(':') || '–') }
           : k === 'fault' ? { what: ['power', 'hardware', 'overheat'].filter((x) => a[x]).map((x) => T.bxFault[x]).join(' · ') } : {};
         out.push({ type: 'bitaxe_' + k, text: T.bxOn[k](n, v) });
       } else if (!a && was) {
         const t = k === 'vrhot' ? b.vrTempC : b.tempC;
-        out.push({ type: 'bitaxe_' + k + '_ok', text: T.bxOff[k](n, { t: t != null ? fm.num(t, 1) : '–', hr: fm.hashrate(b.hashRate) }) });
+        out.push({ type: 'bitaxe_' + k + '_ok', text: T.bxOff[k](n, { t: t != null ? fm.temp(t, 1) : '–', hr: fm.hashrate(b.hashRate) }) });
       }
     }
     if (b.reboots > p.reboots && !b.alerts.offline) out.push({ type: 'bitaxe_reboot', text: T.bxReboot(n, escHtml(b.lastReset || '')) });
@@ -306,7 +308,7 @@ function diffEvents(prev, cur, opts = {}) {
 
 // ---------------------------------------------------------------- respostas aos comandos
 function statusText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T, f = snap.farm || {};
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T, f = snap.farm || {};
   if (!f.hasData) return T.noData;
   const ws = (f.workers || []).filter((w) => !w.inactive && w.state !== 'unknown');
   const mining = ws.filter((w) => w.state === 'ok' || w.state === 'quiet');
@@ -326,7 +328,7 @@ function statusText(snap, opts = {}) {
   for (const b of snap.bitaxes || []) {
     const d = b.data;
     if (!b.fresh || !d) { lines.push(T.bitaxeOff(escHtml(b.name))); continue; }
-    const parts = [fm.hashrate(d.hashRate10m || d.hashRate), d.tempC != null ? `${fm.num(d.tempC, 0)} °C` : null, d.watts != null ? `${fm.num(d.watts, 1)} W` : null, d.pool && d.pool.fallback ? T.bitaxeBackup : null];
+    const parts = [fm.hashrate(d.hashRate10m || d.hashRate), d.tempC != null ? fm.temp(d.tempC, 0) : null, d.watts != null ? `${fm.num(d.watts, 1)} W` : null, d.pool && d.pool.fallback ? T.bitaxeBackup : null];
     lines.push(`🟧 <b>${escHtml(b.name)}</b> · ${parts.filter(Boolean).join(' · ')}`);
   }
   const pools = (snap.proxy || {}).pools || [];
@@ -339,7 +341,7 @@ function statusText(snap, opts = {}) {
 }
 
 function workersText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T, f = snap.farm || {};
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T, f = snap.farm || {};
   if (!f.hasData) return T.noData;
   const dot = { ok: '🟢', quiet: '🟡', stale: '🔴', unknown: '⚪' };
   const now = opts.now || Date.now();
@@ -350,14 +352,14 @@ function workersText(snap, opts = {}) {
 }
 
 function luckText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ws = (snap.luck || {}).workers || [];
   if (!ws.length) return T.luckTitle + '\n' + T.luckEmpty;
   return [T.luckTitle, ...ws.map((w) => T.luckRow(escHtml(w.name), fm.num(w.factor, 2), Math.round(w.percentile * 100)))].join('\n');
 }
 
 function recordsText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const hall = snap.hall || [];
   if (!hall.length) return T.recordsTitle + '\n' + T.recordsEmpty;
   const medal = ['🥇', '🥈', '🥉', '4.', '5.'];
@@ -366,7 +368,7 @@ function recordsText(snap, opts = {}) {
 }
 
 function championshipText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ch = snap.championship || {}, st = ch.standings || [];
   const medal = ['🏆', '🥈', '🥉', '4.', '5.'];
   const lines = [T.champTitle];
@@ -382,7 +384,7 @@ function championshipText(snap, opts = {}) {
 }
 
 function achievementsText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const ach = snap.achievements || {}, list = ach.list || [];
   const isPt = opts.lang === 'pt';
   const lines = [T.achTitle(ach.unlocked || 0, ach.total || list.length)];
@@ -395,7 +397,7 @@ function achievementsText(snap, opts = {}) {
 }
 
 function plugText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const en = (snap && snap.energy) || {};
   const list = Array.isArray(opts.liveList) && opts.liveList.length
     ? opts.liveList
@@ -424,7 +426,7 @@ function plugText(snap, opts = {}) {
 }
 
 function dailyText(snap, opts = {}) {
-  const fm = formatter(opts.lang), T = fm.T;
+  const fm = formatter(opts.lang, opts.tempUnit), T = fm.T;
   const d = new Date(opts.now || Date.now());
   const date = d.toLocaleDateString(T.loc);
   const ld = (snap.championship || {}).leader;
@@ -518,7 +520,7 @@ function start(opts) {
   const chatIds = (opts.chatIds || []).map(String).filter(Boolean);
   const log = opts.log || ((m) => console.log('telegram: ' + m));
   const call = (method, body, t) => apiCall(base, opts.token, method, body, t);
-  const fopts = () => ({ lang, panelUrl: opts.panelUrl, ignore: opts.ignore || [], personal: !!opts.personal });
+  const fopts = () => ({ lang, tempUnit: opts.tempUnit, panelUrl: opts.panelUrl, ignore: opts.ignore || [], personal: !!opts.personal });
 
   let saved = {};
   try { saved = JSON.parse(fs.readFileSync(opts.stateFile, 'utf8')); } catch (_) { /* primeira vez */ }

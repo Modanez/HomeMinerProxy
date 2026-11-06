@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### English
+- **Bitaxe actions:** restart, identify, pause/resume, fan (auto target or fixed) and *point at the proxy* (preview, save, check by reading back, restart) in ⚙️ Settings → Miners behind the PIN, plus Telegram `/reiniciar`, `/pausar`, `/retomar`. A restart asked by the dashboard is not reported as a restart on its own. No overclock, firmware or Wi-Fi changes.
+- **°C or °F:** new *Temperature unit* option (`TEMP_UNIT`) for the dashboard, Telegram and the Bitaxe alert limits.
 - **Bitaxe alerts:** chip or regulator over the limit, low hashrate for 10 min, on the backup pool, power/hardware fault, not answering, restarted and block found. Telegram announces each one when it starts and when it ends; MQTT gets a `binary_sensor` per alert and per Bitaxe; the dashboard card shows the active ones. Limits in ⚙️ Settings → Miners (`BITAXE_TEMP_MAX`, `BITAXE_VR_MAX`, `BITAXE_HASH_MIN`).
 - **Wi-Fi on the Orange Pi and Odroid images:** they now ship NetworkManager handling only the Wi-Fi (the cable keeps the image's own setup), so 🌐 Network → Wi-Fi works with a USB or onboard adapter. The cable shows as connected even when NetworkManager does not manage it.
 - **Docker:** new `minerador` profile (`docker compose --profile minerador up -d`) with cpuminer pointed at the proxy, and the 🌐 Network tab now explains how to set up Tailscale, Wi-Fi and SSH on the host instead of disappearing.
@@ -14,6 +16,8 @@
 - **`health.localMiner`** in `/api/mining` shows how the local miner log is being read (running, hashrate, last line, last read, error).
 
 ### Português
+- **Ações nos Bitaxe:** reiniciar, identificar, pausar/retomar, fan (alvo automático ou fixo) e *apontar para o proxy* (prévia, grava, confere na releitura, reinicia) em ⚙️ Configurações → Mineradores com o PIN, e `/reiniciar`, `/pausar`, `/retomar` no Telegram. Reinício pedido pelo painel não vira aviso de "reiniciou sozinho". Sem overclock, firmware ou Wi-Fi.
+- **°C ou °F:** nova opção *Unidade de temperatura* (`TEMP_UNIT`) para o painel, o Telegram e os limites de alerta dos Bitaxe.
 - **Alertas do Bitaxe:** chip ou regulador acima do limite, hashrate baixo por 10 min, na pool reserva, falha de energia ou hardware, sem resposta, reiniciou e achou bloco. O Telegram avisa cada um quando começa e quando termina; o MQTT ganha um `binary_sensor` por alerta e por Bitaxe; o cartão do painel mostra os ativos. Limites em ⚙️ Configurações → Mineradores (`BITAXE_TEMP_MAX`, `BITAXE_VR_MAX`, `BITAXE_HASH_MIN`).
 - **Wi-Fi nas imagens do Orange Pi e do Odroid:** agora vêm com o NetworkManager cuidando só do Wi-Fi (o cabo continua com a configuração da imagem), então 🌐 Rede → Wi-Fi funciona com adaptador USB ou da placa. O cabo aparece como conectado mesmo sem o NetworkManager cuidar dele.
 - **Docker:** novo perfil `minerador` (`docker compose --profile minerador up -d`) com o cpuminer apontado para o proxy, e a aba 🌐 Rede passa a explicar como configurar Tailscale, Wi-Fi e SSH no host em vez de sumir.
