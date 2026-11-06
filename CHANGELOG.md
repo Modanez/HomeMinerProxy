@@ -4,9 +4,13 @@
 
 ### English
 - **Power-loss-safe state files:** records, history, achievements, worker list, proxy stats and the Telegram bot state are written atomically (temporary file + fsync + rename) and keep the previous version as `.bak`. If the power drops mid-write (a smart plug, a restart from Telegram), the file is never left cut in half; when reading, a missing or damaged file falls back to the `.bak` and the log says so.
+- **Console-style dashboard:** outside kiosk mode the dashboard now has a top bar (active workers or proxy down, pool ping, version, PT | EN, ⚙️ settings) and a side menu grouped into Farm, Mining and Operations, showing one screen at a time. The screen is kept in the address (`#network`, `#luck`…), so it survives a reload and can be bookmarked. Bitaxe gets its own screen, listed only when a Bitaxe is registered, with the count and a warning mark on active alerts. On phones the menu becomes a horizontal strip and the ⚙️ stays visible. Kiosk mode (`?kiosk`) is unchanged; a button on each screen opens it.
+- Very large records (10 million and up) are shown as "1.8 billion" so they fit the card.
 
 ### Português
 - **Arquivos de estado à prova de queda de energia:** recordes, histórico, conquistas, lista de workers, estatísticas do proxy e o estado do bot do Telegram são gravados de forma atômica (arquivo temporário + fsync + renomeação) e guardam a versão anterior como `.bak`. Se a energia cair no meio da gravação (tomada inteligente, reinício pelo Telegram), o arquivo nunca fica cortado; na leitura, um arquivo ausente ou danificado volta pelo `.bak`, com aviso no log.
+- **Painel com visual de console:** fora do modo quiosque, o painel ganhou barra superior (workers ativos ou proxy fora do ar, ping da pool, versão, PT | EN, ⚙️ configurações) e menu lateral agrupado em Fazenda, Mineração e Operação, com uma tela por vez. A tela fica guardada no endereço (`#network`, `#luck`…), então sobrevive ao recarregar e pode virar favorito. O Bitaxe ganhou tela própria, que só aparece com Bitaxe cadastrado, com a contagem e um aviso quando há alerta ativo. No celular o menu vira uma faixa horizontal e o ⚙️ fica sempre à vista. O modo quiosque (`?kiosk`) continua igual; um botão em cada tela abre esse modo.
+- Recordes muito grandes (a partir de 10 milhões) aparecem como "1,8 bilhões", para caber no cartão.
 
 ## v0.5.0 — 2026-11-05
 

@@ -65,7 +65,12 @@ test('proxy repassa, mede e conta os shares', async (t) => {
     env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'teste' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir },
     stdio: 'ignore',
   });
-  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  // o proxy grava as estatísticas ao sair: espera ele terminar antes de apagar a pasta
+  t.after(async () => {
+    const gone = proxy.exitCode != null ? null : new Promise((r) => proxy.once('exit', r));
+    proxy.kill(); pool.close(); await gone;
+    fs.rmSync(dir, { recursive: true, force: true, maxRetries: 3 });
+  });
 
   // minerador de teste
   const miner = await waitFor(() => new Promise((res) => { const s = net.connect(listen, '127.0.0.1', () => res(s)); s.on('error', () => res(null)); }));
