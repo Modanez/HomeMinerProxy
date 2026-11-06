@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### English
+- **Discover miners on the network** (Settings → 🔍 Discover, also in the dashboard menu): scans the home network for Bitaxe and NerdQaxe (AxeOS), ASICs with the cgminer API on port 4028 (Avalon Nano, Antminer…) and ESP32 boards (likely NerdMiner, by the Espressif network card), plus anything already connected to the proxy. Each device says whether it mines through the proxy or directly on a pool, with what to do next; an AxeOS device can be added to the dashboard with one click.
+- Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
+
+### Português
+- **Descobrir mineradores na rede** (Configurações → 🔍 Descobrir, também no menu do painel): procura na rede de casa Bitaxe e NerdQaxe (AxeOS), ASICs com a API do cgminer na porta 4028 (Avalon Nano, Antminer…) e placas ESP32 (provável NerdMiner, pela placa de rede da Espressif), além de tudo que já está conectado ao proxy. Cada aparelho diz se minera pelo proxy ou direto numa pool, com o que fazer; um AxeOS entra no painel com um clique.
+- Corrigido nas Configurações: "Usar estes", depois da busca de Bitaxe, sempre dava os nomes bitaxe1, bitaxe2… em vez do nome do worker, e um endereço de Sonoff com porta (`host:8081`) era recusado no navegador.
+
 ## v0.5.1 — 2026-11-06
 
 ### English
