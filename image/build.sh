@@ -137,6 +137,8 @@ chroot "$ROOT" /usr/bin/env -i HM_BOARD="$BOARD" HOME=/root PATH=/usr/local/sbin
     printf "%s\n" "# HomeMinerProxy: NetworkManager só para o Wi-Fi (aba Rede); o cabo fica com a configuração da imagem" "[keyfile]" "unmanaged-devices=except:type:wifi" > /etc/NetworkManager/conf.d/10-homeminer-wifi-only.conf
     systemctl disable NetworkManager-wait-online.service >/dev/null 2>&1 || true
   fi
+  # hotspot de configuração (rede HomeMiner-Setup quando liga sem rede): o modo "shared" usa o dnsmasq e o iw diz quem está conectado
+  apt-get install -y --no-install-recommends dnsmasq-base iw
   git config --system --add safe.directory /opt/HomeMinerProxy
   cd /opt/HomeMinerProxy
   HOMEMINER_UNATTENDED=1 HOMEMINER_IMAGE=1 bash install.sh </dev/null
@@ -185,6 +187,11 @@ chroot "$ROOT" /usr/local/bin/minerd --help 2>&1 | grep -q 'sha256d' || fail "mi
 [ -x "$ROOT/usr/bin/nmcli" ] || fail "nmcli (Wi-Fi pela aba Rede / Wi-Fi in the Network tab)"
 if [ "$BOARD" != rpi ]; then grep -q 'unmanaged-devices=except:type:wifi' "$ROOT/etc/NetworkManager/conf.d/10-homeminer-wifi-only.conf" 2>/dev/null || fail "NetworkManager só no Wi-Fi / Wi-Fi only"; fi
 echo "    NetworkManager: sim / yes (Wi-Fi pela aba Rede)"
+[ -f "$ROOT/opt/mineracao/hotspot.js" ] || fail "/opt/mineracao/hotspot.js"
+[ -L "$ROOT/etc/systemd/system/multi-user.target.wants/mineracao-hotspot.service" ] || fail "mineracao-hotspot não ativado / not enabled"
+[ -x "$ROOT/usr/sbin/dnsmasq" ] || fail "dnsmasq (hotspot)"
+grep -q 'address=/#/10.42.0.1' "$ROOT/etc/NetworkManager/dnsmasq-shared.d/homeminer-captive.conf" 2>/dev/null || fail "DNS do hotspot / hotspot DNS"
+echo "    hotspot de configuração: sim / setup hotspot: yes"
 [ ! -e "$ROOT/etc/systemd/system/multi-user.target.wants/mineracao-minerador.service" ] || fail "o minerador local tem que vir desligado / local miner must ship disabled"
 [ "$(cat "$ROOT/etc/hostname")" = homeminer ] || fail hostname
 ! grep -qiE 'extraheader|authorization|token|password' "$ROOT/opt/HomeMinerProxy/.git/config" || fail "credencial no .git/config / credential in .git/config"
