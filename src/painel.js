@@ -1042,8 +1042,8 @@ const PAGE = `<!doctype html>
   .cx-badge { font:11px/1 ui-monospace, Menlo, monospace; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
   .cx-btn, body.console .cx-top .langsw { font-size:13px; border:1px solid var(--line); border-radius:6px; padding:6px 11px; color:var(--txt); text-decoration:none; white-space:nowrap; background:transparent; }
   .cx-btn:hover { border-color:var(--gold); color:var(--gold); }
-  body.console .cx-shell { display:grid; grid-template-columns:var(--cxside) minmax(0, 1fr); min-height:calc(100vh - var(--cxtop)); }
-  body.console .cx-side { display:block; position:sticky; top:var(--cxtop); align-self:start; height:calc(100vh - var(--cxtop)); overflow-y:auto; background:var(--card); border-right:1px solid var(--line); padding:10px 10px 24px; }
+  body.console .cx-shell { display:grid; grid-template-columns:var(--cxside) minmax(0, 1fr); min-height:calc(100vh / var(--z, 1) - var(--cxtop)); }
+  body.console .cx-side { display:block; position:sticky; top:var(--cxtop); align-self:start; height:calc(100vh / var(--z, 1) - var(--cxtop)); overflow-y:auto; background:var(--card); border-right:1px solid var(--line); padding:10px 10px 24px; }
   .cx-sec { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); padding:16px 10px 6px; }
   .cx-item { display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:6px; font-size:14px; color:var(--txt); text-decoration:none; }
   .cx-item .ic { width:20px; text-align:center; filter:grayscale(1); opacity:.65; }
@@ -1053,11 +1053,11 @@ const PAGE = `<!doctype html>
   .cx-item .n:not(:empty) { margin-left:auto; font-size:11px; color:var(--dim); border:1px solid var(--line); border-radius:999px; padding:0 7px; }
   .cx-item .n.warn:not(:empty) { color:var(--warn); border-color:var(--warn); }
   .cx-item[hidden] { display:none; }
-  body.console .cx-main { padding:24px 32px 48px; min-width:0; max-width:1400px; }
+  body.console .cx-main { padding:24px 32px 48px; min-width:0; }
   body.console .cx-head { display:flex; align-items:flex-end; gap:16px; padding-bottom:16px; margin-bottom:18px; border-bottom:1px solid var(--line); }
   .cx-head h2 { font-size:22px; font-weight:600; margin:0; letter-spacing:-.01em; }
   .cx-head p { margin:4px 0 0; color:var(--dim); font-size:14px; }
-  .cx-head .narr { margin-top:6px; }
+  .cx-head .narr { margin-top:6px; text-align:left; flex:none; }
   .cx-actions { display:flex; gap:8px; flex-wrap:wrap; }
   .cx-actions .ticket-btn { margin:0; }
   .cx-actions .ticket-btn.offpage { display:none !important; }
@@ -1066,6 +1066,10 @@ const PAGE = `<!doctype html>
   body.console #pages .page { display:none; }
   body.console #pages .page.cur { display:block; }
   body.console .card { border-radius:8px; box-shadow:none; }
+  /* telas grandes (monitor 2K/4K, TV como monitor): amplia tudo para não ficar miúdo e vazio */
+  @media (min-width:2200px) { body.console { zoom:1.25; --z:1.25; } }
+  @media (min-width:2800px) { body.console { zoom:1.5; --z:1.5; } }
+  @media (min-width:3600px) { body.console { zoom:2; --z:2; } }
   @media (max-width:899px) {
     body.console > .cx-top { padding:0 12px; gap:8px; }
     body.console .cx-sep, body.console .cx-crumb, body.console #cxPing, body.console .cx-badge { display:none; }
@@ -1669,7 +1673,8 @@ function lineChart(el, pts, o) {
     el._hover = true;
     el.addEventListener('pointermove', (ev) => {
       const c = el._c; if (!c) return;
-      const r = el.getBoundingClientRect(), x = ev.clientX - r.left;
+      // com zoom (telas grandes) o retângulo vem em pixels da tela e o gráfico em pixels do CSS
+      const r = el.getBoundingClientRect(), k = r.width / el.clientWidth || 1, x = (ev.clientX - r.left) / k;
       let best = c.pts[0];
       for (const p of c.pts) if (Math.abs(c.tx(p.t) - x) < Math.abs(c.tx(best.t) - x)) best = p;
       const xh = el.querySelector('.xh'), xd = el.querySelector('.xd');
@@ -1679,8 +1684,8 @@ function lineChart(el, pts, o) {
       const tip = $('tip');
       tip.innerHTML = '<b>' + c.o.fmtV(best) + '</b> <span>' + c.o.fmtT(best.t) + '</span>';
       tip.style.display = 'block';
-      tip.style.left = Math.min(window.innerWidth - tip.offsetWidth - 8, r.left + px + 12) + 'px';
-      tip.style.top = (r.top + py - 34) + 'px';
+      tip.style.left = Math.min(window.innerWidth / k - tip.offsetWidth - 8, r.left / k + px + 12) + 'px';
+      tip.style.top = (r.top / k + py - 34) + 'px';
     });
     el.addEventListener('pointerleave', () => {
       $('tip').style.display = 'none';
@@ -1757,7 +1762,8 @@ function bxHover(ev) {
   const cx = svg.querySelector('.cx'); cx.setAttribute('x1', px); cx.setAttribute('x2', px); cx.setAttribute('visibility', 'visible');
   let tip = box.querySelector('.tip'); if (!tip) { tip = document.createElement('div'); tip.className = 'tip'; box.appendChild(tip); }
   tip.textContent = new Date(best.t).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' }) + ' · ' + ch.fmt(best.v);
-  tip.style.left = Math.min(Math.max(px / ch.W * r.width, 40), r.width - 40) + 'px';
+  const w = r.width / (box.getBoundingClientRect().width / box.clientWidth || 1);   // largura do gráfico em pixels do CSS (com zoom, a tela é maior)
+  tip.style.left = Math.min(Math.max(px / ch.W * w, 40), w - 40) + 'px';
   tip.style.top = (svg.offsetTop + 2) + 'px';   // dentro do gráfico, sem cobrir os números de cima
 }
 if (typeof document !== 'undefined') { document.addEventListener('mousemove', bxHover); document.addEventListener('touchstart', bxHover, { passive: true }); }
