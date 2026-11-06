@@ -487,6 +487,11 @@ const T = {
   pt: {
     title: 'Configurações', back: '← Voltar ao painel',
     groups: { farm: 'Fazenda', miners: 'Mineradores', cube: 'Cubo GeekMagic', telegram: 'Bot do Telegram', mqtt: 'Home Assistant / MQTT', tuya: 'Tomadas inteligentes (SmartLife / Tuya e Sonoff)', net: 'Rede', backup: 'Backup e restauração' },
+    navGroups: { general: 'Geral', integrations: 'Integrações', system: 'Sistema' },
+    tabDesc: { farm: 'Endereço de bitcoin, idioma, moeda, preço da energia e aparência do painel.', miners: 'Portas do proxy, minerador local, Bitaxe, consumo e hashrate esperado de cada worker.',
+      telegram: 'Bot com alertas, resumo diário, backup semanal e comandos.', tuya: 'Tomadas SmartLife/Tuya e Sonoff: consumo real e religar mineradores.',
+      mqtt: 'Sensores da fazenda no Home Assistant pelo MQTT.', cube: 'Placar da fazenda no cubo GeekMagic.', net: 'Wi-Fi, acesso de fora de casa (Tailscale) e SSH deste servidor.',
+      backup: 'Versão instalada, atualização e cópia de segurança da configuração.' },
     tabs: { farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
     pools: { title: 'Pools e portas', help: 'Cada porta do proxy leva a uma pool. Aponte cada minerador para a porta que combina com ele; se a pool cair, o proxy passa para a reserva sozinho.',
       factory: 'O proxy não respondeu: estas são as portas de fábrica.', backup: 'reserva', down: 'fora do ar · usando', ms: 'ms',
@@ -572,6 +577,11 @@ const T = {
   en: {
     title: 'Settings', back: '← Back to the dashboard',
     groups: { farm: 'Farm', miners: 'Miners', cube: 'GeekMagic cube', telegram: 'Telegram bot', mqtt: 'Home Assistant / MQTT', tuya: 'Smart plugs (SmartLife / Tuya and Sonoff)', net: 'Network', backup: 'Backup and restore' },
+    navGroups: { general: 'General', integrations: 'Integrations', system: 'System' },
+    tabDesc: { farm: 'Bitcoin address, language, currency, power price and dashboard look.', miners: 'Proxy ports, local miner, Bitaxe, power and expected hashrate of each worker.',
+      telegram: 'Bot with alerts, daily summary, weekly backup and commands.', tuya: 'SmartLife/Tuya and Sonoff plugs: real power and restarting miners.',
+      mqtt: 'Farm sensors in Home Assistant over MQTT.', cube: 'Farm scoreboard on the GeekMagic cube.', net: 'Wi-Fi, access from outside home (Tailscale) and SSH for this server.',
+      backup: 'Installed version, updates and settings backup.' },
     tabs: { farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
     pools: { title: 'Pools and ports', help: 'Each proxy port leads to a pool. Point each miner at the port that suits it; if the pool goes down, the proxy switches to the backup on its own.',
       factory: 'The proxy did not answer: these are the factory ports.', backup: 'backup', down: 'down · using', ms: 'ms',
@@ -712,11 +722,17 @@ function page(lang, hasPin, theme) {
       : f.key === 'BITAXES' ? `<div class="bbar"><button type="button" class="ghost" data-test="bitaxe">${S.testBitaxe}</button><button type="button" class="ghost" id="bitaxe_scan">${S.scanBitaxe}</button></div><div id="bitaxe_res" class="pools"></div>` : '';
     const half = ['LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
-    return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><label>${htmlEsc(label)}</label>${input}${test}<div class="hint">${htmlEsc(help)}</div><div class="ferr"></div></div>`;
+    // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
+    return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><div class="fl"><label>${htmlEsc(label)}</label><div class="hint help">${htmlEsc(help)}</div></div><div class="fc">${input}${test}<div class="ferr"></div></div></div>`;
   };
-  const tabOrder = ['farm', 'miners', 'telegram', 'tuya', 'mqtt', 'cube', 'net', 'backup'];
-  const tabBar = `<nav class="tabs" id="tabs">` + tabOrder.map((g, i) =>
-    `<button type="button" class="tab${i === 0 ? ' active' : ''}" data-tab="${g}"><span>${S.tabs[g]}</span><i class="tdot"></i></button>`).join('') + `</nav>`;
+  // menu lateral no estilo de console de nuvem: grupos, ícone discreto, rótulo; no celular vira uma faixa rolável
+  const navGroups = [['general', ['farm', 'miners']], ['integrations', ['telegram', 'tuya', 'mqtt', 'cube']], ['system', ['net', 'backup']]];
+  const splitTab = (t) => { const i = t.indexOf(' '); return i > 0 ? [t.slice(0, i), t.slice(i + 1)] : ['', t]; };
+  const tabBar = `<nav class="tabs" id="tabs">` + navGroups.map(([grp, ids]) => `<div class="navsec">${htmlEsc(S.navGroups[grp])}</div>` + ids.map((g) => {
+    const [ic, lb] = splitTab(S.tabs[g]);
+    return `<button type="button" class="tab${g === 'farm' ? ' active' : ''}" data-tab="${g}" data-title="${htmlEsc(lb)}" data-desc="${htmlEsc(S.tabDesc[g])}"><span class="ic">${ic}</span><span class="lb">${htmlEsc(lb)}</span><i class="tdot"></i></button>`;
+  }).join('')).join('') + `</nav>`;
+  const pageHead = `<div class="phead"><h2 id="ptitle">${htmlEsc(splitTab(S.tabs.farm)[1])}</h2><p id="pdesc">${htmlEsc(S.tabDesc.farm)}</p></div>`;
   const P = S.pools;
   const poolsGroup = `<fieldset class="tab-pane" data-pane="miners"><legend>${htmlEsc(P.title)}</legend>` +
     `<div class="f"><div class="hint">${htmlEsc(P.help)}</div><div class="hint" id="pools_factory" hidden>${htmlEsc(P.factory)}</div><div id="pools_list" class="pools"></div></div>` +
@@ -863,17 +879,91 @@ function page(lang, hasPin, theme) {
   .how code, #pools_hosts, #pools_user { word-break:break-all; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
+  /* ---------- layout de console (nuvem / enterprise) ---------- */
+  :root, body[data-theme] { --radius:8px; --shadow:none; --side:236px; --topbar:52px; }
+  body { padding:0; max-width:none; margin:0; font-size:14px; font-family:Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; }
+  .topbar { position:sticky; top:0; z-index:30; height:var(--topbar); display:flex; align-items:center; gap:10px; padding:0 20px; background:var(--card); border-bottom:1px solid var(--line); }
+  .brand { display:flex; align-items:center; gap:9px; color:var(--txt); text-decoration:none; font-size:15px; }
+  .brand b { font-weight:650; letter-spacing:-.01em; }
+  .logo { width:26px; height:26px; border-radius:6px; background:var(--gold); color:var(--on-gold); display:grid; place-items:center; font-size:14px; }
+  .sep { color:var(--line); font-size:18px; } .crumb { color:var(--dim); } .grow { flex:1; }
+  .badge { font:11px/1 ui-monospace, Menlo, monospace; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
+  .back { border-radius:6px; padding:6px 12px; background:transparent; }
+  .shell { display:grid; grid-template-columns:var(--side) minmax(0, 1fr); min-height:calc(100vh - var(--topbar)); }
+  .side { position:sticky; top:var(--topbar); align-self:start; height:calc(100vh - var(--topbar)); overflow-y:auto; background:var(--card); border-right:1px solid var(--line); padding:10px 10px 24px; }
+  .tabs { flex-direction:column; gap:1px; margin:0; padding:0; overflow:visible; }
+  .navsec { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); padding:16px 10px 6px; }
+  .tab { width:100%; justify-content:flex-start; text-align:left; background:transparent; border:0; border-radius:6px; padding:8px 10px; font-size:14px; font-weight:500; color:var(--txt); gap:10px; }
+  .tab .ic { width:20px; text-align:center; filter:grayscale(1); opacity:.65; font-size:14px; }
+  .tab .lb { flex:1; }
+  .tab:hover { background:var(--gold-soft); color:var(--txt); }
+  .tab.active { background:var(--gold-soft); color:var(--gold); font-weight:600; box-shadow:inset 3px 0 0 var(--gold); }
+  .tab.active .ic { filter:none; opacity:1; }
+  .tab.err { color:var(--warn); }
+  .main { padding:28px 36px 130px; max-width:1080px; width:100%; }
+  .phead { margin-bottom:22px; padding-bottom:18px; border-bottom:1px solid var(--line); }
+  .phead h2 { font-size:22px; font-weight:600; letter-spacing:-.01em; }
+  .phead p { color:var(--dim); margin-top:6px; font-size:14px; }
+  fieldset { padding:0; margin-bottom:20px; border-radius:var(--radius); box-shadow:none; overflow:hidden; }
+  fieldset.tab-pane { grid-template-columns:minmax(0, 1fr); gap:0; }
+  fieldset.tab-pane.active { display:grid; }
+  legend { float:left; width:100%; grid-column:1 / -1; padding:14px 20px; border-bottom:1px solid var(--line); background:color-mix(in srgb, var(--bg) 35%, var(--card)); color:var(--txt); font-size:14px; font-weight:600; letter-spacing:0; text-transform:none; }
+  .f, .f.half { grid-column:1 / -1; padding:18px 20px; margin:0; border-bottom:1px solid var(--line); }
+  .f:last-child { border-bottom:0; }
+  .f > label, .fl > label { display:block; font-size:14px; font-weight:600; margin-bottom:4px; }
+  .fl .help { margin:0 0 10px; }
+  .hint { font-size:12.5px; line-height:1.45; }
+  input:not([type=checkbox]), select, textarea { border-radius:6px; padding:8px 10px; font-size:14px; }
+  input:not([type=checkbox]):focus, select:focus, textarea:focus { outline:none; border-color:var(--gold); box-shadow:0 0 0 3px var(--gold-soft); }
+  button { border-radius:6px; font-size:14px; padding:9px 16px; }
+  button.ghost { background:var(--card); color:var(--txt); border:1px solid var(--line); padding:6px 12px; font-size:13px; font-weight:500; }
+  button.ghost:hover:not(:disabled) { border-color:var(--gold); color:var(--gold); }
+  a.tslink { border-radius:6px; }
+  .tcard, .wrow, .prow, .pool { border-radius:6px; }
+  @media (min-width:900px) {
+    /* rótulo e ajuda à esquerda, campo à direita */
+    .f[data-key] { display:grid; grid-template-columns:minmax(200px, 34%) minmax(0, 1fr); column-gap:32px; align-items:start; }
+    .f[data-key] .fl .help { margin:0; }
+  }
+  /* barra de ações fixa no rodapé: PIN + salvar */
+  fieldset.pin-card { position:fixed; left:var(--side); right:0; bottom:0; z-index:25; margin:0; border-radius:0; border-width:1px 0 0; padding:12px 36px; box-shadow:0 -6px 20px rgba(0,0,0,.18); overflow:visible; }
+  .pin-card legend { display:none; }
+  .pin-card .bar { align-items:center; max-width:1008px; }
+  .pin-card .bar .f { padding:0; border:0; display:flex; align-items:center; gap:12px; flex:1; }
+  .pin-card .bar .f input { max-width:200px; }
+  .pin-card .bar .f .hint { margin:0; }
+  .pin-card #msg { margin-top:6px; min-height:0; }
+  @media (max-width:899px) {
+    .shell { grid-template-columns:minmax(0, 1fr); }
+    .side { position:sticky; top:var(--topbar); z-index:20; height:auto; border-right:0; border-bottom:1px solid var(--line); padding:6px 10px; }
+    .tabs { flex-direction:row; overflow-x:auto; gap:4px; scrollbar-width:none; }
+    .navsec { display:none; }
+    .tab { width:auto; white-space:nowrap; padding:7px 10px; }
+    .tab.active { box-shadow:inset 0 -2px 0 var(--gold); }
+    .main { padding:18px 16px 120px; }
+    .crumb, .sep, .badge { display:none; }
+    .topbar { padding:0 12px; }
+    .back { white-space:nowrap; font-size:13px; padding:6px 10px; }
+    .pin-card .bar { flex-wrap:nowrap; gap:10px; }
+    .pin-card .bar .hint { display:none; }
+    .pin-card .bar button { white-space:nowrap; padding:9px 14px; }
+    fieldset.pin-card { left:0; padding:10px 16px; }
+    .pin-card .bar .f { flex-wrap:wrap; }
+    .pin-card .bar .f input { max-width:none; flex:1; min-width:120px; }
+  }
 </style></head><body data-theme="${activeTheme}">
-<div class="top"><h1>⚙️ ${S.title}</h1><a class="back" href="/">${S.back}</a></div>
+<header class="topbar"><a class="brand" href="/"><span class="logo">⛏</span><b>HomeMinerProxy</b></a><span class="sep">/</span><span class="crumb">${S.title}</span><span class="grow"></span><span class="badge" id="tb_ver" hidden></span><a class="back" href="/">${S.back}</a></header>
 <form id="form" autocomplete="off">
-${tabBar}
+<div class="shell"><aside class="side">${tabBar}</aside><main class="main">
+${pageHead}
 ${fieldGroups}
 ${netGroup}
 ${backupGroup}
 <fieldset class="pin-card"><legend>${S.pin}</legend>
-${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
+${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code" placeholder="${htmlEsc(S.pin)}" aria-label="${htmlEsc(S.pin)}"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
 <div id="msg"></div>
 </fieldset>
+</main></div>
 </form>
 <script>
 const M = ${JSON.stringify(msgs)};
@@ -887,12 +977,16 @@ function selectTab(id) {
   if (!form.querySelector('.tab-pane[data-pane="' + id + '"]')) return;
   for (const b of form.querySelectorAll('.tab[data-tab]')) b.classList.toggle('active', b.dataset.tab === id);
   for (const p of form.querySelectorAll('.tab-pane[data-pane]')) p.classList.toggle('active', p.dataset.pane === id);
+  const tb = form.querySelector('.tab[data-tab="' + id + '"]');
+  if (tb) { document.getElementById('ptitle').textContent = tb.dataset.title; document.getElementById('pdesc').textContent = tb.dataset.desc; }
+  if (typeof window !== 'undefined' && window.scrollTo) window.scrollTo(0, 0);
   if (typeof history !== 'undefined' && history.replaceState) history.replaceState(null, '', '#' + id);
 }
 for (const b of form.querySelectorAll('.tab[data-tab]')) {
   b.addEventListener('click', () => selectTab(b.dataset.tab));
 }
 if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.slice(1));
+fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { const b = document.getElementById('tb_ver'); b.textContent = 'v' + v.version; b.hidden = false; } }).catch(() => {});
 
 function setThemeUI(val) {
   const th = ['obsidian', 'ocean', 'latte'].includes(val) ? val : 'obsidian';
