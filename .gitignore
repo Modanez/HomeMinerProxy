@@ -26,3 +26,7 @@ src/update.json
 src/update.log
 src/version.json
 src/minerador.env
+
+# cópias e temporários da gravação segura (src/store.js)
+*.json.bak
+.*.json.*.tmp
