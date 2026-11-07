@@ -302,6 +302,21 @@ if (!Array.isArray(records)) {
     .map((w) => ({ worker: w.name, value: Number(w.bestDifficulty), at: w.lastSeen }));
   saveJson('records.json', records);
 }
+// O mesmo share chega por mais de um caminho (pool com 2 casas, proxy com mais): 1410,95 e 1410,9534 são um recorde só
+const sameShare = (a, b) => Math.abs(a - b) <= Math.max(0.011, Math.max(a, b) * 1e-4);
+function dedupeRecords(list) {
+  const out = [];
+  for (const r of [...list].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0))) {
+    const d = out.find((x) => sameShare(x.value, r.value) && (x.worker === r.worker || x.worker === '—' || r.worker === '—'));
+    if (d) { d.value = Math.max(d.value, r.value); if (d.worker === '—' && r.worker !== '—') d.worker = r.worker; continue; }
+    out.push({ ...r });
+  }
+  return out.sort((a, b) => b.value - a.value);
+}
+{
+  const clean = dedupeRecords(records);
+  if (clean.length !== records.length) { console.log(`recordes: ${records.length - clean.length} repetido(s) removido(s)`); records = clean; saveJson('records.json', records); }
+}
 
 let history = loadJson('history.json', []);
 if (!Array.isArray(history)) history = [];
@@ -309,6 +324,14 @@ let achievements = loadJson('achievements.json', {});
 if (!achievements || typeof achievements !== 'object' || Array.isArray(achievements)) achievements = {};
 
 function addRecord(worker, value) {
+  const dup = records.find((r) => sameShare(r.value, value) && (r.worker === worker || r.worker === '—' || worker === '—'));
+  if (dup) {   // o mesmo share visto por outro caminho: só acerta o valor e o nome, sem novo alarme
+    dup.value = Math.max(dup.value, value);
+    if (dup.worker === '—' && worker !== '—') dup.worker = worker;
+    records.sort((a, b) => b.value - a.value);
+    saveJson('records.json', records);
+    return;
+  }
   alarm(value > topRecord() ? 'R' : 'P');
   records.push({ worker, value, at: new Date().toISOString() });
   records.sort((a, b) => b.value - a.value);
@@ -322,7 +345,7 @@ function rememberWorkers(workers, poolName) {
     const prev = known[w.name] || {};
     const prevBest = Number(prev.bestDifficulty || 0);
     const best = Number(w.bestDifficulty || 0);
-    if (best > prevBest && best >= 1) addRecord(w.name, best);
+    if (best > prevBest && best >= 1 && !sameShare(best, prevBest)) addRecord(w.name, best);
     known[w.name] = {
       name: w.name,
       hashRate: Number(w.hashRate || 0),
@@ -2735,6 +2758,7 @@ module.exports = {
   farmHashrate,
   topRecord,
   addRecord,
+  dedupeRecords,
   rememberWorkers,
   hashDiff,
   timeMachine,

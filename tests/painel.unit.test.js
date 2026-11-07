@@ -655,3 +655,42 @@ test('tickLocal com customReader e alarmOpen com arquivo existente', async () =>
     painel._resetAlarmTryForTest();
   }
 });
+
+test('recordes: o mesmo share vindo da pool (2 casas) e do proxy conta uma vez só', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-rec-'));
+  const oldDataDir = process.env.DATA_DIR;
+  process.env.DATA_DIR = dir;
+  try {
+    const at = new Date().toISOString();
+    painel.rememberWorkers([{ name: 'macdup', hashRate: 9e6, bestDifficulty: 141095.12, lastSeen: at }], 'public-pool');
+    painel.rememberWorkers([{ name: 'macdup', hashRate: 9e6, bestDifficulty: 141095.1234, lastSeen: at }], 'public-pool');
+    painel.addRecord('—', 141095.12);   // recorde do endereço que a pool devolve: o mesmo share
+    const hits = painel.snapshot().hall.filter((r) => Math.abs(r.value - 141095.12) < 1);
+    assert.strictEqual(hits.length, 1);
+    assert.strictEqual(hits[0].worker, 'macdup');
+    // um share maior de verdade continua virando recorde
+    painel.rememberWorkers([{ name: 'macdup', hashRate: 9e6, bestDifficulty: 141200, lastSeen: at }], 'public-pool');
+    assert.strictEqual(painel.snapshot().hall.filter((r) => r.worker === 'macdup').length, 2);
+  } finally {
+    process.env.DATA_DIR = oldDataDir;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('recordes repetidos já gravados: limpa mantendo o mais antigo e o nome do worker', () => {
+  const out = painel.dedupeRecords([
+    { worker: 'macbook', value: 1410.95, at: '2026-11-06T10:00:00Z' },
+    { worker: 'macbook', value: 1410.9534, at: '2026-11-06T10:00:20Z' },
+    { worker: '—', value: 1889.37, at: '2026-11-05T14:21:00Z' },
+    { worker: 'devkit', value: 1889.3712, at: '2026-11-05T14:22:00Z' },
+    { worker: 'macbook', value: 774.93, at: '2026-11-05T09:00:00Z' },
+    { worker: 'macbook', value: 774.93, at: '2026-11-05T09:01:00Z' },
+    { worker: 'tablet', value: 774.93, at: '2026-11-05T09:02:00Z' },
+  ]);
+  assert.deepStrictEqual(out.map((r) => [r.worker, r.value, r.at]), [
+    ['devkit', 1889.3712, '2026-11-05T14:21:00Z'],
+    ['macbook', 1410.9534, '2026-11-06T10:00:00Z'],
+    ['macbook', 774.93, '2026-11-05T09:00:00Z'],
+    ['tablet', 774.93, '2026-11-05T09:02:00Z'],
+  ]);
+});
