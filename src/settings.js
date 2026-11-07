@@ -21,7 +21,7 @@ const { parseBroker, cleanTopic, testBroker } = require('./mqtt');
 const { ID_RE: TUYA_ID_RE, SECRET_RE: TUYA_SECRET_RE, normalizePlugs, testPlug } = require('./tuya');
 const { testSonoff } = require('./sonoff');
 
-const THEMES = ['obsidian', 'ocean', 'latte'];
+const THEMES = ['obsidian', 'ocean', 'neon', 'latte'];
 function normTheme(v) {
   const s = String(v || '').trim().toLowerCase();
   return THEMES.includes(s) ? s : 'obsidian';
@@ -29,7 +29,7 @@ function normTheme(v) {
 
 const FIELDS = [
   { key: 'BTC_ADDRESS', group: 'farm', type: 'address', required: true },
-  { key: 'THEME', group: 'farm', type: 'theme', options: ['', 'obsidian', 'ocean', 'latte'] },
+  { key: 'THEME', group: 'farm', type: 'theme', options: ['', 'obsidian', 'ocean', 'neon', 'latte'] },
   { key: 'LANGUAGE', group: 'farm', type: 'select', options: ['', 'pt-BR', 'en'] },
   { key: 'CURRENCY', group: 'farm', type: 'select', options: ['', 'BRL', 'USD'] },
   { key: 'TEMP_UNIT', group: 'farm', type: 'select', options: ['', 'C', 'F'], hideEmpty: true, labels: { C: '°C (Celsius)', F: '°F (Fahrenheit)' } },   // vazio = °C
@@ -543,10 +543,11 @@ const T = {
         '<b>Minerar também com este computador:</b> <code>docker compose --profile minerador up -d</code> (nome no painel: LOCAL_WORKER, padrão "docker"; núcleos: MINER_THREADS).',
         '<b>Windows:</b> libere as portas 3000 e 3333–3339 no Firewall para a rede privada e desligue a suspensão do PC, senão os mineradores caem juntos.'] },
     BTC_ADDRESS: ['Endereço de bitcoin', 'O endereço público que os mineradores usam como usuário. O painel consulta pools e carteira por ele. Mudar aqui não muda para onde os mineradores mandam o prêmio: isso vem do usuário configurado em cada um.'],
-    THEME: ['Tema visual (Material Design)', 'Escolha um dos 3 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
+    THEME: ['Tema visual (Material Design)', 'Escolha um dos 4 temas Material Design para o painel, modo kiosk e tela de administração. Clique em um cartão para pré-visualizar na hora.'],
     themes: [
       { id: 'obsidian', name: '🌑 Obsidian', sub: 'Material Dark · Grafite e Ouro Bitcoin (padrão)', colors: ['#0e1117', '#171c26', '#f2a900', '#3ecf8e'] },
       { id: 'ocean', name: '🌊 Material Ocean', sub: 'Material You Escuro · Azul Profundo e Ciano Elétrico', colors: ['#0b111e', '#131c31', '#38bdf8', '#34d399'] },
+      { id: 'neon', name: '⚡ Material Neon', sub: 'Material Dark · Grafite e Verde Neon', colors: ['#0a111b', '#20272e', '#36cf8c', '#52eeaf'] },
       { id: 'latte', name: '☀️ Material Solar', sub: 'Material 3 Claro · Alabastro e Âmbar', colors: ['#f5f3ee', '#ffffff', '#d97706', '#16a34a'] },
     ],
     LANGUAGE: ['Idioma padrão', 'Do painel, do cubo e do bot. O botão PT | EN continua valendo em cada navegador.'],
@@ -650,10 +651,11 @@ const T = {
         '<b>Also mine with this computer:</b> <code>docker compose --profile minerador up -d</code> (name on the dashboard: LOCAL_WORKER, default "docker"; cores: MINER_THREADS).',
         '<b>Windows:</b> allow ports 3000 and 3333–3339 in the Firewall for the private network and turn off sleep, or all miners drop together.'] },
     BTC_ADDRESS: ['Bitcoin address', 'The public address your miners use as username. The dashboard looks up pools and the wallet with it. Changing it here does not change where the miners send the reward: that comes from the username set on each miner.'],
-    THEME: ['Visual theme (Material Design)', 'Choose one of the 3 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
+    THEME: ['Visual theme (Material Design)', 'Choose one of the 4 Material Design themes for the dashboard, kiosk mode and admin screen. Click a card to preview it live.'],
     themes: [
       { id: 'obsidian', name: '🌑 Obsidian', sub: 'Material Dark · Graphite & Bitcoin Gold (default)', colors: ['#0e1117', '#171c26', '#f2a900', '#3ecf8e'] },
       { id: 'ocean', name: '🌊 Material Ocean', sub: 'Material You Dark · Deep Blue & Electric Cyan', colors: ['#0b111e', '#131c31', '#38bdf8', '#34d399'] },
+      { id: 'neon', name: '⚡ Material Neon', sub: 'Material Dark · Graphite & Neon Green', colors: ['#0a111b', '#20272e', '#36cf8c', '#52eeaf'] },
       { id: 'latte', name: '☀️ Material Solar', sub: 'Material 3 Light · Alabaster & Amber', colors: ['#f5f3ee', '#ffffff', '#d97706', '#16a34a'] },
     ],
     LANGUAGE: ['Default language', 'For the dashboard, cube and bot. The PT | EN button still works per browser.'],
@@ -729,7 +731,7 @@ function page(lang, hasPin, theme) {
             `<span class="tswatch">${dots}</span><span class="tname">${htmlEsc(t.name)}</span><span class="tsub">${htmlEsc(t.sub)}</span></button>`;
         }).join('') + `</div>`;
     } else if (f.type === 'select') {
-      input = `<select name="${f.key}">` + f.options.filter((o) => !(f.hideEmpty && o === '')).map((o) => `<option value="${o}">${o === '' ? S.auto : (f.labels && f.labels[o]) || o}</option>`).join('') + '</select>';
+      input = `<select name="${f.key}"${f.hideEmpty ? ` data-empty="${f.options.find((o) => o !== '')}"` : ''}>` + f.options.filter((o) => !(f.hideEmpty && o === '')).map((o) => `<option value="${o}">${o === '' ? S.auto : (f.labels && f.labels[o]) || o}</option>`).join('') + '</select>';
     } else if (f.type === 'worker') {
       input = `<select name="${f.key}" data-workers="1"><option value="">${S.none}</option></select>`;
     } else if (f.type === 'tuyaworker') {
@@ -834,6 +836,7 @@ function page(lang, hasPin, theme) {
 <style>
   :root, body[data-theme="obsidian"] { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --on-gold:#14161c; --gold-soft:rgba(242,169,0,.09); --ok:#3ecf8e; --warn:#e5534b; --shadow:none; --radius:12px; }
   body[data-theme="ocean"] { --bg:#0b111e; --card:#131c31; --line:#223254; --txt:#e2e8f0; --dim:#8ea0c2; --gold:#38bdf8; --on-gold:#081221; --gold-soft:rgba(56,189,248,.11); --ok:#34d399; --warn:#fb7185; --shadow:0 4px 18px rgba(0,0,0,.28); --radius:16px; }
+  body[data-theme="neon"] { --bg:#0a111b; --card:#20272e; --line:#343d46; --txt:#eef2f5; --dim:#97a3ad; --gold:#36cf8c; --on-gold:#04140d; --gold-soft:rgba(54,207,140,.11); --ok:#52eeaf; --warn:#f87171; --shadow:0 4px 18px rgba(0,0,0,.3); --radius:14px; }
   body[data-theme="latte"] { --bg:#f5f3ee; --card:#ffffff; --line:#e2ded5; --txt:#1c1b18; --dim:#666159; --gold:#d97706; --on-gold:#ffffff; --gold-soft:rgba(217,119,6,.10); --ok:#16a34a; --warn:#dc2626; --shadow:0 2px 10px rgba(28,27,24,.06); --radius:16px; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:18px 16px 32px; max-width:840px; margin:0 auto; transition:background .2s, color .2s; }
@@ -850,7 +853,7 @@ function page(lang, hasPin, theme) {
   .tab.err { border-color:var(--warn); color:var(--warn); }
   .tab.err .tdot { display:inline-block; background:var(--warn); box-shadow:0 0 6px rgba(229,83,75,.8); }
   fieldset { background:var(--card); border:1px solid var(--line); border-radius:var(--radius); box-shadow:var(--shadow); padding:18px 18px 10px; margin-bottom:14px; transition:background .2s, border-color .2s; }
-  .tcards { display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px; margin-top:4px; }
+  .tcards { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:10px; margin-top:4px; }   /* 4 temas: 2 por linha */
   @media (max-width:640px) { .tcards { grid-template-columns:1fr; } }
   .tcard { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:12px; padding:12px; text-align:left; display:flex; flex-direction:column; gap:5px; cursor:pointer; transition:all .15s; font-weight:500; }
   .tcard:hover { border-color:var(--gold); }
@@ -1080,7 +1083,7 @@ function tempUnitUI(from, to) {
 }
 if (el('TEMP_UNIT')) el('TEMP_UNIT').addEventListener('change', () => tempUnitUI(tempUnitNow, el('TEMP_UNIT').value));
 function setThemeUI(val) {
-  const th = ['obsidian', 'ocean', 'latte'].includes(val) ? val : 'obsidian';
+  const th = THEMES.includes(val) ? val : 'obsidian';
   const sel = el('THEME');
   if (sel) sel.value = val || '';
   if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = th;
@@ -1305,6 +1308,7 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
     if (e.type === 'checkbox') e.checked = !!v;
     else if (e.type === 'password') { secretSet[k] = !!(v && v.set); document.getElementById(k + '_state').textContent = v.set ? M.tokenSet.replace('%s', v.tail) : ''; document.getElementById(k + '_clearbox').hidden = !v.set; }
     else if (e.tagName === 'SELECT' && v && ![...e.options].some((o) => o.value === v)) { e.add(new Option(v, v)); e.value = v; }
+    else if (e.tagName === 'SELECT' && v === '' && e.dataset.empty) e.value = e.dataset.empty;   // vazio = o padrão (°C), que é a primeira opção
     else e.value = v;
   }
   setThemeUI(c.values && c.values.THEME);

@@ -35,6 +35,7 @@ test('locale e moeda são injetados', () => {
   assert.match(localizePage(PAGE, 'en', 'USD'), /<html lang="en">/);
   assert.match(localizePage(PAGE, 'pt', 'BRL', 'ocean'), /<body data-theme="ocean">/);
   assert.match(localizePage(PAGE, 'en', 'USD', 'latte'), /<body data-theme="latte">/);
+  assert.match(localizePage(PAGE, 'pt', 'BRL', 'neon'), /<body data-theme="neon">/);
   // tema padrão omitido e tema inválido que cai no fallback obsidian
   assert.match(localizePage(PAGE, 'pt', 'BRL'), /<body data-theme="obsidian">/);
   assert.match(localizePage(PAGE, 'pt', 'BRL', 'invalido'), /<body data-theme="obsidian">/);

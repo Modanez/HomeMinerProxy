@@ -27,9 +27,11 @@ test('validação dos campos', () => {
   assert.deepStrictEqual(st.clean(field('THEME'), 'ocean'), { value: 'ocean' });
   assert.deepStrictEqual(st.clean(field('THEME'), 'latte'), { value: 'latte' });
   assert.deepStrictEqual(st.clean(field('THEME'), 'obsidian'), { value: 'obsidian' });
-  assert.ok(st.clean(field('THEME'), 'neon').error);
+  assert.deepStrictEqual(st.clean(field('THEME'), 'neon'), { value: 'neon' });
+  assert.ok(st.clean(field('THEME'), 'rosa').error);
   assert.strictEqual(st.normTheme('ocean'), 'ocean');
   assert.strictEqual(st.normTheme('latte'), 'latte');
+  assert.strictEqual(st.normTheme('neon'), 'neon');
   assert.strictEqual(st.normTheme('invalido'), 'obsidian');
   assert.deepStrictEqual(st.clean(field('ALARM_IGNORE'), ['macbook', 'macbook', ' tablet ']), { value: 'macbook,tablet' });
   assert.ok(st.clean(field('ALARM_IGNORE'), ['a b']).error);
