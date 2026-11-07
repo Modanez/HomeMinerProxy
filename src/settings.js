@@ -35,6 +35,7 @@ const FIELDS = [
   { key: 'TEMP_UNIT', group: 'farm', type: 'select', options: ['', 'C', 'F'], hideEmpty: true, labels: { C: '°C (Celsius)', F: '°F (Fahrenheit)' } },   // vazio = °C
   { key: 'POWER_PRICE_KWH', group: 'farm', type: 'price', alias: 'TARIFA_KWH' },
   { key: 'SHOW_WALLET', group: 'farm', type: 'bool', unset: '1' },
+  { key: 'SHOW_DONATE', group: 'farm', type: 'bool', unset: '1' },
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
   { key: 'LOCAL_MINER', group: 'miners', type: 'bool' },
   { key: 'MINER_THREADS', group: 'miners', type: 'threads' },
@@ -552,6 +553,7 @@ const T = {
     CURRENCY: ['Moeda', 'Cotação, prêmio e conta de luz.'],
     TEMP_UNIT: ['Unidade de temperatura', 'Celsius ou Fahrenheit no painel, no Telegram e nos limites de alerta dos Bitaxe. O Home Assistant converte sozinho.'],
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
+    SHOW_DONATE: ['Mostrar "Apoiar o projeto"', 'O item ❤️ no fim do menu do painel, com o endereço para doar ao HomeMinerProxy. Nunca aparece no modo quiosque.'],
     SHOW_WALLET: ['Mostrar a carteira', 'Saldo, valor e movimentação na tela da fazenda. Desligue se a tela fica à vista de visitas ou se o painel é aberto de fora de casa. A cotação continua aparecendo, e o aviso de dinheiro entrando continua chegando no Telegram.'],
     BITAXES: ['Bitaxe (API do AxeOS)', 'nome=IP de cada Bitaxe, separados por vírgula (ex.: bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). O painel lê hashrate, temperatura, consumo e fan direto do aparelho. Use o mesmo nome do worker (o que vem depois do ponto no usuário da pool) e reserve um IP fixo no roteador.'],
     BITAXE_TEMP_MAX: ['Bitaxe: limite do chip', 'Alerta no Telegram e no MQTT quando o chip passa disso em 2 leituras seguidas, na unidade escolhida na aba Fazenda. Vazio = {def}.'],
@@ -658,6 +660,7 @@ const T = {
     CURRENCY: ['Currency', 'BTC price, prize and power bill.'],
     TEMP_UNIT: ['Temperature unit', 'Celsius or Fahrenheit on the dashboard, on Telegram and in the Bitaxe alert limits. Home Assistant converts on its own.'],
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
+    SHOW_DONATE: ['Show "Support the project"', 'The ❤️ item at the end of the dashboard menu, with the address to donate to HomeMinerProxy. Never shown in kiosk mode.'],
     SHOW_WALLET: ['Show the wallet', 'Balance, value and activity on the farm screen. Turn it off if the screen is in view of visitors or the dashboard is opened from outside your home. The BTC price still shows, and Telegram still alerts when money arrives.'],
     BITAXES: ['Bitaxe (AxeOS API)', 'name=IP of each Bitaxe, comma separated (e.g. bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). The dashboard reads hashrate, temperature, power and fan straight from the device. Use the worker name (what comes after the dot in the pool user) and reserve a fixed IP in your router.'],
     BITAXE_TEMP_MAX: ['Bitaxe: chip limit', 'Alert on Telegram and MQTT when the chip goes over this in 2 reads in a row, in the unit chosen in the Farm tab. Empty = {def}.'],
@@ -764,7 +767,7 @@ function page(lang, hasPin, theme) {
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>`
       : f.key === 'BITAXES' ? `<div class="bbar"><button type="button" class="ghost" data-test="bitaxe">${S.testBitaxe}</button><button type="button" class="ghost" id="bitaxe_scan">${S.scanBitaxe}</button></div><div id="bitaxe_res" class="pools"></div>` : '';
-    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
     const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80 }[f.key]) : null;
