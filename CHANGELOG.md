@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### English
+- **New theme ⚡ Material Neon:** bluish graphite with neon green, in Settings → Farm → Visual theme (`THEME=neon`). The theme cards now show two per row.
+- Fixed: the temperature unit field in Settings showed blank when it was never set (it now shows °C, the default).
 - **❤️ Support the project:** a discreet item at the end of the dashboard menu opens a dialog with the bitcoin (on-chain) address for donations, a copy button (works over plain http) and "Open in wallet" (`bitcoin:` link). Never shown in kiosk mode; Settings → Farm → "Show 'Support the project'" (`SHOW_DONATE=0`) hides it. The GitHub repository also gets a "Sponsor" button pointing to the donations section.
 - Fixed: an empty ping pill showed in the dashboard top bar when there was no ping.
 - **PIN in a dialog:** the PIN field left the bottom bar of ⚙️ Settings. Any action that needs it (save, tests, Bitaxe actions, discovery, network, update, backup) opens a dialog asking for the PIN, which is kept only while the page is open; a wrong PIN asks again. The dashboard smart plug buttons use the same dialog.
@@ -12,6 +14,8 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **Tema novo ⚡ Material Neon:** grafite azulado com verde neon, em Configurações → Fazenda → Tema visual (`THEME=neon`). Os cartões de tema passam a ficar dois por linha.
+- Corrigido: o campo de unidade de temperatura nas Configurações aparecia em branco quando nunca tinha sido definido (agora mostra °C, o padrão).
 - **❤️ Apoiar o projeto:** um item discreto no fim do menu do painel abre um modal com o endereço bitcoin (on-chain) para doações, botão de copiar (funciona mesmo por http) e "Abrir na carteira" (link `bitcoin:`). Nunca aparece no modo quiosque; Configurações → Fazenda → "Mostrar 'Apoiar o projeto'" (`SHOW_DONATE=0`) esconde. O repositório no GitHub ganha também o botão "Sponsor", que leva à seção de doações.
 - Corrigido: aparecia uma pílula de ping vazia na barra superior do painel quando não havia ping.
 - **PIN num modal:** o campo de PIN saiu da barra de baixo das ⚙️ Configurações. Toda ação que precisa dele (salvar, testes, ações nos Bitaxe, descoberta, rede, atualização, backup) abre um modal pedindo o PIN, que fica guardado só enquanto a página está aberta; PIN errado pede de novo. Os botões das tomadas no painel usam o mesmo modal.

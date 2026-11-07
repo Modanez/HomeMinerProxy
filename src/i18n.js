@@ -249,7 +249,7 @@ const EN = [
 
 // Gera a página no idioma, moeda e tema pedidos (o resultado é guardado em cache por quem chama)
 function localizePage(page, lang, currency, theme = 'obsidian') {
-  const th = ['obsidian', 'ocean', 'latte'].includes(theme) ? theme : 'obsidian';
+  const th = ['obsidian', 'ocean', 'neon', 'latte'].includes(theme) ? theme : 'obsidian';
   let out = page
     .replace('<body data-theme="obsidian">', `<body data-theme="${th}">`)
     .replace("const LOC = '__LOC__', CUR = '__CUR__';", `const LOC = '${LOCALES[lang] || LOCALES.en}', CUR = '${currency}';`);
