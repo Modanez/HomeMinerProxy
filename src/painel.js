@@ -1263,13 +1263,19 @@ const PAGE = `<!doctype html>
   .en-plugs { display:flex; flex-direction:column; gap:5px; margin-top:6px; }
   .en-prow { display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap; font-size:13px; color:var(--dim); }
   .en-pbtns { display:inline-flex; gap:5px; }
-  body.kiosk .en-pbtns, body.kiosk .en-pin { display:none !important; }
+  body.kiosk .en-pbtns, body.kiosk .pinmodal { display:none !important; }
   .en-btn { background:transparent; color:var(--gold); border:1px solid var(--line); border-radius:6px; padding:2px 7px; font-size:11px; font-family:inherit; cursor:pointer; }
   .en-btn:hover { border-color:var(--gold); }
-  .en-pin { display:none; align-items:center; gap:6px; margin-top:6px; flex-wrap:wrap; }
-  .en-pin.on { display:flex; }
-  .en-pin input { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:4px 8px; width:100px; font-size:12px; font-family:ui-monospace, monospace; }
-  .en-pin span { font-size:12px; color:var(--warn); }
+  /* PIN das ações nas tomadas: modal no meio da tela */
+  .pinmodal { position:fixed; inset:0; z-index:200; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .pinmodal[hidden] { display:none; }
+  .pm-box { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; width:100%; max-width:340px; box-shadow:0 20px 50px rgba(0,0,0,.45); display:flex; flex-direction:column; gap:10px; }
+  .pm-box b { font-size:16px; } .pm-hint { color:var(--dim); font-size:13px; margin:0; }
+  .pm-box input { background:var(--bg); color:var(--txt); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:20px; letter-spacing:.3em; text-align:center; font-family:ui-monospace, monospace; }
+  #enPinMsg { color:var(--warn); font-size:13px; min-height:16px; }
+  .pm-btns { display:flex; justify-content:flex-end; gap:8px; }
+  .pm-btn { background:transparent; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:8px 14px; font-size:14px; font-family:inherit; cursor:pointer; }
+  .pm-btn.pm-ok { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #111); font-weight:600; }
   .tooltip { position:fixed; pointer-events:none; background:var(--tip-bg); box-shadow:var(--shadow); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
   .tooltip b { color:var(--txt); } .tooltip span { color:var(--dim); }
 
@@ -1429,7 +1435,6 @@ const PAGE = `<!doctype html>
       <div class="big" id="enC" style="font-size:28px">–</div>
       <div class="sub" id="enS">–</div>
       <div class="en-plugs" id="enP"></div>
-      <div class="en-pin" id="enPin"><input type="password" id="enPinInp" inputmode="numeric" placeholder="PIN"><button type="button" class="en-btn" id="enPinOk">Confirmar</button><button type="button" class="en-btn" id="enPinCancel">✕</button><span id="enPinMsg"></span></div>
       <div class="sub" id="enJ">–</div>
     </div>
   </div>
@@ -1486,6 +1491,9 @@ const PAGE = `<!doctype html>
 
 </main>
 </div></div>
+<div class="pinmodal" id="enPin" hidden role="dialog" aria-modal="true"><div class="pm-box"><b>Digite o PIN para continuar</b><p class="pm-hint">O mesmo PIN das Configurações.</p>
+<input type="password" id="enPinInp" inputmode="numeric" autocomplete="one-time-code" placeholder="PIN"><span id="enPinMsg"></span>
+<div class="pm-btns"><button type="button" class="pm-btn" id="enPinCancel">Cancelar</button><button type="button" class="pm-btn pm-ok" id="enPinOk">Confirmar</button></div></div></div>
 <div class="tooltip" id="tip"></div>
 <div class="ticket" id="ticket">
   <img id="ticketImg" alt="">
@@ -2316,8 +2324,9 @@ function askPlugAction(deviceId, action) {
   pendingPlug = { deviceId, action };
   set('enPinMsg', '');
   if (savedPin) return execPlugAction(savedPin);
-  $('enPin').classList.add('on');
-  $('enPinInp').focus();
+  $('enPinInp').value = '';
+  $('enPin').hidden = false;
+  setTimeout(() => $('enPinInp').focus(), 0);
 }
 async function execPlugAction(pinVal) {
   if (!pendingPlug) return;
@@ -2326,21 +2335,24 @@ async function execPlugAction(pinVal) {
     const r = await fetch('/api/plug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pinVal, deviceId, action }) }).then((x) => x.json());
     if (!r.ok) {
       savedPin = '';
-      $('enPin').classList.add('on');
+      $('enPin').hidden = false;
       set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (PLUG_ERR[r.error] || r.error || 'erro'));
       if (PLUG_ERR[r.error]) savedPin = pinVal;   // o PIN estava certo; o problema foi a tomada
       return;
     }
     savedPin = pinVal;
     pendingPlug = null;
-    $('enPin').classList.remove('on');
+    $('enPin').hidden = true;
     $('enPinInp').value = '';
     set('enPinMsg', '');
     load();
   } catch (_) { set('enPinMsg', 'erro'); }
 }
 $('enPinOk').addEventListener('click', () => execPlugAction($('enPinInp').value.trim()));
-$('enPinCancel').addEventListener('click', () => { pendingPlug = null; $('enPin').classList.remove('on'); set('enPinMsg', ''); });
+const closePin = () => { pendingPlug = null; $('enPin').hidden = true; set('enPinMsg', ''); };
+$('enPinCancel').addEventListener('click', closePin);
+$('enPin').addEventListener('click', (e) => { if (e.target === $('enPin')) closePin(); });   // toque fora da caixa fecha
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('enPin').hidden) closePin(); });
 $('enPinInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); execPlugAction($('enPinInp').value.trim()); } });
 
 // ------------------------------------------------ narrador sarcástico

@@ -505,7 +505,7 @@ const T = {
       mqtt: 'Sensores da fazenda no Home Assistant pelo MQTT.', cube: 'Placar da fazenda no cubo GeekMagic.', net: 'Wi-Fi, acesso de fora de casa (Tailscale) e SSH deste servidor.',
       backup: 'Versão instalada, atualização e cópia de segurança da configuração.' },
     tabs: { discover: '🔍 Descobrir', farm: '🏠 Fazenda', miners: '⛏️ Mineradores', telegram: '✈️ Telegram', tuya: '🔌 Tomada', mqtt: '🏠 MQTT / HA', cube: '🧊 Cubo', net: '🌐 Rede', backup: '💾 Backup' },
-    dsc: { help: 'Varre a rede de casa atrás de Bitaxe e NerdQaxe (AxeOS), ASICs com a API do cgminer (porta 4028, como Avalon Nano e Antminer) e placas ESP32 (NerdMiner). Leva até meio minuto. Digite o PIN na barra de baixo antes.',
+    dsc: { help: 'Varre a rede de casa atrás de Bitaxe e NerdQaxe (AxeOS), ASICs com a API do cgminer (porta 4028, como Avalon Nano e Antminer) e placas ESP32 (NerdMiner). Leva até meio minuto.',
       run: 'Procurar na rede', running: 'Procurando na rede (até meio minuto)…', none: 'Nenhum minerador encontrado. Confira se estão na mesma rede (Wi-Fi ou cabo) que este servidor.',
       docker: 'Rodando em Docker: sem network_mode: host, a busca só enxerga a rede interna do Docker.', count: '%s aparelho(s) encontrado(s).',
       kinds: { axeos: 'AxeOS', cgminer: 'API cgminer', esp32: 'ESP32', proxy: 'aparelho conectado ao proxy' },
@@ -513,7 +513,7 @@ const T = {
       esp: 'Provavelmente um NerdMiner, ou outro aparelho com ESP32 (uma tomada Sonoff, por exemplo).', espHint: 'Se for um NerdMiner, aponte para a porta do NerdMiner do proxy (veja Pools e portas na aba Mineradores).',
       cgHint: 'Para minerar pelo proxy, troque a pool na página deste ASIC (veja Pools e portas na aba Mineradores).', axeHint: 'Adicione ao painel, salve e use "Apontar para o proxy" em Ações nos Bitaxe.',
       registered: 'no painel como %s', add: 'Adicionar ao painel', added: 'Adicionado ao campo Bitaxe da aba Mineradores. Salve para começar a monitorar.', open: 'abrir ↗' },
-    bx: { title: 'Ações nos Bitaxe', help: 'Reiniciar, identificar (a tela pisca), pausar e retomar, fan e apontar para o proxy. Overclock, firmware e Wi-Fi ficam no AxeOS. Digite o PIN na barra de baixo antes.',
+    bx: { title: 'Ações nos Bitaxe', help: 'Reiniciar, identificar (a tela pisca), pausar e retomar, fan e apontar para o proxy. Overclock, firmware e Wi-Fi ficam no AxeOS.',
       none: 'Cadastre os Bitaxe no campo acima e salve para aparecerem aqui.', restart: 'Reiniciar', identify: 'Identificar', pause: 'Pausar', resume: 'Retomar', point: 'Apontar para o proxy',
       fanAuto: 'Fan automático, alvo', fanFixed: 'Fan fixo em', apply: 'Aplicar', confirm: 'Confirmar e reiniciar', cancel: 'Cancelar', offline: 'sem resposta', paused: 'pausado',
       from: 'Hoje', to: 'Vai ficar', backupLbl: 'reserva', same: 'Já aponta para o proxy.', done: 'Feito.', pointDone: 'Pool gravada e conferida; o Bitaxe está reiniciando.', last: 'Última ação' },
@@ -526,7 +526,7 @@ const T = {
       nerd: 'NerdMiner / ESP32', nerdHow: 'Pool: %h · Porta: %p · Endereço: o seu endereço de bitcoin',
       cpu: 'cpuminer', cpuHow: 'minerd -a sha256d -o stratum+tcp://%h:%p -u %u -p x',
       noAddr: 'SEU_ENDERECO' },
-    net: { pinFirst: 'Digite o PIN no fim da página e toque em "Ver estado".', refresh: '↻ Ver estado', none: 'Nada para configurar aqui neste aparelho (sem Wi-Fi gerenciável e sem Tailscale).',
+    net: { pinFirst: 'Toque em "Ver estado" (pede o PIN).', refresh: '↻ Ver estado', none: 'Nada para configurar aqui neste aparelho (sem Wi-Fi gerenciável e sem Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'Sem adaptador Wi-Fi neste aparelho.', wifiOn: (s, ip) => `Conectado em ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi desconectado.', wired: 'O cabo de rede está conectado.',
       scan: 'Procurar redes', pass: 'Senha do Wi-Fi', connect: 'Conectar', forget: 'Esquecer esta rede', scanning: 'Procurando redes…', connecting: 'Conectando… (até 45 s)', wifiAp: 'O HomeMiner está saindo da rede de configuração (HomeMiner-Setup) para entrar em "%s". Volte o celular para o Wi-Fi de casa e abra http://homeminer.local:3000. Se não conectar, a HomeMiner-Setup volta em um minuto.', wifiOk: 'Conectado ao Wi-Fi! Pode tirar o cabo; o painel continua em http://homeminer.local:3000.',
       wifiHint: 'Ao trocar de rede com o painel aberto pelo próprio Wi-Fi, a página pode perder a conexão por alguns segundos.',
@@ -592,7 +592,7 @@ const T = {
     updWhy: { docker: 'No Docker, atualize com: docker compose pull && docker compose up -d', norepo: 'A atualização pelo botão precisa da pasta do repositório (instalação pelo install.sh).', nosystemd: 'A atualização pelo botão precisa do serviço do systemd (instalação pelo install.sh).' },
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
     backupOk: 'Backup baixado.', restored: 'Backup restaurado! Reiniciando o painel…',
-    pin: 'PIN', pinHelp: 'O SETTINGS_PIN que está em /etc/mineracao.env (o instalador cria e mostra no final).',
+    pin: 'PIN', pinHelp: 'O SETTINGS_PIN que está em /etc/mineracao.env (o instalador cria e mostra no final).', pinAsk: 'Digite o PIN para continuar', pinOk: 'Confirmar', pinCancel: 'Cancelar', pinCanceled: 'Ação cancelada (sem PIN).',
     noPin: 'Para salvar por aqui, defina SETTINGS_PIN em /etc/mineracao.env e reinicie o painel. Rode o install.sh de novo que ele cria um PIN para você.',
     save: 'Salvar e reiniciar', testBitaxe: 'Testar', scanBitaxe: 'Procurar na rede', bitaxeScanning: 'Procurando Bitaxe na rede (uns 15 s)…', bitaxeNone: 'Nenhum Bitaxe respondeu na rede.', bitaxeFail: 'sem resposta', bitaxeAdd: 'Usar estes', testCube: 'Testar cubo', testTg: 'Mandar mensagem de teste', testMqtt: 'Testar MQTT', testTuya: 'Testar tomada',
     saved: 'Salvo! Reiniciando o painel…', back2: 'Pronto. Voltando ao painel…', nothing: 'Nada mudou.',
@@ -611,7 +611,7 @@ const T = {
       mqtt: 'Farm sensors in Home Assistant over MQTT.', cube: 'Farm scoreboard on the GeekMagic cube.', net: 'Wi-Fi, access from outside home (Tailscale) and SSH for this server.',
       backup: 'Installed version, updates and settings backup.' },
     tabs: { discover: '🔍 Discover', farm: '🏠 Farm', miners: '⛏️ Miners', telegram: '✈️ Telegram', tuya: '🔌 Smart Plug', mqtt: '🏠 MQTT / HA', cube: '🧊 Cube', net: '🌐 Network', backup: '💾 Backup' },
-    dsc: { help: 'Scans the home network for Bitaxe and NerdQaxe (AxeOS), ASICs with the cgminer API (port 4028, such as Avalon Nano and Antminer) and ESP32 boards (NerdMiner). Takes up to half a minute. Type the PIN in the bottom bar first.',
+    dsc: { help: 'Scans the home network for Bitaxe and NerdQaxe (AxeOS), ASICs with the cgminer API (port 4028, such as Avalon Nano and Antminer) and ESP32 boards (NerdMiner). Takes up to half a minute.',
       run: 'Scan the network', running: 'Scanning the network (up to half a minute)…', none: 'No miner found. Check that they are on the same network (Wi-Fi or cable) as this server.',
       docker: 'Running in Docker: without network_mode: host, the scan only sees the Docker internal network.', count: '%s device(s) found.',
       kinds: { axeos: 'AxeOS', cgminer: 'cgminer API', esp32: 'ESP32', proxy: 'device connected to the proxy' },
@@ -619,7 +619,7 @@ const T = {
       esp: 'Probably a NerdMiner, or another ESP32 device (a Sonoff plug, for example).', espHint: 'If it is a NerdMiner, point it at the proxy NerdMiner port (see Pools and ports in the Miners tab).',
       cgHint: 'To mine through the proxy, change the pool on this ASIC page (see Pools and ports in the Miners tab).', axeHint: 'Add it to the dashboard, save and use "Point at the proxy" in Bitaxe actions.',
       registered: 'on the dashboard as %s', add: 'Add to dashboard', added: 'Added to the Bitaxe field in the Miners tab. Save to start monitoring.', open: 'open ↗' },
-    bx: { title: 'Bitaxe actions', help: 'Restart, identify (the screen blinks), pause and resume, fan and point at the proxy. Overclock, firmware and Wi-Fi stay in AxeOS. Type the PIN in the bar below first.',
+    bx: { title: 'Bitaxe actions', help: 'Restart, identify (the screen blinks), pause and resume, fan and point at the proxy. Overclock, firmware and Wi-Fi stay in AxeOS.',
       none: 'Register the Bitaxe in the field above and save to see them here.', restart: 'Restart', identify: 'Identify', pause: 'Pause', resume: 'Resume', point: 'Point at the proxy',
       fanAuto: 'Auto fan, target', fanFixed: 'Fixed fan at', apply: 'Apply', confirm: 'Confirm and restart', cancel: 'Cancel', offline: 'no answer', paused: 'paused',
       from: 'Now', to: 'Will be', backupLbl: 'backup', same: 'Already points at the proxy.', done: 'Done.', pointDone: 'Pool saved and checked; the Bitaxe is restarting.', last: 'Last action' },
@@ -632,7 +632,7 @@ const T = {
       nerd: 'NerdMiner / ESP32', nerdHow: 'Pool: %h · Port: %p · Address: your bitcoin address',
       cpu: 'cpuminer', cpuHow: 'minerd -a sha256d -o stratum+tcp://%h:%p -u %u -p x',
       noAddr: 'YOUR_ADDRESS' },
-    net: { pinFirst: 'Type the PIN at the bottom of the page and tap "Show status".', refresh: '↻ Show status', none: 'Nothing to set up here on this device (no managed Wi-Fi and no Tailscale).',
+    net: { pinFirst: 'Tap "Show status" (asks for the PIN).', refresh: '↻ Show status', none: 'Nothing to set up here on this device (no managed Wi-Fi and no Tailscale).',
       wifi: 'Wi-Fi', wifiNone: 'No Wi-Fi adapter on this device.', wifiOn: (s, ip) => `Connected to ${s}${ip ? ' · IP ' + ip : ''}`, wifiOff: 'Wi-Fi not connected.', wired: 'The network cable is connected.',
       scan: 'Find networks', pass: 'Wi-Fi password', connect: 'Connect', forget: 'Forget this network', scanning: 'Searching for networks…', connecting: 'Connecting… (up to 45 s)', wifiAp: 'HomeMiner is leaving the setup network (HomeMiner-Setup) to join "%s". Switch your phone back to your home Wi-Fi and open http://homeminer.local:3000. If it does not connect, HomeMiner-Setup comes back in a minute.', wifiOk: 'Connected to Wi-Fi! You can unplug the cable; the dashboard stays at http://homeminer.local:3000.',
       wifiHint: 'If you change networks while the dashboard is open over that same Wi-Fi, the page may lose the connection for a few seconds.',
@@ -698,7 +698,7 @@ const T = {
     updWhy: { docker: 'With Docker, update with: docker compose pull && docker compose up -d', norepo: 'Updating from here needs the repository folder (install.sh install).', nosystemd: 'Updating from here needs the systemd service (install.sh install).' },
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
     backupOk: 'Backup downloaded.', restored: 'Backup restored! Restarting the dashboard…',
-    pin: 'PIN', pinHelp: 'The SETTINGS_PIN in /etc/mineracao.env (the installer creates it and shows it at the end).',
+    pin: 'PIN', pinHelp: 'The SETTINGS_PIN in /etc/mineracao.env (the installer creates it and shows it at the end).', pinAsk: 'Type the PIN to continue', pinOk: 'Confirm', pinCancel: 'Cancel', pinCanceled: 'Action canceled (no PIN).',
     noPin: 'To save from here, set SETTINGS_PIN in /etc/mineracao.env and restart the dashboard. Running install.sh again creates a PIN for you.',
     save: 'Save and restart', testBitaxe: 'Test', scanBitaxe: 'Find on the network', bitaxeScanning: 'Looking for Bitaxe on the network (about 15 s)…', bitaxeNone: 'No Bitaxe answered on the network.', bitaxeFail: 'no answer', bitaxeAdd: 'Use these', testCube: 'Test cube', testTg: 'Send test message', testMqtt: 'Test MQTT', testTuya: 'Test plug',
     saved: 'Saved! Restarting the dashboard…', back2: 'Done. Going back to the dashboard…', nothing: 'Nothing changed.',
@@ -819,7 +819,7 @@ function page(lang, hasPin, theme) {
     tuyaNone: S.tuyaNone, tuyaAll: S.tuyaAll, testTuya: S.testTuya,
     dsc: S.dsc, bitaxeScanning: S.bitaxeScanning, bitaxeNone: S.bitaxeNone, bitaxeFail: S.bitaxeFail, bitaxeAdd: S.bitaxeAdd,
     plugTypes: S.plugTypes, phId: S.addPlugIdPlaceholder, phHost: S.addPlugHostPlaceholder,
-    backupOk: S.backupOk, restored: S.restored, err: S.err,
+    backupOk: S.backupOk, restored: S.restored, err: { ...S.err, cancel: S.pinCanceled },
     net: { ...N, wifiOn: N.wifiOn('%s', '%i') },
     pools: P,
     bx: B,
@@ -932,6 +932,14 @@ function page(lang, hasPin, theme) {
   .how code, #pools_hosts, #pools_user { word-break:break-all; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
+  .pinmodal { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
+  .pinmodal[hidden] { display:none; }
+  .pm-box { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; width:100%; max-width:360px; box-shadow:0 20px 50px rgba(0,0,0,.45); display:flex; flex-direction:column; gap:10px; }
+  .pm-box b { font-size:16px; } .pm-box .hint { margin:0; }
+  .pm-box input { font-size:20px; letter-spacing:.3em; text-align:center; }
+  .pm-err { color:var(--warn); font-size:13px; min-height:16px; }
+  .pm-box .bbar { justify-content:flex-end; margin:0; }
+  .pin-card #msg { margin:0; }
   /* ---------- layout de console (nuvem / enterprise) ---------- */
   :root, body[data-theme] { --radius:8px; --shadow:none; --side:236px; --topbar:52px; }
   body { padding:0; max-width:none; margin:0; font-size:14px; font-family:Inter, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; }
@@ -1015,11 +1023,17 @@ ${discoverGroup}
 ${netGroup}
 ${backupGroup}
 <fieldset class="pin-card"><legend>${S.pin}</legend>
-${hasPin ? `<div class="bar"><div class="f"><input type="password" name="pin" inputmode="numeric" autocomplete="one-time-code" placeholder="${htmlEsc(S.pin)}" aria-label="${htmlEsc(S.pin)}"><div class="hint">${S.pinHelp}</div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
-<div id="msg"></div>
+${hasPin ? `<div class="bar"><div class="f"><div id="msg"></div></div><button type="submit" id="save">${S.save}</button></div>` : `<p class="nopin">${S.noPin}</p>`}
+${hasPin ? '' : '<div id="msg"></div>'}
 </fieldset>
 </main></div>
 </form>
+<div class="pinmodal" id="pinModal" hidden role="dialog" aria-modal="true" aria-labelledby="pm_title"><form class="pm-box" id="pm_form" autocomplete="off">
+<b id="pm_title">${htmlEsc(S.pinAsk)}</b><p class="hint">${htmlEsc(S.pinHelp)}</p>
+<input type="password" id="pm_pin" inputmode="numeric" autocomplete="one-time-code" placeholder="${htmlEsc(S.pin)}" aria-label="${htmlEsc(S.pin)}">
+<div class="pm-err" id="pm_err"></div>
+<div class="bbar"><button type="button" class="ghost" id="pm_cancel">${htmlEsc(S.pinCancel)}</button><button type="submit" id="pm_ok">${htmlEsc(S.pinOk)}</button></div>
+</form></div>
 <script>
 const M = ${JSON.stringify(msgs)};
 const UNITS = [['', 'H/s', 1], ['k', 'kH/s', 1e3], ['M', 'MH/s', 1e6], ['G', 'GH/s', 1e9], ['T', 'TH/s', 1e12], ['P', 'PH/s', 1e15]];
@@ -1195,9 +1209,9 @@ async function testPlugById(devId, btn, plug) {
     const v = values();
     v.TUYA_DEVICE_ID = devId;
     const sonoff = plug && plug.type === 'sonoff';
-    const r = await post('/api/config/test', sonoff
-      ? { pin: pin(), what: 'sonoff', values: { host: plug.host, deviceId: plug.deviceId } }
-      : { pin: pin(), what: 'tuya', values: v });
+    const r = await postPin('/api/config/test', sonoff
+      ? { what: 'sonoff', values: { host: plug.host, deviceId: plug.deviceId } }
+      : { what: 'tuya', values: v });
     showErrors(r.errors || {});
     if (r.error) say(M.err[r.error] || r.error, false);
     else if (r.ok && r.status) {
@@ -1413,7 +1427,32 @@ function values() {
   return out;
 }
 const post = (url, body) => fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((r) => r.json());
-const pin = () => (el('pin') || {}).value || '';
+// PIN: pedido num modal na primeira ação que precisa dele e guardado só enquanto a página está aberta
+let pinCache = '';
+function askPin(errText) {
+  const m = document.getElementById('pinModal'), inp = document.getElementById('pm_pin');
+  if (!m) return Promise.resolve(null);
+  document.getElementById('pm_err').textContent = errText || '';
+  inp.value = ''; m.hidden = false; setTimeout(() => inp.focus(), 0);
+  return new Promise((resolve) => {
+    const done = (v) => { m.hidden = true; f.removeEventListener('submit', ok); c.removeEventListener('click', no); document.removeEventListener('keydown', esc); resolve(v); };
+    const f = document.getElementById('pm_form'), c = document.getElementById('pm_cancel');
+    const ok = (ev) => { ev.preventDefault(); const v = inp.value.trim(); if (!v) { inp.focus(); return; } done(v); };
+    const no = () => done(null);
+    const esc = (ev) => { if (ev.key === 'Escape') done(null); };
+    f.addEventListener('submit', ok); c.addEventListener('click', no); document.addEventListener('keydown', esc);
+  });
+}
+async function postPin(url, body) {
+  let errText = '';
+  for (;;) {
+    if (!pinCache) { const p = await askPin(errText); if (p == null) return { error: 'cancel' }; pinCache = p; }
+    const r = await post(url, { ...body, pin: pinCache });
+    if (r && r.error === 'wrong') { pinCache = ''; errText = M.err.wrong; continue; }
+    if (r && (r.error === 'locked' || r.error === 'nopin')) pinCache = '';
+    return r;
+  }
+}
 function showErrors(errs) {
   let firstErrPane = null;
   for (const f of form.querySelectorAll('.f[data-key]')) {
@@ -1449,7 +1488,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   updBtn.disabled = true;
   try {
     const started = Date.now();
-    const r = await post('/api/config/update', { pin: pin() });
+    const r = await postPin('/api/config/update', {});
     if (r.error) { say(M.err[r.error] || M.updWhy[r.error] || r.error, false); return; }
     say(M.updRunning, true);
     // espera o painel voltar reinstalado: muda o installedAt (e o commit/versão, se havia coisa nova), até ~5 minutos
@@ -1482,7 +1521,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   const mk = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt != null) e.textContent = txt; return e; };
   const btn = (txt, fn) => { const b = mk('button', 'ghost', txt); b.type = 'button'; b.addEventListener('click', async () => { b.disabled = true; try { await fn(); } finally { b.disabled = false; } }); return b; };
   const act = async (name, action, params) => {
-    const r = await post('/api/config/bitaxe-action', { pin: pin(), name, action, params });
+    const r = await postPin('/api/config/bitaxe-action', { name, action, params });
     if (r.error || r.ok === false) { say(r.error === 'fan' ? M.err.fanT.replace('{lo}', tUnit(50)).replace('{hi}', tUnit(70)) : M.err[r.error] || r.error || '?', false); return null; }
     return r;
   };
@@ -1571,7 +1610,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   const $ = (id) => document.getElementById(id);
   const N = M.net, msg = $('net_msg');
   const err = (r) => M.err[r && r.error] || (r && r.error) || '?';
-  const netPost = (action, extra) => post('/api/config/net', { pin: pin(), action, ...(extra || {}) });
+  const netPost = (action, extra) => postPin('/api/config/net', { action, ...(extra || {}) });
   let wifiSsid = null;
   fetch('/api/config/net').then((r) => r.json()).then((c) => {
     $('net_wifi').hidden = !(c.wifi || c.wifiReason === 'noadapter');
@@ -1689,7 +1728,7 @@ form.addEventListener('submit', async (ev) => {
   ev.preventDefault();
   const b = document.getElementById('save'); b.disabled = true; say('', true);
   try {
-    const r = await post('/api/config', { pin: pin(), values: values() });
+    const r = await postPin('/api/config', { values: values() });
     showErrors(r.errors || {});
     if (r.error) return say(M.err[r.error] || r.error, false);
     if (!r.restart) return say(M.nothing, true);
@@ -1763,7 +1802,7 @@ function dscRender(list, docker) {
 if (dscBtn) dscBtn.addEventListener('click', async () => {
   dscBtn.disabled = true; document.getElementById('dsc_msg').textContent = M.dsc.running;
   try {
-    const r = await post('/api/config/test', { pin: pin(), what: 'discover', values: values() });
+    const r = await postPin('/api/config/test', { what: 'discover', values: values() });
     if (r.error) { document.getElementById('dsc_msg').textContent = ''; say(M.err[r.error] || r.error, false); } else dscRender(r.found || [], r.docker);
   } catch (_) { document.getElementById('dsc_msg').textContent = ''; }
   finally { dscBtn.disabled = false; }
@@ -1772,7 +1811,7 @@ const scanBtn = document.getElementById('bitaxe_scan');
 if (scanBtn) scanBtn.addEventListener('click', async () => {
   scanBtn.disabled = true; say(M.bitaxeScanning, true);
   try {
-    const r = await post('/api/config/test', { pin: pin(), what: 'bitaxe-scan', values: values() });
+    const r = await postPin('/api/config/test', { what: 'bitaxe-scan', values: values() });
     if (r.error) say(M.err[r.error] || r.error, false); else { say('', true); showBitaxes(r.found || [], true); }
   } finally { scanBtn.disabled = false; }
 });
@@ -1780,7 +1819,7 @@ for (const t of form.querySelectorAll('[data-test]')) t.addEventListener('click'
   t.disabled = true;
   try {
     const v = values();
-    const r = await post('/api/config/test', { pin: pin(), what: t.dataset.test, values: v });
+    const r = await postPin('/api/config/test', { what: t.dataset.test, values: v });
     showErrors(r.errors || {});
     if (r.error) say(M.err[r.error] || r.error, false);
     else if (t.dataset.test === 'bitaxe') showBitaxes(r.bitaxes || [], false);
@@ -1804,7 +1843,7 @@ const expBtn = form.querySelector('[data-backup="export"]'), resBtn = form.query
 if (expBtn) expBtn.addEventListener('click', async () => {
   expBtn.disabled = true;
   try {
-    const r = await post('/api/config/backup', { pin: pin() });
+    const r = await postPin('/api/config/backup', {});
     if (r.error) return say(M.err[r.error] || r.error, false);
     const blob = new Blob([JSON.stringify(r.backup, null, 2)], { type: 'application/json' });
     const a = document.createElement('a');
@@ -1824,7 +1863,7 @@ if (resBtn && fileInp) {
     try {
       let parsed;
       try { parsed = JSON.parse(await f.text()); } catch (_) { return say(M.err.backup, false); }
-      const r = await post('/api/config/restore', { pin: pin(), backup: parsed });
+      const r = await postPin('/api/config/restore', { backup: parsed });
       if (r.error) return say(M.err[r.error] || r.error, false);
       await waitRestartAndGo(M.restored);
     } catch (_) { say('?', false); } finally { resBtn.disabled = false; }

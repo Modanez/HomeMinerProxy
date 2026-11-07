@@ -133,7 +133,9 @@ const EN = [
   ["[t.target, 'alvo da rede', 'var(--dim)'], [t.hashDiff, 'bloco #'", "[t.target, 'network target', 'var(--dim)'], [t.hashDiff, 'block #'"],
 
   // ---------- histórico
-  ['<button type="button" class="en-btn" id="enPinOk">Confirmar</button>', '<button type="button" class="en-btn" id="enPinOk">Confirm</button>'],
+  ['<button type="button" class="pm-btn pm-ok" id="enPinOk">Confirmar</button>', '<button type="button" class="pm-btn pm-ok" id="enPinOk">Confirm</button>'],
+  ['<button type="button" class="pm-btn" id="enPinCancel">Cancelar</button>', '<button type="button" class="pm-btn" id="enPinCancel">Cancel</button>'],
+  ['<b>Digite o PIN para continuar</b><p class="pm-hint">O mesmo PIN das Configurações.</p>', '<b>Type the PIN to continue</b><p class="pm-hint">The same PIN as in Settings.</p>'],
   ["'coletando dados… o gráfico aparece em alguns minutos'", "'collecting data… the chart shows up in a few minutes'"],
   ["'o gráfico aparece depois do primeiro recorde registrado'", "'the chart shows up after the first recorded record'"],
   ["'<li><span></span><span class=\"sub\">nenhum recorde ainda</span></li>'", "'<li><span></span><span class=\"sub\">no records yet</span></li>'"],
