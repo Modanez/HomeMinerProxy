@@ -1083,7 +1083,7 @@ function tempUnitUI(from, to) {
 }
 if (el('TEMP_UNIT')) el('TEMP_UNIT').addEventListener('change', () => tempUnitUI(tempUnitNow, el('TEMP_UNIT').value));
 function setThemeUI(val) {
-  const th = THEMES.includes(val) ? val : 'obsidian';
+  const th = ${JSON.stringify(THEMES)}.includes(val) ? val : 'obsidian';   // a lista vem do servidor (THEMES não existe no navegador)
   const sel = el('THEME');
   if (sel) sel.value = val || '';
   if (typeof document !== 'undefined' && document.body) document.body.dataset.theme = th;

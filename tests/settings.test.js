@@ -346,6 +346,8 @@ test('testCube, testTelegram, validateBackupData e rotas desconhecidas em settin
   // page com tema customizado
   assert.match(st.page('pt', true, 'ocean'), /data-theme="ocean"/);
   assert.match(st.page('en', true, 'latte'), /data-theme="latte"/);
+  // clicar num cartão de tema troca na hora: a lista de temas precisa ir escrita no script do navegador
+  assert.ok(st.page('pt', true, 'obsidian').includes('["obsidian","ocean","neon","latte"].includes(val)'));
 
   // 2. testTelegram
   assert.deepStrictEqual(await st.testTelegram('invalido', '123'), { ok: false, error: 'missing' });
