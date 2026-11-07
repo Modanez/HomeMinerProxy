@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### English
+- **Calmer failback:** when the main pool comes back, the proxy now waits until it has been up for 5 minutes (`PROXY_FAILBACK_STABLE_S`) before moving miners back from the backup, re-testing it meanwhile. A pool that keeps dropping and coming back (like pool.nerdminers.org on Nov 7) no longer kicks the miners each time; the dashboard shows "⏳ … came back, miners return once it is stable".
+- **Miner that doesn't come back:** a miner that dropped with a pool switch or a proxy restart and hasn't reconnected in 10 minutes (`PROXY_MISSING_MIN`) shows a warning on the dashboard ("🔌 devkit did not reconnect… Unplug it and plug it back in"), in Recent events and on Telegram, with another message when it reconnects. Some ESP32 firmwares get stuck after the connection drops.
 - **New theme ⚡ Material Neon:** bluish graphite with neon green, in Settings → Farm → Visual theme (`THEME=neon`). The theme cards now show two per row.
 - Fixed: clicking a theme card in Settings did nothing (a browser-side error introduced with the Neon theme).
 - Fixed: the temperature unit field in Settings showed blank when it was never set (it now shows °C, the default).
@@ -15,6 +17,8 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **Volta para a pool principal mais calma:** quando a principal volta, o proxy agora espera ela ficar 5 minutos no ar (`PROXY_FAILBACK_STABLE_S`) antes de tirar os mineradores da reserva, testando de novo nesse meio-tempo. Uma pool que cai e volta toda hora (como a pool.nerdminers.org em 7/11) não derruba mais os mineradores a cada volta; o painel mostra "⏳ … voltou, os mineradores voltam quando ficar estável".
+- **Minerador que não volta:** quem caiu junto com uma troca de pool ou com o reinício do proxy e não reconectou em 10 minutos (`PROXY_MISSING_MIN`) aparece com um aviso no painel ("🔌 devkit não reconectou… Tire da tomada e ligue de novo"), nos Eventos recentes e no Telegram, com outra mensagem quando ele reconecta. Alguns firmwares de ESP32 travam depois que a conexão cai.
 - **Tema novo ⚡ Material Neon:** grafite azulado com verde neon, em Configurações → Fazenda → Tema visual (`THEME=neon`). Os cartões de tema passam a ficar dois por linha.
 - Corrigido: clicar num cartão de tema nas Configurações não fazia nada (erro no navegador que entrou junto com o tema Neon).
 - Corrigido: o campo de unidade de temperatura nas Configurações aparecia em branco quando nunca tinha sido definido (agora mostra °C, o padrão).

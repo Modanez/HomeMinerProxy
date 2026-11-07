@@ -5,8 +5,11 @@
 // Uso: node proxy.js        (estatísticas em http://127.0.0.1:3336/stats)
 // A pool é escolhida pela porta em que o minerador se conecta (ROUTES abaixo).
 // Failover: se a pool principal de uma porta não responder, o minerador vai para a primeira reserva
-// (backup) que estiver no ar; quando a principal volta, as sessões na reserva são encerradas e os
-// mineradores reconectam na principal.
+// (backup) que estiver no ar; quando a principal volta e fica estável por PROXY_FAILBACK_STABLE_S (padrão
+// 300 s), as sessões na reserva são encerradas e os mineradores reconectam na principal. Pool que cai e volta
+// toda hora não fica derrubando os mineradores (alguns ESP32 não reconectam bem).
+// Quem cai junto com uma troca de pool (ou com o reinício do proxy) e não volta em PROXY_MISSING_MIN minutos
+// (padrão 10) aparece em "missing" nas estatísticas: o painel e o Telegram avisam.
 
 const net = require('net');
 const http = require('http');
@@ -26,6 +29,9 @@ const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
 const CONNECT_TIMEOUT_MS = Number(process.env.PROXY_CONNECT_TIMEOUT_MS || 8000);
 const HEALTH_MS = Number(process.env.PROXY_HEALTH_MS || 60e3);      // de quanto em quanto tempo testa as pools fora do ar
 const FAILBACK = process.env.PROXY_FAILBACK !== '0';                 // voltar para a principal quando ela se recuperar
+const FAILBACK_STABLE_MS = Number(process.env.PROXY_FAILBACK_STABLE_S ?? 300) * 1000;   // ...e ficar no ar por esse tempo
+const MISSING_MS = Number(process.env.PROXY_MISSING_MIN ?? 10) * 60e3;                // minerador que não volta depois de uma troca
+const POOL_EVENT_WINDOW_MS = 2 * 60e3;                                                // queda até 2 min de uma troca conta como "por causa da troca"
 const STATS_PORT = Number(process.env.PROXY_STATS_PORT || 3336);
 const STATS_FILE = process.env.PROXY_STATS_FILE || path.join(process.env.DATA_DIR || __dirname, 'proxy-stats.json');
 const HASHRATE_WINDOW_MS = 60 * 60e3;   // hashrate estimado pelos shares da última hora
@@ -48,6 +54,15 @@ const cleanIp = (a) => (a ? String(a).replace(/^::ffff:/, '') : null);
 // workers[nome] = { name, pool, accepted, rejected, lastShareAt, lastShareDiff, bestEver, bestSession,
 //                   connectedSince, online, window: [[ts, dificuldadeAlvo], ...] }
 const { weekKey } = require('./luck');
+// mineradores que caíram junto com uma troca de pool (ou reinício do proxy) e ainda não voltaram: nome -> { since, ip, why, alerted }
+const awaiting = {};
+let poolEventAt = 0;
+const noteAwaiting = (name, ip, why) => { awaiting[name] = { name, ip: ip || null, since: Date.now(), why }; };
+function missingList(now = Date.now()) {
+  for (const [k, a] of Object.entries(awaiting)) if (now - a.since > DAY_MS_MISSING) delete awaiting[k];   // depois de 1 dia vira só "parado"
+  return Object.values(awaiting).filter((a) => now - a.since >= MISSING_MS).map(({ name, ip, since, why }) => ({ name, ip, since, why }));
+}
+const DAY_MS_MISSING = 24 * 3600e3;
 let workers = {};
 let recent = [];
 let today = { date: dayKey(), accepted: 0 };   // shares aceitos hoje, somando todas as pools
@@ -90,6 +105,8 @@ try {
   bestHash = saved.bestHash || null;
   dayBestHash = saved.dayBestHash || null;
   if (Array.isArray(saved.hist) && saved.hist.length === HIST_BUCKETS) hist = saved.hist;
+  // quem estava conectado quando o proxy parou deve voltar sozinho: se não voltar, avisa
+  for (const w of Object.values(workers)) if (w.online > 0) awaiting[w.name] = { name: w.name, ip: w.ip || null, since: Date.now(), why: 'restart' };
   for (const w of Object.values(workers)) { w.online = 0; w.window = []; w.bestSession = 0; }
 } catch (_) { /* primeiro uso */ }
 
@@ -165,6 +182,7 @@ function markDown(u, error) {
   const h = health[hkey(u)];
   if (h && h.down) { h.error = error; return; }
   health[hkey(u)] = { down: true, since: Date.now(), error, pingMs: (h && h.pingMs) ?? null };
+  poolEventAt = Date.now();
   log(`pool ${u.label} (${hkey(u)}) fora do ar: ${error}`);
   addEvent('pool_down', `${u.label} is down: ${error}`);
 }
@@ -177,6 +195,7 @@ function markUp(u, pingMs = null) {
     return;
   }
   health[hkey(u)] = { down: false, since: Date.now(), error: null, pingMs: ms };
+  poolEventAt = Date.now();
   log(`pool ${u.label} (${hkey(u)}) voltou`);
   addEvent('pool_up', `${u.label} is back`);
 }
@@ -197,14 +216,26 @@ function probe(u) {
     c.on('error', () => done(false));
   });
 }
-async function healthCheck() {
+async function healthCheck(now = Date.now()) {
   for (const route of ROUTES) {
     for (const u of upstreamsOf(route)) if (isDown(u) && await probe(u)) markUp(u);
     const primary = upstreamsOf(route)[0];
     if (!FAILBACK || isDown(primary)) continue;
-    for (const s of sessions) {
-      if (s.route === route && s.upIndex > 0 && !s.closed) s.close('pool principal voltou, reconectando nela');
+    const onBackup = [...sessions].filter((s) => s.route === route && s.upIndex > 0 && !s.closed);
+    if (!onBackup.length) continue;
+    // a principal voltou há pouco: testa de novo a cada volta e só devolve os mineradores quando ficar estável
+    const upFor = now - ((health[hkey(primary)] || {}).since || 0);
+    if (upFor < FAILBACK_STABLE_MS) {
+      if (!(await probe(primary))) markDown(primary, 'caiu de novo');
+      continue;
     }
+    poolEventAt = Date.now();
+    for (const s of onBackup) s.close('pool principal voltou, reconectando nela');
+  }
+  // avisa uma vez quem não voltou
+  for (const a of missingList()) {
+    const w = awaiting[a.name];
+    if (w && !w.alerted) { w.alerted = true; log(`${a.name} não reconectou desde ${new Date(a.since).toISOString()} (${a.why})`); addEvent('missing', `${a.name} did not reconnect after the ${a.why === 'restart' ? 'proxy restart' : 'pool switch'}`, { worker: a.name }); }
   }
 }
 setInterval(() => { healthCheck().catch(() => {}); }, HEALTH_MS).unref();
@@ -290,6 +321,7 @@ function session(down, route) {
         s.worker.listen = route.listen;
         s.worker.shareDiff = s.shareDiff;
         s.worker.extranonce1 = s.en1;
+        delete awaiting[name];
         log(`[${route.label}] ${name} conectou de ${s.peer}`);
         addEvent('worker_up', `${name} connected (${cleanIp(s.peer)})`, { worker: name });
       } else if (m.method === 'mining.submit' && m.params) {
@@ -378,6 +410,10 @@ function session(down, route) {
   function close(why) {
     if (s.closed) return; s.closed = true;
     sessions.delete(s);
+    if (s.worker) {
+      // caiu junto com uma troca de pool: se não voltar em MISSING_MS, vira aviso
+      if (s.worker.online <= 1 && (/pool principal voltou/.test(why) || Date.now() - poolEventAt < POOL_EVENT_WINDOW_MS)) noteAwaiting(s.worker.name, s.worker.ip, 'pool');
+    }
     if (s.worker) { s.worker.online = Math.max(0, s.worker.online - 1); log(`[${label()}] ${s.worker.name} desconectou (${why})`); addEvent('worker_down', `${s.worker.name} disconnected (${why})`, { worker: s.worker.name }); }
     down.destroy(); if (up) up.destroy();
   }
@@ -429,6 +465,7 @@ function startServers() {
     const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
     const routes = ROUTES.map((r) => ({
       ...r,
+      onBackup: [...sessions].filter((x) => x.route === r && x.upIndex > 0 && !x.closed).length,   // ainda na reserva (a principal pode já ter voltado)
       upstreams: upstreamsOf(r).map((u) => {
         const h = health[hkey(u)] || {};
         const ps = pingScore(h.pingMs);
@@ -469,7 +506,7 @@ function startServers() {
       efficiency: efficiency(),
       hashrate: { m15: list.reduce((n, w) => n + w.hashrate15m, 0), h1: list.reduce((n, w) => n + w.hashrate, 0), h24: list.reduce((n, w) => n + w.hashrate24h, 0) },
     };
-    res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist }));
+    res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist, missing: missingList() }));
   }).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
   servers.push(statsServer);
   return servers;
@@ -499,5 +536,7 @@ module.exports = {
   addEvent,
   efficiency,
   processStats,
-  _state: () => ({ events, workers, recent, today, week, lastWeek, bestHash, dayBestHash, hist, health }),
+  _state: () => ({ events, workers, recent, today, week, lastWeek, bestHash, dayBestHash, hist, health, awaiting }),
+  healthCheck,
+  missingList,
 };

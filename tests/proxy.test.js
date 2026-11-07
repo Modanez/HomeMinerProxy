@@ -181,7 +181,7 @@ test('failover: pool principal fora vai para a reserva e volta quando ela se rec
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
   const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
   const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
-    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000' },
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000', PROXY_FAILBACK_STABLE_S: '0' },
     stdio: 'ignore',
   });
   let primary = null;
@@ -207,6 +207,50 @@ test('failover: pool principal fora vai para a reserva e volta quando ela se rec
   s = await getJson(`http://127.0.0.1:${statsPort}/stats`);
   assert.strictEqual(s.routes[0].upstreams[0].down, false);
   assert.strictEqual(s.workers.find((w) => w.name === 'esp').pool, 'principal');
+});
+
+test('failback espera a principal ficar estável; quem não volta aparece em missing', async (t) => {
+  const [primaryPort, listen, statsPort] = [await freePort(), await freePort(), await freePort()];
+  const backup = miniPool('reserva');
+  const backupPort = await new Promise((r) => backup.listen(0, '127.0.0.1', () => r(backup.address().port)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000',
+      PROXY_FAILBACK_STABLE_S: '2', PROXY_MISSING_MIN: '0.02' },
+    stdio: 'ignore',
+  });
+  let primary = null;
+  t.after(() => { proxy.kill(); backup.close(); if (primary) primary.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const stats = () => getJson(`http://127.0.0.1:${statsPort}/stats`);
+
+  const a = await mine(listen);
+  await waitFor(() => a.jobs.length);
+  assert.deepStrictEqual(a.jobs, ['reserva']);
+
+  // a principal volta, mas o minerador fica na reserva até ela ficar estável (2 s)
+  primary = miniPool('principal');
+  await new Promise((r) => primary.listen(primaryPort, '127.0.0.1', r));
+  await waitFor(async () => !(await stats()).routes[0].upstreams[0].down, 3000);
+  let s = await stats();
+  assert.strictEqual(a.closed, false, 'ainda na reserva logo depois da volta');
+  assert.strictEqual(s.routes[0].onBackup, 1);
+  await waitFor(() => a.closed, 6000);
+
+  // não reconectou: vira "missing" e um evento
+  await waitFor(async () => (await stats()).missing.length, 6000);
+  s = await stats();
+  assert.strictEqual(s.missing[0].name, 'esp');
+  assert.strictEqual(s.missing[0].why, 'pool');
+  assert.ok(s.events.some((e) => e.type === 'missing' && /esp did not reconnect/.test(e.msg)));
+  // voltou: sai da lista
+  const b = await mine(listen);
+  t.after(() => b.sock.destroy());
+  await waitFor(() => b.jobs.length);
+  assert.deepStrictEqual(b.jobs, ['principal']);
+  s = await stats();
+  assert.deepStrictEqual(s.missing, []);
 });
 
 test('ping separado por pool em uso (reservas só testadas não entram)', async (t) => {

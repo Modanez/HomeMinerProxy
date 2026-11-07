@@ -198,6 +198,8 @@ const EN = [
   ["'🕒 O relógio não acertou pela internet: datas do histórico podem sair erradas. Confira a conexão.'", "'🕒 The clock did not sync from the internet: history dates may be wrong. Check the connection.'"],
   ["' fora do ar desde ' + hora(f.since) +\n      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)",
     "' down since ' + hora(f.since) +\n      (f.active ? ' — miners on port ' + f.listen + ' moved to backup ' + f.active : ' — no backup available on port ' + f.listen)"],
+  ["' voltou às ' + hora(f.since) + ' — os mineradores da porta ' + f.listen + ' voltam para ela quando ficar estável'", "' came back at ' + hora(f.since) + ' — miners on port ' + f.listen + ' return to it once it is stable'"],
+  ["(m.why === 'restart' ? ' não reconectou depois do reinício do proxy' : ' não reconectou depois da troca de pool') +\n      ' (desde ' + hora(m.since) + '). Tire da tomada e ligue de novo.'", "(m.why === 'restart' ? ' did not reconnect after the proxy restart' : ' did not reconnect after the pool switch') +\n      ' (since ' + hora(m.since) + '). Unplug it and plug it back in.'"],
   ["celebrate({ worker: 'teste',", "celebrate({ worker: 'test',"],
 
   // ---------- sorte

@@ -20,6 +20,8 @@ const STRINGS = {
     back: (w) => `🟢 ${w} voltou a minerar`,
     failover: (port, primary, active) => `⚠️ <b>${primary} fora do ar</b>: os mineradores da porta ${port} foram para a reserva ${active || '(nenhuma disponível)'}`,
     failback: (port, primary) => `✅ ${primary} voltou: a porta ${port} está de novo na pool principal`,
+    missing: (name, why, ago) => `🔌 <b>${name}</b> não reconectou ao proxy depois ${why === 'restart' ? 'do reinício do proxy' : 'da troca de pool'} (há ${ago}). Tire da tomada e ligue de novo.`,
+    missingBack: (name) => `🔌 ${name} reconectou ao proxy`,
     money: (sats) => `💰 Entraram <b>${sats} sats</b> na carteira`,
     block: (btc) => `🎉🎉🎉 <b>ACHAMOS UM BLOCO!</b> 🎉🎉🎉\nEntraram <b>${btc} BTC</b> na carteira!`,
     dailyTitle: (d) => `📋 <b>Resumo do dia</b> · ${d}`,
@@ -106,6 +108,8 @@ const STRINGS = {
     back: (w) => `🟢 ${w} is mining again`,
     failover: (port, primary, active) => `⚠️ <b>${primary} is down</b>: miners on port ${port} moved to backup ${active || '(none available)'}`,
     failback: (port, primary) => `✅ ${primary} is back: port ${port} is on the main pool again`,
+    missing: (name, why, ago) => `🔌 <b>${name}</b> did not reconnect to the proxy after the ${why === 'restart' ? 'proxy restart' : 'pool switch'} (${ago} ago). Unplug it and plug it back in.`,
+    missingBack: (name) => `🔌 ${name} reconnected to the proxy`,
     money: (sats) => `💰 <b>${sats} sats</b> arrived in the wallet`,
     block: (btc) => `🎉🎉🎉 <b>WE FOUND A BLOCK!</b> 🎉🎉🎉\n<b>${btc} BTC</b> arrived in the wallet!`,
     dailyTitle: (d) => `📋 <b>Daily summary</b> · ${d}`,
@@ -229,7 +233,8 @@ function digest(snap) {
     best: Number(f.best) || 0,
     bestWorker: ((snap.hall || [])[0] || {}).worker || '—',
     workers: (f.workers || []).map((w) => ({ name: w.name, state: w.state, inactive: !!w.inactive, best: Number(w.bestDifficulty) || 0, lastSeen: w.lastSeen })),
-    failover: ((snap.proxy || {}).failover || []).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
+    failover: ((snap.proxy || {}).failover || []).filter((r) => !r.returning).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
+    missing: ((snap.proxy || {}).missing || []).map((m) => ({ name: m.name, why: m.why, since: m.since })),
     sats: (snap.wallet || {}).okAt ? (snap.wallet || {}).sats : null,
     achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
     plugReboots: plugs.reduce((s, p) => s + (Number(p && p.rebootCount) || 0), 0),
@@ -264,6 +269,10 @@ function diffEvents(prev, cur, opts = {}) {
   const was = new Set(prev.failover.map((r) => r.listen)), is = new Set(cur.failover.map((r) => r.listen));
   for (const r of cur.failover) if (!was.has(r.listen)) out.push({ type: 'failover', text: T.failover(r.listen, escHtml(r.primary), escHtml(r.active)) });
   for (const r of prev.failover) if (!is.has(r.listen)) out.push({ type: 'failback', text: T.failback(r.listen, escHtml(r.primary)) });
+  const wasMissing = new Set((prev.missing || []).map((m) => m.name)), isMissing = new Set((cur.missing || []).map((m) => m.name));
+  for (const m of cur.missing || []) if (!wasMissing.has(m.name) && !ignore.includes(m.name)) out.push({ type: 'missing', text: T.missing(escHtml(m.name), m.why, fm.ago(now - m.since)) });
+  const online = new Set(cur.workers.filter((w) => w.state === 'ok' || w.state === 'quiet').map((w) => w.name));
+  for (const name of wasMissing) if (!isMissing.has(name) && online.has(name)) out.push({ type: 'missingBack', text: T.missingBack(escHtml(name)) });
   if (prev.sats != null && cur.sats != null && cur.sats > prev.sats) {
     const got = cur.sats - prev.sats;
     out.push(got >= 1e8

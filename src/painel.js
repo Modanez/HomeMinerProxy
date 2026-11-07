@@ -793,11 +793,13 @@ async function tickProxy() {
       events: Array.isArray(s.events) ? s.events.slice(0, 30) : [],
       process: s.process || null,
       hist: Array.isArray(s.hist) ? s.hist : null,
-      // portas cuja pool principal está fora do ar (os mineradores dessas portas estão na reserva)
-      failover: (s.routes || []).filter((r) => r.upstreams && r.upstreams[0].down).map((r) => ({
-        listen: r.listen, primary: r.upstreams[0].label, since: r.upstreams[0].since,
+      // portas cuja pool principal está fora do ar (ou voltou há pouco e os mineradores ainda estão na reserva)
+      failover: (s.routes || []).filter((r) => r.upstreams && (r.upstreams[0].down || r.onBackup > 0)).map((r) => ({
+        listen: r.listen, primary: r.upstreams[0].label, since: r.upstreams[0].since, returning: !r.upstreams[0].down,
         active: (r.upstreams.slice(1).find((u) => !u.down) || {}).label || null,
       })),
+      // mineradores que caíram numa troca de pool (ou no reinício do proxy) e não voltaram
+      missing: Array.isArray(s.missing) ? s.missing : [],
       // portas do proxy (para o guia "Pools e portas" da tela de configurações)
       routes: (s.routes || []).map((r) => {
         const up = r.upstreams || [];
@@ -1774,7 +1776,7 @@ function renderProxyExtras(p) {
     parts.push('Proxy: ' + up + ' no ar · ' + pr.rssMB + ' MB · CPU ' + nf(pr.cpuPct, 1) + '% · ' + pr.sessions + ' sessão(ões)' + (pr.queueBytes > 0 ? ' · fila ' + pr.queueBytes + ' B' : ''));
   }
   info.textContent = parts.join(' · ');
-  const icon = { worker_up: '🟢', worker_down: '🔴', pool_up: '🟢', pool_down: '🔴', failover: '🔁', reject: '⚠️' };
+  const icon = { worker_up: '🟢', worker_down: '🔴', pool_up: '🟢', pool_down: '🔴', failover: '🔁', reject: '⚠️', missing: '🔌' };
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
@@ -2541,8 +2543,12 @@ async function load() {
     if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; schedule(); }
     const stale = !j.okAt || Date.now() - j.okAt > (j.staleWarnMs || 600000);
     const px = j.proxy && j.proxy.up;
-    set('fo', ((j.proxy && j.proxy.failover) || []).map((f) => '⚠️ ' + f.primary + ' fora do ar desde ' + hora(f.since) +
-      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)).join(' · '));
+    set('fo', [...((j.proxy && j.proxy.failover) || []).map((f) => f.returning
+      ? '⏳ ' + f.primary + ' voltou às ' + hora(f.since) + ' — os mineradores da porta ' + f.listen + ' voltam para ela quando ficar estável'
+      : '⚠️ ' + f.primary + ' fora do ar desde ' + hora(f.since) +
+      (f.active ? ' — mineradores da porta ' + f.listen + ' na reserva ' + f.active : ' — sem reserva no ar na porta ' + f.listen)),
+      ...((j.proxy && j.proxy.missing) || []).map((m) => '🔌 ' + m.name + (m.why === 'restart' ? ' não reconectou depois do reinício do proxy' : ' não reconectou depois da troca de pool') +
+      ' (desde ' + hora(m.since) + '). Tire da tomada e ligue de novo.')].join(' · '));
     renderProxyExtras(j.proxy);
     set('err', j.clock && j.clock.waiting ? '🕒 Acertando o relógio pela internet antes de começar (placas sem bateria ligam com a hora errada)…'
       : j.clock && j.clock.suspect ? '🕒 O relógio não acertou pela internet: datas do histórico podem sair erradas. Confira a conexão.'

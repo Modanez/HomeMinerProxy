@@ -13,7 +13,7 @@ const worker = (name, state, best, extra = {}) => ({ name, state, bestDifficulty
 const snap = (o = {}) => ({
   farm: { hasData: true, best: 100, hashrate: 16.5e6, shares: { today: 6244 }, workers: [worker('odroid', 'ok', 100), worker('vovo', 'ok', 38.76)], ...o.farm },
   hall: o.hall || [{ worker: 'odroid', value: 100, at: '2026-11-01T10:00:00Z' }],
-  proxy: { failover: o.failover || [] },
+  proxy: { failover: o.failover || [], missing: o.missing || [] },
   wallet: { okAt: 1, sats: o.sats ?? 9248 },
   energy: o.energy || null,
   luck: { workers: [{ name: 'vovo', factor: 2.69, percentile: 0.77 }] },
@@ -84,6 +84,23 @@ test('worker parado avisa uma vez e avisa quando volta; ignorados e inativos nã
   assert.deepStrictEqual(tg.diffEvents(b, b, { lang: 'pt', down, ignore: ['vovo'] }), []);   // não repete
   const c = tg.digest(snap());
   assert.deepStrictEqual(tg.diffEvents(b, c, { lang: 'pt', down, ignore: ['vovo'] }).map((e) => e.type), ['back']);
+});
+
+test('minerador que não volta depois da troca de pool avisa uma vez e avisa quando reconecta', () => {
+  const now = Date.parse('2026-11-07T15:45:00Z');
+  const a = tg.digest(snap());
+  const b = tg.digest(snap({ farm: { workers: [worker('odroid', 'ok', 100), worker('devkit', 'quiet', 38.76)] }, missing: [{ name: 'devkit', why: 'pool', since: now - 12 * 60e3 }] }));
+  const ev = tg.diffEvents(a, b, { lang: 'pt', now });
+  assert.deepStrictEqual(ev.map((e) => e.type), ['missing']);
+  assert.match(ev[0].text, /<b>devkit<\/b> não reconectou ao proxy depois da troca de pool \(há 12 min\)/);
+  assert.deepStrictEqual(tg.diffEvents(b, b, { lang: 'pt', now }), []);   // não repete
+  const c = tg.digest(snap({ farm: { workers: [worker('odroid', 'ok', 100), worker('devkit', 'ok', 38.76)] } }));
+  const back = tg.diffEvents(b, c, { lang: 'en', now });
+  assert.deepStrictEqual(back.map((e) => e.type), ['missingBack']);
+  // depois do reinício do proxy, o texto muda; quem está na lista de ignorados não avisa
+  const r = tg.digest(snap({ missing: [{ name: 'tablet', why: 'restart', since: now - 10 * 60e3 }] }));
+  assert.match(tg.diffEvents(a, r, { lang: 'en', now })[0].text, /did not reconnect to the proxy after the proxy restart/);
+  assert.deepStrictEqual(tg.diffEvents(a, r, { lang: 'pt', now, ignore: ['tablet'] }), []);
 });
 
 test('failover, volta da pool, dinheiro e bloco', () => {
