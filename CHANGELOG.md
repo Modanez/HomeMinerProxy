@@ -4,6 +4,7 @@
 
 ### English
 - **New theme ⚡ Material Neon:** bluish graphite with neon green, in Settings → Farm → Visual theme (`THEME=neon`). The theme cards now show two per row.
+- Fixed: clicking a theme card in Settings did nothing (a browser-side error introduced with the Neon theme).
 - Fixed: the temperature unit field in Settings showed blank when it was never set (it now shows °C, the default).
 - **❤️ Support the project:** a discreet item at the end of the dashboard menu opens a dialog with the bitcoin (on-chain) address for donations, a copy button (works over plain http) and "Open in wallet" (`bitcoin:` link). Never shown in kiosk mode; Settings → Farm → "Show 'Support the project'" (`SHOW_DONATE=0`) hides it. The GitHub repository also gets a "Sponsor" button pointing to the donations section.
 - Fixed: an empty ping pill showed in the dashboard top bar when there was no ping.
@@ -15,6 +16,7 @@
 
 ### Português
 - **Tema novo ⚡ Material Neon:** grafite azulado com verde neon, em Configurações → Fazenda → Tema visual (`THEME=neon`). Os cartões de tema passam a ficar dois por linha.
+- Corrigido: clicar num cartão de tema nas Configurações não fazia nada (erro no navegador que entrou junto com o tema Neon).
 - Corrigido: o campo de unidade de temperatura nas Configurações aparecia em branco quando nunca tinha sido definido (agora mostra °C, o padrão).
 - **❤️ Apoiar o projeto:** um item discreto no fim do menu do painel abre um modal com o endereço bitcoin (on-chain) para doações, botão de copiar (funciona mesmo por http) e "Abrir na carteira" (link `bitcoin:`). Nunca aparece no modo quiosque; Configurações → Fazenda → "Mostrar 'Apoiar o projeto'" (`SHOW_DONATE=0`) esconde. O repositório no GitHub ganha também o botão "Sponsor", que leva à seção de doações.
 - Corrigido: aparecia uma pílula de ping vazia na barra superior do painel quando não havia ping.
