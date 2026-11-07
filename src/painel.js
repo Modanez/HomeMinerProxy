@@ -36,6 +36,9 @@ let LOCAL_WORKER = process.env.LOCAL_WORKER || '';   // nome do worker do cpumin
 const ROTATE_S = Number(process.env.ROTATE_S || 20);
 // Mostrar saldo e movimentação da carteira no painel (0 esconde; os avisos do Telegram continuam)
 const SHOW_WALLET = process.env.SHOW_WALLET !== '0';
+// "Apoiar o projeto" no menu: doações em bitcoin (on-chain) para quem mantém o HomeMinerProxy. SHOW_DONATE=0 esconde.
+const SHOW_DONATE = process.env.SHOW_DONATE !== '0';
+const DONATE_ADDRESS = 'bc1qstq0tx86kwgskzxte0l7a6ewtyp0y4z8w4jd2w';
 // Preço do kWh na moeda CURRENCY. POWER_PRICE_KWH (ou o nome antigo TARIFA_KWH); padrão: R$ 0,90 ou US$ 0,15.
 const TARIFA_KWH = Number(process.env.POWER_PRICE_KWH || process.env.TARIFA_KWH || (CURRENCY === 'BRL' ? 0.9 : 0.15));
 const WATTS = Object.assign({}, safeJson(process.env.WATTS));   // consumo por worker, ex.: '{"bitaxe":20,"nerdminer":1}'
@@ -941,6 +944,7 @@ function snapshot(internal = false) {
   return {
     boot: BOOT,
     tempUnit: TEMP_UNIT,
+    donate: SHOW_DONATE ? DONATE_ADDRESS : null,
     clock: clockState,
     okAt: pool.okAt,
     ckpools: Object.entries(ckpools).map(([url, p]) => ({ url, okAt: p.okAt, error: p.error, active: p.active })),
@@ -1062,6 +1066,7 @@ const PAGE = `<!doctype html>
   .cx-pill { display:flex; align-items:center; gap:6px; font-size:12px; border:1px solid var(--line); border-radius:999px; padding:4px 10px; color:var(--txt); white-space:nowrap; }
   .cx-pill i { width:8px; height:8px; border-radius:50%; background:var(--ok, #3fb950); display:inline-block; }
   .cx-pill.bad i { background:var(--warn); }
+  .cx-pill[hidden], .cx-badge[hidden] { display:none; }   /* sem ping (ou sem versão) a pílula some */
   .cx-badge { font:11px/1 ui-monospace, Menlo, monospace; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
   .cx-btn, body.console .cx-top .langsw { font-size:13px; border:1px solid var(--line); border-radius:6px; padding:6px 11px; color:var(--txt); text-decoration:none; white-space:nowrap; background:transparent; }
   .cx-btn:hover { border-color:var(--gold); color:var(--gold); }
@@ -1275,6 +1280,13 @@ const PAGE = `<!doctype html>
   #enPinMsg { color:var(--warn); font-size:13px; min-height:16px; }
   .pm-btns { display:flex; justify-content:flex-end; gap:8px; }
   .pm-btn { background:transparent; color:var(--txt); border:1px solid var(--line); border-radius:6px; padding:8px 14px; font-size:14px; font-family:inherit; cursor:pointer; }
+  .dn-box { max-width:440px; }
+  .dn-l { font-size:12px; color:var(--dim); text-transform:uppercase; letter-spacing:.06em; }
+  .pm-box #dnAddr { font-size:13px; letter-spacing:0; text-align:left; width:100%; box-sizing:border-box; }
+  .dn-ok { color:var(--gold); font-size:13px; min-height:16px; }
+  .pm-btns { flex-wrap:wrap; } a.pm-btn { text-decoration:none; display:inline-flex; align-items:center; }
+  .dn-foot { font-size:12px; }
+  .cx-item.cx-donate .ic { filter:none; opacity:.9; }
   .pm-btn.pm-ok { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #111); font-weight:600; }
   .tooltip { position:fixed; pointer-events:none; background:var(--tip-bg); box-shadow:var(--shadow); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
   .tooltip b { color:var(--txt); } .tooltip span { color:var(--dim); }
@@ -1494,6 +1506,12 @@ const PAGE = `<!doctype html>
 <div class="pinmodal" id="enPin" hidden role="dialog" aria-modal="true"><div class="pm-box"><b>Digite o PIN para continuar</b><p class="pm-hint">O mesmo PIN das Configurações.</p>
 <input type="password" id="enPinInp" inputmode="numeric" autocomplete="one-time-code" placeholder="PIN"><span id="enPinMsg"></span>
 <div class="pm-btns"><button type="button" class="pm-btn" id="enPinCancel">Cancelar</button><button type="button" class="pm-btn pm-ok" id="enPinOk">Confirmar</button></div></div></div>
+<div class="pinmodal" id="donateModal" hidden role="dialog" aria-modal="true"><div class="pm-box dn-box"><b>❤️ Apoiar o projeto</b>
+<p class="pm-hint">O HomeMinerProxy é aberto e gratuito. Se ele deixou a sua loteria do bloco mais divertida, uma doação em bitcoin ajuda a manter o projeto.</p>
+<label class="dn-l">Bitcoin (on-chain)</label><input id="dnAddr" readonly spellcheck="false" aria-label="Bitcoin">
+<span class="dn-ok" id="dnOk"></span>
+<div class="pm-btns"><button type="button" class="pm-btn" id="dnClose">Fechar</button><a class="pm-btn" id="dnOpen" href="#">Abrir na carteira</a><button type="button" class="pm-btn pm-ok" id="dnCopy">Copiar endereço</button></div>
+<p class="pm-hint dn-foot">Dá para esconder este item em Configurações → Fazenda.</p></div></div>
 <div class="tooltip" id="tip"></div>
 <div class="ticket" id="ticket">
   <img id="ticketImg" alt="">
@@ -1585,11 +1603,11 @@ if (kiosk) {
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
-const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
 const CX_NAV = [
   [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
   [CX.gMining, [['network', '🌐'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
-  [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings]]],
+  [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings], ['donate', '❤️', CX.donate]]],
 ];
 const cxPage = () => {
   const id = location.hash.slice(1), el = document.querySelector('.page[data-page="' + id + '"]');
@@ -1607,7 +1625,9 @@ function cxShow(scroll) {
 if (!kiosk) {
   document.body.classList.add('console');
   $('cxNav').innerHTML = CX_NAV.map(([g, items]) => '<div class="cx-sec">' + g + '</div>' + items.map(([id, ic, label]) =>
-    id[0] === '/'
+    id === 'donate'
+      ? '<a class="cx-item cx-donate" href="#" id="cxDonate" hidden><span class="ic">' + ic + '</span>' + label + '</a>'
+      : id[0] === '/'
       ? '<a class="cx-item" href="' + id + '"><span class="ic">' + ic + '</span>' + label + '</a>'
       : '<a class="cx-item" href="#' + id + '" data-page="' + id + '"' + (id === 'bitaxe' ? ' id="cxNavBx" hidden' : '') + '><span class="ic">' + ic + '</span>' + CX[id] + '<span class="n" id="' + (id === 'bitaxe' ? 'cxBxN' : '') + '"></span></a>').join('')).join('');
   // os elementos existentes mudam de lugar (os eventos vão junto)
@@ -1619,6 +1639,7 @@ if (!kiosk) {
   $('cxGear').title = CX.settings;
   fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { set('cxVer', 'v' + v.version); $('cxVer').hidden = false; } }).catch(() => {});
   window.addEventListener('hashchange', () => cxShow(true));
+  $('cxDonate').addEventListener('click', (e) => { e.preventDefault(); $('donateModal').hidden = false; });
   cxShow(false);
 }
 // barra superior: workers ativos, proxy e ping
@@ -1633,6 +1654,8 @@ function renderConsole(j) {
   const ping = j.proxy && j.proxy.pingMs;
   $('cxPing').hidden = ping == null;
   if (ping != null) set('cxPing', CX.ping + ' ' + ping + ' ms');
+  $('cxDonate').hidden = !j.donate;
+  if (j.donate && $('dnAddr').value !== j.donate) { $('dnAddr').value = j.donate; $('dnOpen').href = 'bitcoin:' + j.donate; }
   // tela Bitaxe só com Bitaxe cadastrado; o número e o alerta aparecem no menu
   const bx = j.bitaxes || [];
   const sec = document.querySelector('.page[data-page="bitaxe"]');
@@ -2349,6 +2372,19 @@ async function execPlugAction(pinVal) {
   } catch (_) { set('enPinMsg', 'erro'); }
 }
 $('enPinOk').addEventListener('click', () => execPlugAction($('enPinInp').value.trim()));
+// doação: copiar funciona mesmo sem HTTPS (o painel abre por http na rede de casa)
+const DN = { copied: 'Endereço copiado. Obrigado! 🧡', select: 'Selecionado: use Ctrl+C / Copiar.' };
+$('dnCopy').addEventListener('click', async () => {
+  const inp = $('dnAddr');
+  try { await navigator.clipboard.writeText(inp.value); set('dnOk', DN.copied); return; } catch (_) { /* sem clipboard (http): seleciona */ }
+  inp.focus(); inp.select();
+  let ok = false; try { ok = document.execCommand('copy'); } catch (_) { /* segue */ }
+  set('dnOk', ok ? DN.copied : DN.select);
+});
+const closeDonate = () => { $('donateModal').hidden = true; set('dnOk', ''); };
+$('dnClose').addEventListener('click', closeDonate);
+$('donateModal').addEventListener('click', (e) => { if (e.target === $('donateModal')) closeDonate(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('donateModal').hidden) closeDonate(); });
 const closePin = () => { pendingPlug = null; $('enPin').hidden = true; set('enPinMsg', ''); };
 $('enPinCancel').addEventListener('click', closePin);
 $('enPin').addEventListener('click', (e) => { if (e.target === $('enPin')) closePin(); });   // toque fora da caixa fecha
