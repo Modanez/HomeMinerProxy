@@ -253,6 +253,41 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   assert.deepStrictEqual(s.missing, []);
 });
 
+test('pool instável (cai e volta): um aviso de instável e um de estável, não um por minuto', async (t) => {
+  const [primaryPort, listen, statsPort] = [await freePort(), await freePort(), await freePort()];
+  const backup = miniPool('reserva');
+  const backupPort = await new Promise((r) => backup.listen(0, '127.0.0.1', () => r(backup.address().port)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '250', PROXY_CONNECT_TIMEOUT_MS: '800', PROXY_FAILBACK_STABLE_S: '2' },
+    stdio: 'ignore',
+  });
+  let primary = null;
+  t.after(() => { proxy.kill(); backup.close(); if (primary) primary.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const stats = () => getJson(`http://127.0.0.1:${statsPort}/stats`);
+  await waitFor(stats);
+  const a = await mine(listen);
+  t.after(() => a.sock.destroy());
+  await waitFor(() => a.jobs.length);
+  const open = async () => { primary = miniPool('principal'); await new Promise((r) => primary.listen(primaryPort, '127.0.0.1', r)); };
+  const shut = () => new Promise((r) => { primary.close(r); primary = null; });
+  // volta, cai, volta, cai, volta... antes de ficar 2 s estável
+  for (let i = 0; i < 3; i++) {
+    await open();
+    await waitFor(async () => !(await stats()).routes[0].upstreams[0].down, 3000);
+    await shut();
+    await waitFor(async () => (await stats()).routes[0].upstreams[0].down, 3000);
+  }
+  await open();
+  await waitFor(() => a.closed, 8000);   // estável: os mineradores voltam
+  await waitFor(async () => (await stats()).events.some((e) => /is stable again/.test(e.msg)), 3000);
+  const ev = (await stats()).events.map((e) => e.msg);
+  assert.strictEqual(ev.filter((m) => /is unstable/.test(m)).length, 1);
+  assert.strictEqual(ev.filter((m) => /is stable again/.test(m)).length, 1);
+  assert.ok(ev.filter((m) => /principal is back/.test(m)).length <= 1, ev.join(' | '));
+});
+
 test('ping separado por pool em uso (reservas só testadas não entram)', async (t) => {
   const [l1, l2, statsPort] = [await freePort(), await freePort(), await freePort()];
   const p1 = miniPool('um'), p2 = miniPool('dois'), spare = miniPool('reserva');

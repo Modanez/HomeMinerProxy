@@ -131,7 +131,9 @@ test('eventos são gravados e recarregados do arquivo de estatísticas', () => {
 test('rejectKind: classifica stale, duplicado e inválido', () => {
   assert.strictEqual(proxy.rejectKind([21, 'Job not found', null]), 'stale');
   assert.strictEqual(proxy.rejectKind([22, 'Duplicate share', null]), 'duplicate');
-  assert.strictEqual(proxy.rejectKind([23, 'Low difficulty share', null]), 'invalid');
+  assert.strictEqual(proxy.rejectKind([23, 'Low difficulty share', null]), 'low');
+  assert.strictEqual(proxy.rejectKind([20, 'Above target', null]), 'low');
+  assert.strictEqual(proxy.rejectKind([24, 'Unauthorized worker', null]), 'invalid');
   assert.strictEqual(proxy.rejectKind({ code: 21, message: 'x' }), 'stale');
   assert.strictEqual(proxy.rejectKind({ message: 'stale share' }), 'stale');
   assert.strictEqual(proxy.rejectKind(null), 'invalid');
@@ -155,4 +157,18 @@ test('addBin e hashrateOver: médias de 15 min, 1 h e 24 h', () => {
   proxy.addBin(w, now, 1);
   assert.ok(!w.bins.some(([t]) => t < now - 24 * 3600e3));
   assert.ok(proxy.hashrateOver(w, 24 * 3600e3) > 0);
+});
+
+test('hashrate de ESP32 na reserva: um share aceito por sorte não vira 100x mais', () => {
+  const now = Date.now();
+  const w = { connectedSince: now - 30 * 60e3, window: [[now - 60e3, 1]], subs: [] };   // 1 share de dificuldade 1 aceito
+  // ~350 kH/s com o alvo próprio de 0,001: um share a cada ~12 s; a pool pede 1, então quase todos são recusados
+  for (let t = now - 30 * 60e3; t < now; t += 12e3) w.subs.push([t, 0.001 + Math.random() * 0.002, 1]);
+  const hr = proxy.hashrate(w);
+  assert.ok(hr > 250e3 && hr < 600e3, `estimativa ${Math.round(hr)} H/s`);
+  // minerador normal (shares no alvo da pool): continua usando os aceitos
+  const n = { connectedSince: now - 30 * 60e3, window: [], subs: [] };
+  for (let t = now - 30 * 60e3; t < now; t += 30e3) { n.window.push([t, 1]); n.subs.push([t, 1.5, 1]); }
+  const hn = proxy.hashrate(n);
+  assert.ok(Math.abs(hn - 60 * 4294967296 / 1800) / hn < 0.05);
 });

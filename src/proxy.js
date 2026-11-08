@@ -107,7 +107,7 @@ try {
   if (Array.isArray(saved.hist) && saved.hist.length === HIST_BUCKETS) hist = saved.hist;
   // quem estava conectado quando o proxy parou deve voltar sozinho: se não voltar, avisa
   for (const w of Object.values(workers)) if (w.online > 0) awaiting[w.name] = { name: w.name, ip: w.ip || null, since: Date.now(), why: 'restart' };
-  for (const w of Object.values(workers)) { w.online = 0; w.window = []; w.bestSession = 0; }
+  for (const w of Object.values(workers)) { w.online = 0; w.window = []; w.subs = []; w.bestSession = 0; }
 } catch (_) { /* primeiro uso */ }
 
 function worker(name, pool) {
@@ -124,14 +124,28 @@ function worker(name, pool) {
 
 function saveStats() {
   const out = {};
-  for (const [k, w] of Object.entries(workers)) { const { window, ...rest } = w; out[k] = rest; }
+  for (const [k, w] of Object.entries(workers)) { const { window, subs, ...rest } = w; out[k] = rest; }
   try { require('./store').writeJson(STATS_FILE, { savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist }); } catch (_) { /* segue */ }
 }
 setInterval(saveStats, 60e3).unref();
 
+// Minerador que ignora a dificuldade da pool (NerdMiner/ESP32 na reserva public-pool) manda shares bem abaixo do
+// alvo: quase todos recusados e, de vez em quando, um aceito por sorte, que sozinho faria a conta dar 100x mais.
+// Nesse caso a estimativa usa todos os shares enviados: N shares com dificuldade >= m (o menor visto) em T segundos.
+function hashrateLowDiff(w, now) {
+  w.subs = (w.subs || []).filter(([t]) => now - t <= HASHRATE_WINDOW_MS);
+  const subs = w.subs;
+  if (subs.length < 8 || subs.filter(([, d, tg]) => tg > 0 && d < tg).length < subs.length / 2) return null;
+  const minD = subs.reduce((m, [, d]) => (d > 0 && d < m ? d : m), Infinity);
+  if (!Number.isFinite(minD)) return null;
+  const span = Math.max(now - Math.min(w.connectedSince || now, subs[0][0]), 60e3);
+  return subs.length * minD * 4294967296 / (Math.min(span, HASHRATE_WINDOW_MS) / 1000);
+}
 function hashrate(w) {
   const now = Date.now();
+  const low = hashrateLowDiff(w, now);
   w.window = w.window.filter(([t]) => now - t <= HASHRATE_WINDOW_MS);
+  if (low != null) return low;
   if (!w.window.length) return 0;
   const work = w.window.reduce((s, [, d]) => s + d, 0) * 4294967296;
   const span = Math.max(now - Math.min(w.connectedSince || now, w.window[0][0]), 60e3);
@@ -168,6 +182,7 @@ function rejectKind(err) {
   const text = Array.isArray(err) ? String(err[1] || '') : String((err && err.message) || err || '');
   if (code === 21 || /stale|job not found/i.test(text)) return 'stale';
   if (code === 22 || /duplicate/i.test(text)) return 'duplicate';
+  if (code === 23 || /above target|low difficulty|low diff/i.test(text)) return 'low';
   return 'invalid';
 }
 
@@ -178,12 +193,18 @@ const upstreamsOf = (route) => [{ host: route.host, port: route.port, label: rou
 const health = {};   // "host:porta" -> { down, since, error, pingMs }
 const hkey = (u) => `${u.host}:${u.port}`;
 const isDown = (u) => !!(health[hkey(u)] && health[hkey(u)].down);
-function markDown(u, error) {
-  const h = health[hkey(u)];
+const flapping = {};   // "host:porta" -> true enquanto a pool cai e volta antes de estabilizar
+function markDown(u, error, { flap = false } = {}) {
+  const k = hkey(u), h = health[k];
   if (h && h.down) { h.error = error; return; }
-  health[hkey(u)] = { down: true, since: Date.now(), error, pingMs: (h && h.pingMs) ?? null };
+  health[k] = { down: true, since: Date.now(), error, pingMs: (h && h.pingMs) ?? null };
   poolEventAt = Date.now();
-  log(`pool ${u.label} (${hkey(u)}) fora do ar: ${error}`);
+  log(`pool ${u.label} (${k}) fora do ar: ${error}`);
+  if (flap) {
+    if (!flapping[k]) addEvent('pool_down', `${u.label} is unstable (keeps dropping and coming back)`);
+    flapping[k] = true;
+    return;
+  }
   addEvent('pool_down', `${u.label} is down: ${error}`);
 }
 function markUp(u, pingMs = null) {
@@ -197,6 +218,7 @@ function markUp(u, pingMs = null) {
   health[hkey(u)] = { down: false, since: Date.now(), error: null, pingMs: ms };
   poolEventAt = Date.now();
   log(`pool ${u.label} (${hkey(u)}) voltou`);
+  if (flapping[hkey(u)]) return;   // instável: o aviso de volta só sai quando ficar estável
   addEvent('pool_up', `${u.label} is back`);
 }
 const sessions = new Set();   // sessões ativas (para devolver à principal quando ela voltar)
@@ -226,9 +248,10 @@ async function healthCheck(now = Date.now()) {
     // a principal voltou há pouco: testa de novo a cada volta e só devolve os mineradores quando ficar estável
     const upFor = now - ((health[hkey(primary)] || {}).since || 0);
     if (upFor < FAILBACK_STABLE_MS) {
-      if (!(await probe(primary))) markDown(primary, 'caiu de novo');
+      if (!(await probe(primary))) markDown(primary, 'caiu de novo', { flap: true });
       continue;
     }
+    if (flapping[hkey(primary)]) { delete flapping[hkey(primary)]; addEvent('pool_up', `${primary.label} is stable again`); }
     poolEventAt = Date.now();
     for (const s of onBackup) s.close('pool principal voltou, reconectando nela');
   }
@@ -366,6 +389,7 @@ function session(down, route) {
           w.pingScore = pingScore(rtt).score;
           const ok = m.result === true;
           const entry = { at: p.at, worker: w.name, pool: label(), diff: p.diff, target: p.target, ok };
+          if (p.diff > 0) (w.subs || (w.subs = [])).push([p.at, p.diff, p.target || 0]);
           if (ok) {
             w.accepted++;
             if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
@@ -391,10 +415,15 @@ function session(down, route) {
               if (k >= 0) { hist[k]++; (w.hist || (w.hist = new Array(HIST_BUCKETS).fill(0)))[k]++; }
             }
             noteBestHash(w.name, p);
+          } else if (s.upIndex > 0 && rejectKind(m.error) === 'low' && p.diff > 0 && p.target > 0 && p.diff < p.target) {
+            // na reserva, shares abaixo do mínimo dela são esperados (o ESP32 segue com a dificuldade da pool dele);
+            // um share bom de verdade (um bloco) passa do mínimo e é aceito. Conta à parte, sem alerta.
+            w.belowMin = (w.belowMin || 0) + 1;
+            return;
           } else {
             w.rejected++;
             const kind = rejectKind(m.error);
-            if (kind !== 'invalid') w[kind] = (w[kind] || 0) + 1;
+            if (kind === 'stale' || kind === 'duplicate') w[kind] = (w[kind] || 0) + 1;
             entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
             w.lastReject = { at: p.at, error: entry.error };
             addEvent('reject', `${w.name}: share rejected (${entry.error})`, { worker: w.name });
@@ -453,7 +482,7 @@ function startServers() {
   const statsServer = http.createServer((req, res) => {
     if (!req.url.startsWith('/stats')) { res.writeHead(404); return res.end(); }
     const list = Object.values(workers).map((w) => {
-      const { window, ...rest } = w;
+      const { window, subs, ...rest } = w;
       const hr = hashrate(w);   // poda a janela antes de contar
       const { bins, ...slim } = rest;
       return { ...slim, hashrate: hr, shares1h: w.window.length, hashrate15m: hashrateOver(w, 15 * 60e3), hashrate24h: hashrateOver(w, DAY_MS), stale: w.stale || 0, duplicate: w.duplicate || 0 };
