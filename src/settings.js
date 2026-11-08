@@ -536,7 +536,7 @@ const T = {
       tsConnect: 'Conectar ao Tailscale', tsOpen: 'Abrir o link de autorização', tsDisconnect: 'Desconectar', tsWait: 'Iniciando o Tailscale…', tsDone: 'Tailscale conectado!',
       ssh: 'Acesso SSH (só com chave)', sshHint: 'Cole a sua chave pública (o conteúdo de ~/.ssh/id_ed25519.pub; para criar uma: ssh-keygen -t ed25519). O login por senha fica desligado. Depois: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… voce@computador', sshOn: 'Ligado.', sshOff: 'Desligado.', sshOutside: 'Ligado por fora do painel: a configuração dele não é alterada aqui, só dá para acrescentar chaves.', sshKeys: 'Chaves: ',
-      sshEnable: 'Ligar o SSH', sshAdd: 'Adicionar a chave', sshDisable: 'Desligar o SSH', sshDone: 'Pronto: SSH com a sua chave.',
+      sshEnable: 'Ligar o SSH', sshAdd: 'Adicionar a chave', sshDisable: 'Desligar o SSH', sshDone: 'Pronto: SSH com a sua chave.', sshNoBoot: '⚠️ Não liga sozinho depois de reiniciar.', sshPersist: 'Manter ligado ao reiniciar', sshPersisted: 'Pronto: o SSH liga sozinho depois de reiniciar.',
       dockerTitle: 'Rodando em Docker',
       dockerHelp: ['O painel está num container, então rede, Wi-Fi e SSH são do computador onde o Docker roda (o host): configure por lá.',
         '<b>Acesso de fora de casa:</b> instale o Tailscale no host (tailscale.com/download, no Windows é o app normal) e abra <code>http://NOME-DO-HOST:3000</code> pelo celular com o Tailscale ligado.',
@@ -644,7 +644,7 @@ const T = {
       tsConnect: 'Connect to Tailscale', tsOpen: 'Open the authorization link', tsDisconnect: 'Disconnect', tsWait: 'Starting Tailscale…', tsDone: 'Tailscale connected!',
       ssh: 'SSH access (key only)', sshHint: 'Paste your public key (the content of ~/.ssh/id_ed25519.pub; to create one: ssh-keygen -t ed25519). Password login stays off. Then: ssh root@homeminer.local',
       sshKey: 'ssh-ed25519 AAAA… you@computer', sshOn: 'On.', sshOff: 'Off.', sshOutside: 'Turned on outside the dashboard: its configuration is not changed here, you can only add keys.', sshKeys: 'Keys: ',
-      sshEnable: 'Turn SSH on', sshAdd: 'Add the key', sshDisable: 'Turn SSH off', sshDone: 'Done: SSH with your key.',
+      sshEnable: 'Turn SSH on', sshAdd: 'Add the key', sshDisable: 'Turn SSH off', sshDone: 'Done: SSH with your key.', sshNoBoot: '⚠️ Does not start by itself after a restart.', sshPersist: 'Keep it on after restarts', sshPersisted: 'Done: SSH starts by itself after a restart.',
       dockerTitle: 'Running in Docker',
       dockerHelp: ['The dashboard runs in a container, so network, Wi-Fi and SSH belong to the computer running Docker (the host): set them up there.',
         '<b>Access from outside home:</b> install Tailscale on the host (tailscale.com/download, on Windows it is the regular app) and open <code>http://HOST-NAME:3000</code> on a phone with Tailscale on.',
@@ -1648,8 +1648,10 @@ if (updBtn) updBtn.addEventListener('click', async () => {
   }
   function showSsh(h) {
     if (!h || !h.available) return;
-    $('ssh_state').textContent = (h.active ? (h.managed ? N.sshOn : N.sshOutside) : N.sshOff) + (h.keys.length ? ' ' + N.sshKeys + h.keys.join(' · ') : '');
-    $('ssh_enable').textContent = h.active ? N.sshAdd : N.sshEnable;
+    const noBoot = h.active && h.enabled === false;   // ligado só até o próximo reinício (systemctl start)
+    $('ssh_state').textContent = (h.active ? (h.managed ? N.sshOn : N.sshOutside) : N.sshOff) + (noBoot ? ' ' + N.sshNoBoot : '') + (h.keys.length ? ' ' + N.sshKeys + h.keys.join(' · ') : '');
+    $('ssh_enable').textContent = noBoot ? N.sshPersist : h.active ? N.sshAdd : N.sshEnable;
+    $('ssh_enable').dataset.persist = noBoot ? '1' : '';
     $('ssh_disable').hidden = !(h.active && h.managed);
   }
   async function refresh() {
@@ -1713,7 +1715,8 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     try {
       const r = await netPost('ssh-enable', { key: $('ssh_key').value });
       if (!r.ok) { say(err(r), false); return; }
-      $('ssh_key').value = ''; msg.textContent = ''; showSsh(r.status); say(N.sshDone, true);
+      const persisted = b.dataset.persist === '1';
+      $('ssh_key').value = ''; msg.textContent = ''; showSsh(r.status); say(persisted ? N.sshPersisted : N.sshDone, true);
     } finally { b.disabled = false; }
   });
   $('ssh_disable').addEventListener('click', async () => {

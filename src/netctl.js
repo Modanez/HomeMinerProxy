@@ -144,7 +144,9 @@ const keyLabel = (k) => { const [type, body, ...c] = k.split(' '); return (c.joi
 async function sshStatus() {
   if (!SSH.sshd() || (process.getuid && process.getuid() !== 0 && !process.env.SSH_DIR)) return { available: false };
   const active = (await run(BIN.systemctl(), ['is-active', '--quiet', 'ssh'])).ok;
-  return { available: true, active, managed: fs.existsSync(SSH.dropin()), keys: sshKeys().map(keyLabel) };
+  // "enabled" = liga sozinho no boot (pelo serviço ou pelo socket, nas distros com ativação por socket)
+  const enabled = (await run(BIN.systemctl(), ['is-enabled', '--quiet', 'ssh'])).ok || (await run(BIN.systemctl(), ['is-enabled', '--quiet', 'ssh.socket'])).ok;
+  return { available: true, active, enabled, managed: fs.existsSync(SSH.dropin()), keys: sshKeys().map(keyLabel) };
 }
 
 async function sshEnable(pubkey) {
@@ -154,7 +156,7 @@ async function sshEnable(pubkey) {
   if (/[\r\n]/.test(raw)) return { ok: false, error: 'sshkey' };   // uma chave por vez, numa linha só
   const key = raw.replace(/\s+/g, ' ');
   if (key && !KEY_RE.test(key)) return { ok: false, error: 'sshkey' };
-  if (!key && !st.keys.length) return { ok: false, error: 'sshkey' };
+  if (!key && !st.keys.length && !st.active) return { ok: false, error: 'sshkey' };   // ligar pelo painel exige uma chave
   if (key && !sshKeys().includes(key)) {
     fs.mkdirSync(SSH.dir(), { recursive: true, mode: 0o700 });
     fs.chmodSync(SSH.dir(), 0o700);
@@ -169,6 +171,10 @@ async function sshEnable(pubkey) {
     fs.writeFileSync(SSH.dropin(), DROPIN, { mode: 0o644 });
     await run(SSH.keygen(), ['-A'], 60000);   // chaves do servidor, se faltarem
     const r = await run(BIN.systemctl(), ['enable', '--now', 'ssh'], 30000);
+    if (!r.ok) return { ok: false, error: 'sshstart' };
+  } else if (!st.enabled) {
+    // ligado por fora (systemctl start): continua igual, mas passa a ligar sozinho depois de reiniciar
+    const r = await run(BIN.systemctl(), ['enable', 'ssh'], 30000);
     if (!r.ok) return { ok: false, error: 'sshstart' };
   }
   return { ok: true, status: await sshStatus() };

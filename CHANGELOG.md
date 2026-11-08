@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **SSH stays on after a restart:** if SSH was started outside the dashboard only until the next reboot (`systemctl start`), Settings → 🌐 Network now says "⚠️ Does not start by itself after a restart" and offers **Keep it on after restarts**, which enables the service without touching its configuration (password login, if it was on, stays as it was). Turning SSH on from the dashboard already enabled it at boot.
 - **Calmer failback:** when the main pool comes back, the proxy now waits until it has been up for 5 minutes (`PROXY_FAILBACK_STABLE_S`) before moving miners back from the backup, re-testing it meanwhile. A pool that keeps dropping and coming back (like pool.nerdminers.org on Nov 7) no longer kicks the miners each time; the dashboard shows "⏳ … came back, miners return once it is stable".
 - **Miner that doesn't come back:** a miner that dropped with a pool switch or a proxy restart and hasn't reconnected in 10 minutes (`PROXY_MISSING_MIN`) shows a warning on the dashboard ("🔌 devkit did not reconnect… Unplug it and plug it back in"), in Recent events and on Telegram, with another message when it reconnects. Some ESP32 firmwares get stuck after the connection drops.
 - **New theme ⚡ Material Neon:** bluish graphite with neon green, in Settings → Farm → Visual theme (`THEME=neon`). The theme cards now show two per row.
@@ -17,6 +18,7 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **SSH continua ligado depois de reiniciar:** se o SSH foi ligado por fora do painel só até o próximo reinício (`systemctl start`), Configurações → 🌐 Rede agora mostra "⚠️ Não liga sozinho depois de reiniciar" e oferece **Manter ligado ao reiniciar**, que ativa o serviço sem mexer na configuração dele (o login por senha, se estava ligado, continua igual). Ligar o SSH pelo painel já ativava no boot.
 - **Volta para a pool principal mais calma:** quando a principal volta, o proxy agora espera ela ficar 5 minutos no ar (`PROXY_FAILBACK_STABLE_S`) antes de tirar os mineradores da reserva, testando de novo nesse meio-tempo. Uma pool que cai e volta toda hora (como a pool.nerdminers.org em 7/11) não derruba mais os mineradores a cada volta; o painel mostra "⏳ … voltou, os mineradores voltam quando ficar estável".
 - **Minerador que não volta:** quem caiu junto com uma troca de pool ou com o reinício do proxy e não reconectou em 10 minutos (`PROXY_MISSING_MIN`) aparece com um aviso no painel ("🔌 devkit não reconectou… Tire da tomada e ligue de novo"), nos Eventos recentes e no Telegram, com outra mensagem quando ele reconecta. Alguns firmwares de ESP32 travam depois que a conexão cai.
 - **Tema novo ⚡ Material Neon:** grafite azulado com verde neon, em Configurações → Fazenda → Tema visual (`THEME=neon`). Os cartões de tema passam a ficar dois por linha.
