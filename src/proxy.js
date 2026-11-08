@@ -20,8 +20,8 @@ const CKPOOL = { host: 'solo.ckpool.org', port: 3333, label: 'ckpool solo' };
 const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
   { listen: 3333, host: 'public-pool.io', port: 21496, label: 'public-pool', backup: [CKPOOL] },
   { listen: 3334, ...CKPOOL, backup: [{ host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU' }] },
-  // reserva dos ESP32: a public-pool recusa os shares abaixo de 1, mas aceita os maiores (e um bloco)
-  { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers', backup: [{ host: 'public-pool.io', port: 21496, label: 'public-pool' }] },
+  // sem reserva: nenhuma outra pool aceita os shares pequenos dos ESP32 (a public-pool recusa abaixo de 1)
+  { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' },
   { listen: 3337, host: 'mine.ocean.xyz', port: 3334, label: 'OCEAN' },                // sem reserva: o pagamento da OCEAN é outro modelo
   { listen: 3338, host: 'solo.atlaspool.io', port: 3333, label: 'atlaspool', backup: [CKPOOL] },   // dificuldade mínima 2.000: ASICs, não ESP32
   { listen: 3339, host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU', backup: [CKPOOL] },
@@ -193,6 +193,11 @@ const upstreamsOf = (route) => [{ host: route.host, port: route.port, label: rou
 const health = {};   // "host:porta" -> { down, since, error, pingMs }
 const hkey = (u) => `${u.host}:${u.port}`;
 const isDown = (u) => !!(health[hkey(u)] && health[hkey(u)].down);
+// Última vez que cada pool mandou algo numa sessão aberta. Pool que está mandando trabalho nas conexões abertas
+// está no ar, mesmo que uma conexão nova falhe (a nerdminers às vezes recusa conexões novas quando está cheia).
+const upSeen = {};   // "host:porta" -> ms
+const ALIVE_MS = 3 * 60e3;
+const aliveRecently = (u, now = Date.now()) => now - (upSeen[hkey(u)] || 0) < ALIVE_MS;
 const flapping = {};   // "host:porta" -> true enquanto a pool cai e volta antes de estabilizar
 function markDown(u, error, { flap = false } = {}) {
   const k = hkey(u), h = health[k];
@@ -248,7 +253,7 @@ async function healthCheck(now = Date.now()) {
     // a principal voltou há pouco: testa de novo a cada volta e só devolve os mineradores quando ficar estável
     const upFor = now - ((health[hkey(primary)] || {}).since || 0);
     if (upFor < FAILBACK_STABLE_MS) {
-      if (!(await probe(primary))) markDown(primary, 'caiu de novo', { flap: true });
+      if (!(await probe(primary)) && !aliveRecently(primary)) markDown(primary, 'caiu de novo', { flap: true });
       continue;
     }
     if (flapping[hkey(primary)]) { delete flapping[hkey(primary)]; addEvent('pool_up', `${primary.label} is stable again`); }
@@ -288,6 +293,7 @@ function session(down, route) {
 
   // Tenta a primeira pool que não está marcada como fora; se a conexão falhar antes de abrir,
   // marca essa pool como fora e passa para a próxima, reenviando o que o minerador já mandou.
+  let retries = 0;
   function connectUp(start) {
     let i = start;
     while (i < ups.length && isDown(ups[i]) && i < ups.length - 1) i++;
@@ -315,9 +321,17 @@ function session(down, route) {
       for (const l of queue) c.write(l);
       queue.length = 0;
     });
-    c.on('data', fromUp);
+    c.on('data', (d) => { upSeen[hkey(u)] = Date.now(); fromUp(d); });
     c.on('error', (e) => {
       if (upReady || s.closed) return close('pool: ' + (e.code || e.message));
+      // a pool está mandando trabalho para as outras sessões: a falha foi só nesta conexão nova, tenta de novo
+      if (aliveRecently(u) && retries < 3) {
+        retries++;
+        log(`[${route.label}] ${u.label} não aceitou a conexão (${e.code || e.message}), mas está no ar nas outras sessões: tentando de novo (${retries}/3)`);
+        c.removeAllListeners('close');
+        setTimeout(() => { if (!s.closed) connectUp(i); }, 2000);
+        return;
+      }
       markDown(u, e.code || e.message);
       c.removeAllListeners('close');
       if (i + 1 < ups.length) connectUp(i + 1); else close('nenhuma pool respondeu');

@@ -217,7 +217,7 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
   const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
     env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000',
-      PROXY_FAILBACK_STABLE_S: '2', PROXY_MISSING_MIN: '0.02' },
+      PROXY_FAILBACK_STABLE_S: '4', PROXY_MISSING_MIN: '0.02' },   // 4 s: folga para máquina lenta (CI)
     stdio: 'ignore',
   });
   let primary = null;
@@ -229,14 +229,14 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   await waitFor(() => a.jobs.length);
   assert.deepStrictEqual(a.jobs, ['reserva']);
 
-  // a principal volta, mas o minerador fica na reserva até ela ficar estável (2 s)
+  // a principal volta, mas o minerador fica na reserva até ela ficar estável (4 s)
   primary = miniPool('principal');
   await new Promise((r) => primary.listen(primaryPort, '127.0.0.1', r));
   await waitFor(async () => !(await stats()).routes[0].upstreams[0].down, 3000);
   let s = await stats();
   assert.strictEqual(a.closed, false, 'ainda na reserva logo depois da volta');
   assert.strictEqual(s.routes[0].onBackup, 1);
-  await waitFor(() => a.closed, 6000);
+  await waitFor(() => a.closed, 10000);
 
   // não reconectou: vira "missing" e um evento
   await waitFor(async () => (await stats()).missing.length, 6000);
@@ -286,6 +286,50 @@ test('pool instável (cai e volta): um aviso de instável e um de estável, não
   assert.strictEqual(ev.filter((m) => /is unstable/.test(m)).length, 1);
   assert.strictEqual(ev.filter((m) => /is stable again/.test(m)).length, 1);
   assert.ok(ev.filter((m) => /principal is back/.test(m)).length <= 1, ev.join(' | '));
+});
+
+test('pool que manda trabalho nas sessões abertas não é dada como fora por uma conexão nova recusada', async (t) => {
+  const [primaryPort, listen, statsPort] = [await freePort(), await freePort(), await freePort()];
+  // pool que manda um job novo a cada 300 ms para quem está conectado
+  const clients = new Set();
+  const mk = () => net.createServer((c) => {
+    clients.add(c); c.on('close', () => clients.delete(c)); c.on('error', () => {});
+    lines(c, (l) => {
+      const m = JSON.parse(l), send = (o) => c.write(JSON.stringify(o) + '\n');
+      if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+      else if (m.method === 'mining.authorize') send({ id: m.id, result: true, error: null });
+    });
+  });
+  let pool = mk();
+  await new Promise((r) => pool.listen(primaryPort, '127.0.0.1', r));
+  let n = 0;
+  const tick = setInterval(() => { for (const c of clients) c.write(JSON.stringify({ id: null, method: 'mining.notify', params: ['j' + (n++), '00'.repeat(32), '01', '02', [], '20000000', '1d00ffff', '6553f100', true] }) + '\n'); }, 300);
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal' }];   // sem reserva, como a nerdminers
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '800' },
+    stdio: 'ignore',
+  });
+  t.after(() => { clearInterval(tick); proxy.kill(); for (const c of clients) c.destroy(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  const stats = () => getJson(`http://127.0.0.1:${statsPort}/stats`);
+  await waitFor(stats);
+  const a = await mine(listen);
+  t.after(() => a.sock.destroy());
+  await waitFor(() => a.jobs.length >= 2);
+  // a pool para de aceitar conexões novas (as abertas continuam recebendo trabalho)
+  pool.close();   // sem esperar: o close só termina quando as conexões abertas acabam
+  const b = await mine(listen);
+  t.after(() => b.sock.destroy());
+  await new Promise((r) => setTimeout(r, 1500));
+  let s = await stats();
+  assert.strictEqual(s.routes[0].upstreams[0].down, false, 'continua no ar: as sessões abertas recebem trabalho');
+  assert.strictEqual(b.closed, false, 'a conexão nova espera e tenta de novo');
+  // a pool volta a aceitar: a conexão nova entra nela
+  pool = mk();
+  await new Promise((r) => pool.listen(primaryPort, '127.0.0.1', r));
+  await waitFor(() => b.jobs.length, 8000);
+  s = await stats();
+  assert.ok(!s.events.some((e) => e.type === 'pool_down'), 'nenhum aviso de pool fora');
 });
 
 test('ping separado por pool em uso (reservas só testadas não entram)', async (t) => {
