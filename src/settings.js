@@ -8,7 +8,7 @@ const fs = require('fs');
 const DEFAULT_ROUTES = [
   { listen: 3333, label: 'public-pool', host: 'public-pool.io', backups: ['ckpool solo'] },
   { listen: 3334, label: 'ckpool solo', host: 'solo.ckpool.org', backups: ['ckpool solo EU'] },
-  { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: ['public-pool'] },
+  { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: [] },
   { listen: 3337, label: 'OCEAN', host: 'mine.ocean.xyz', backups: [] },
   { listen: 3338, label: 'atlaspool', host: 'solo.atlaspool.io', backups: ['ckpool solo'] },
   { listen: 3339, label: 'ckpool solo EU', host: 'eusolo.ckpool.org', backups: ['ckpool solo'] },
