@@ -233,7 +233,8 @@ function digest(snap) {
     best: Number(f.best) || 0,
     bestWorker: ((snap.hall || [])[0] || {}).worker || '—',
     workers: (f.workers || []).map((w) => ({ name: w.name, state: w.state, inactive: !!w.inactive, best: Number(w.bestDifficulty) || 0, lastSeen: w.lastSeen })),
-    failover: ((snap.proxy || {}).failover || []).filter((r) => !r.returning).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
+    // inclui quem já voltou mas ainda está estabilizando: o "voltou" só sai quando os mineradores voltam de fato
+    failover: ((snap.proxy || {}).failover || []).map((r) => ({ listen: r.listen, primary: r.primary, active: r.active })),
     missing: ((snap.proxy || {}).missing || []).map((m) => ({ name: m.name, why: m.why, since: m.since })),
     sats: (snap.wallet || {}).okAt ? (snap.wallet || {}).sats : null,
     achievements: ((snap.achievements || {}).list || []).filter((a) => a.unlocked).map((a) => ({ id: a.id, icon: a.icon, pt: a.pt, en: a.en, worker: a.worker })),
