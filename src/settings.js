@@ -8,7 +8,8 @@ const fs = require('fs');
 const DEFAULT_ROUTES = [
   { listen: 3333, label: 'public-pool', host: 'public-pool.io', backups: ['ckpool solo'] },
   { listen: 3334, label: 'ckpool solo', host: 'solo.ckpool.org', backups: ['ckpool solo EU'] },
-  { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: [] },
+  { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: ['bitronics'] },
+  { listen: 3340, label: 'bitronics', host: 'pool.bitronics.store', backups: ['nerdminers'] },
   { listen: 3337, label: 'OCEAN', host: 'mine.ocean.xyz', backups: [] },
   { listen: 3338, label: 'atlaspool', host: 'solo.atlaspool.io', backups: ['ckpool solo'] },
   { listen: 3339, label: 'ckpool solo EU', host: 'eusolo.ckpool.org', backups: ['ckpool solo'] },
@@ -1585,7 +1586,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
 // Guia "Pools e portas" (aba Mineradores)
 (() => {
   const P = M.pools, $ = (id) => document.getElementById(id);
-  const useOf = (host) => /nerdminers/.test(host) ? P.use.nerd : /public-pool/.test(host) ? P.use.pub : /atlaspool/.test(host) ? P.use.atlas
+  const useOf = (host) => /nerdminers|bitronics/.test(host) ? P.use.nerd : /public-pool/.test(host) ? P.use.pub : /atlaspool/.test(host) ? P.use.atlas
     : /eusolo\\.ckpool/.test(host) ? P.use.ckeu : /ckpool/.test(host) ? P.use.ck : /ocean/.test(host) ? P.use.ocean : P.use.other;
   const txt = (tag, cls, t) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = t; return e; };
   fetch('/api/config/pools').then((r) => r.json()).then((d) => {

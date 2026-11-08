@@ -41,6 +41,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (porta 3333, 3334, 3335…) ──
   | 3333 | public-pool.io | 0% |
   | 3334 | solo.ckpool.org (EUA) | 2% |
   | 3335 | pool.nerdminers.org | 0% |
+  | 3340 | pool.bitronics.store (porta 3334 de NerdMiner) | 0% |
   | 3337 | OCEAN (pagamento dividido, não é solo) | ver ocean.xyz |
   | 3338 | solo.atlaspool.io (anycast, com servidor em São Paulo) | 1,5% do subsídio |
   | 3339 | eusolo.ckpool.org (Europa) | 2% |
@@ -138,7 +139,7 @@ O painel fica em `http://IP-DO-SERVIDOR:3000`, e as portas do proxy são as mesm
 
 | Minerador | Hashrate | Porta recomendada | Por quê |
 |---|---|---|---|
-| NerdMiner, placas ESP32 | ~50–400 kH/s | **3335** nerdminers | Aceita a dificuldade minúscula dos shares deles. A maioria das outras pools recusa ("difficulty too low") |
+| NerdMiner, placas ESP32 | ~50–400 kH/s | **3335** nerdminers ou **3340** bitronics | Aceitam a dificuldade minúscula dos shares deles (a maioria das outras pools recusa, "difficulty too low") e uma é a reserva da outra. A pool.nerdminers.org parece aceitar uma conexão por IP de casa: com dois NerdMiners, ponha o segundo na 3340 |
 | cpuminer no PC, celular ou placa tipo Raspberry | ~1–20 MH/s | **3333** public-pool | Sem taxa e com dificuldade mínima 1 |
 | Bitaxe e outros ASICs pequenos | ~0,4–10 TH/s | **3334** ckpool ou **3338** atlaspool | Pools solo consagradas. Escolha a de menor latência onde você mora. O proxy conta os shares aceitos e recusados de cada worker (`curl localhost:3336/stats` no servidor), então dá para comparar. No Brasil, a AtlasPool tem servidor em São Paulo |
 | Qualquer minerador, na Europa | | **3339** ckpool EU | A mesma pool da 3334, com servidores mais perto |
@@ -374,7 +375,7 @@ Documentação de arquitetura e APIs:
 ## Segurança
 
 - Use só o **endereço público** de bitcoin. Nenhuma parte do projeto pede seed ou chave privada.
-- As portas do proxy (3333–3339) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
+- As portas do proxy (3333–3340) e do painel (3000) são para a rede de casa. Não as exponha na internet. Para acesso de fora, prefira uma VPN como Tailscale. As estatísticas brutas (`3336`) só escutam em `127.0.0.1`.
 
 ## Apoie o projeto
 

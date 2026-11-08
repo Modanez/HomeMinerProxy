@@ -20,8 +20,10 @@ const CKPOOL = { host: 'solo.ckpool.org', port: 3333, label: 'ckpool solo' };
 const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
   { listen: 3333, host: 'public-pool.io', port: 21496, label: 'public-pool', backup: [CKPOOL] },
   { listen: 3334, ...CKPOOL, backup: [{ host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU' }] },
-  // sem reserva: nenhuma outra pool aceita os shares pequenos dos ESP32 (a public-pool recusa abaixo de 1)
-  { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' },
+  // pools para ESP32 (sem dificuldade mínima); uma é a reserva da outra. Duas portas porque a nerdminers parece
+  // aceitar uma conexão por IP: o segundo NerdMiner da casa vai para a 3340 (Bitronics, porta 3334 dela).
+  { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers', backup: [{ host: 'pool.bitronics.store', port: 3334, label: 'bitronics' }] },
+  { listen: 3340, host: 'pool.bitronics.store', port: 3334, label: 'bitronics', backup: [{ host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' }] },
   { listen: 3337, host: 'mine.ocean.xyz', port: 3334, label: 'OCEAN' },                // sem reserva: o pagamento da OCEAN é outro modelo
   { listen: 3338, host: 'solo.atlaspool.io', port: 3333, label: 'atlaspool', backup: [CKPOOL] },   // dificuldade mínima 2.000: ASICs, não ESP32
   { listen: 3339, host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU', backup: [CKPOOL] },
