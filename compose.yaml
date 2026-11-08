@@ -21,6 +21,7 @@ services:
       - "3333:3333"   # public-pool
       - "3334:3334"   # ckpool solo
       - "3335:3335"   # nerdminers
+      - "3340:3340"   # bitronics (segundo NerdMiner)
       - "3337:3337"   # OCEAN
       - "3338:3338"   # atlaspool
       - "3339:3339"   # ckpool solo EU

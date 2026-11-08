@@ -41,6 +41,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   | 3333 | public-pool.io | 0% |
   | 3334 | solo.ckpool.org (US) | 2% |
   | 3335 | pool.nerdminers.org | 0% |
+  | 3340 | pool.bitronics.store (NerdMiner port 3334) | 0% |
   | 3337 | OCEAN (shared payouts, not solo) | see ocean.xyz |
   | 3338 | solo.atlaspool.io (anycast, servers on every continent) | 1.5% of the subsidy |
   | 3339 | eusolo.ckpool.org (Europe) | 2% |
@@ -138,7 +139,7 @@ The dashboard is at `http://SERVER-IP:3000` and the proxy ports are the same as 
 
 | Miner | Hashrate | Recommended port | Why |
 |---|---|---|---|
-| NerdMiner, ESP32 boards | ~50–400 kH/s | **3335** nerdminers | Accepts their tiny share difficulty. Most other pools reject them ("difficulty too low") |
+| NerdMiner, ESP32 boards | ~50–400 kH/s | **3335** nerdminers or **3340** bitronics | Accept their tiny share difficulty (most other pools reject them, "difficulty too low") and back each other up. pool.nerdminers.org seems to allow one connection per home IP: with two NerdMiners, put the second one on 3340 |
 | cpuminer on a PC, phone or SBC | ~1–20 MH/s | **3333** public-pool | No fee and a minimum difficulty of 1 |
 | Bitaxe and other small ASICs | ~0.4–10 TH/s | **3334** ckpool or **3338** atlaspool | Proven solo pools. Pick the one with lower latency where you live. The proxy counts accepted and rejected shares per worker (`curl localhost:3336/stats` on the server), so you can compare |
 | Any miner, in Europe | | **3339** ckpool EU | Same pool as 3334, closer servers |
@@ -374,7 +375,7 @@ Architecture & API documentation:
 ## Security
 
 - Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.
-- The proxy ports (3333–3339) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
+- The proxy ports (3333–3340) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
 
 ## Support the project
 
