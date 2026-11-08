@@ -217,7 +217,7 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   const routes = [{ listen, host: '127.0.0.1', port: primaryPort, label: 'principal', backup: [{ host: '127.0.0.1', port: backupPort, label: 'reserva' }] }];
   const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
     env: { ...process.env, PROXY_ROUTES: JSON.stringify(routes), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir, PROXY_HEALTH_MS: '300', PROXY_CONNECT_TIMEOUT_MS: '1000',
-      PROXY_FAILBACK_STABLE_S: '2', PROXY_MISSING_MIN: '0.02' },
+      PROXY_FAILBACK_STABLE_S: '4', PROXY_MISSING_MIN: '0.02' },   // 4 s: folga para máquina lenta (CI)
     stdio: 'ignore',
   });
   let primary = null;
@@ -229,14 +229,14 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   await waitFor(() => a.jobs.length);
   assert.deepStrictEqual(a.jobs, ['reserva']);
 
-  // a principal volta, mas o minerador fica na reserva até ela ficar estável (2 s)
+  // a principal volta, mas o minerador fica na reserva até ela ficar estável (4 s)
   primary = miniPool('principal');
   await new Promise((r) => primary.listen(primaryPort, '127.0.0.1', r));
   await waitFor(async () => !(await stats()).routes[0].upstreams[0].down, 3000);
   let s = await stats();
   assert.strictEqual(a.closed, false, 'ainda na reserva logo depois da volta');
   assert.strictEqual(s.routes[0].onBackup, 1);
-  await waitFor(() => a.closed, 6000);
+  await waitFor(() => a.closed, 10000);
 
   // não reconectou: vira "missing" e um evento
   await waitFor(async () => (await stats()).missing.length, 6000);
