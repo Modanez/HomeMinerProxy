@@ -24,6 +24,8 @@ const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
   // aceitar uma conexão por IP: o segundo NerdMiner da casa vai para a 3340 (Bitronics, porta 3334 dela).
   { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers', backup: [{ host: 'pool.bitronics.store', port: 3334, label: 'bitronics' }] },
   { listen: 3340, host: 'pool.bitronics.store', port: 3334, label: 'bitronics', backup: [{ host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' }] },
+  // Bitaxe/ASIC em SOLO Group da Bitronics: usuário ENDERECO.worker#grupo, taxa 1% (só divide se o grupo achar o bloco)
+  { listen: 3341, host: 'pool.bitronics.store', port: 3333, label: 'bitronics group', backup: [CKPOOL] },
   { listen: 3337, host: 'mine.ocean.xyz', port: 3334, label: 'OCEAN' },                // sem reserva: o pagamento da OCEAN é outro modelo
   { listen: 3338, host: 'solo.atlaspool.io', port: 3333, label: 'atlaspool', backup: [CKPOOL] },   // dificuldade mínima 2.000: ASICs, não ESP32
   { listen: 3339, host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU', backup: [CKPOOL] },
@@ -351,8 +353,11 @@ function session(down, route) {
       else if (m.method === 'mining.configure') s.configureIds.add(m.id);
       else if (m.method === 'mining.authorize' && m.params) {
         const user = String(m.params[0] || '');
-        const name = user.includes('.') ? user.slice(user.indexOf('.') + 1) : '(sem nome)';
+        // "endereço.worker#grupo" (SOLO Group da Bitronics): o grupo vai junto para a pool, mas não entra no nome
+        const [base, group] = [user.split('#')[0], user.includes('#') ? user.slice(user.indexOf('#') + 1) : null];
+        const name = base.includes('.') ? base.slice(base.indexOf('.') + 1) : '(sem nome)';
         s.worker = worker(name, label());
+        s.worker.group = group || null;
         s.worker.online++;
         s.worker.connectedSince = Date.now();
         s.worker.bestSession = 0;

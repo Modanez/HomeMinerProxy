@@ -184,7 +184,7 @@ test('guia "Pools e portas": portas de fábrica quando o proxy não responde, co
   t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
   const d = JSON.parse((await waitFor(() => req(port, 'GET', '/api/config/pools'))).body);
   assert.strictEqual(d.live, false);
-  assert.deepStrictEqual(d.routes.map((r) => [r.listen, r.label]), [[3333, 'public-pool'], [3334, 'ckpool solo'], [3335, 'nerdminers'], [3340, 'bitronics'], [3337, 'OCEAN'], [3338, 'atlaspool'], [3339, 'ckpool solo EU']]);
+  assert.deepStrictEqual(d.routes.map((r) => [r.listen, r.label]), [[3333, 'public-pool'], [3334, 'ckpool solo'], [3335, 'nerdminers'], [3340, 'bitronics'], [3341, 'bitronics group'], [3337, 'OCEAN'], [3338, 'atlaspool'], [3339, 'ckpool solo EU']]);
   assert.strictEqual(d.address, ADDR);
   assert.ok(d.hosts[0].endsWith('.local'));
   assert.match((await req(port, 'GET', '/config')).body, /id="pools_list"/);

@@ -160,7 +160,7 @@ function miniPool(tag) {
     });
   });
 }
-function mine(port) {
+function mine(port, user = 'bc1qteste.esp') {
   return new Promise((resolve, reject) => {
     const s = net.connect(port, '127.0.0.1');
     const got = { jobs: [], closed: false, sock: s };
@@ -168,7 +168,7 @@ function mine(port) {
     s.on('close', () => { got.closed = true; });
     s.on('error', reject);
     s.on('connect', () => {
-      s.write('{"id":1,"method":"mining.subscribe","params":[]}\n{"id":2,"method":"mining.authorize","params":["bc1qteste.esp","x"]}\n');
+      s.write('{"id":1,"method":"mining.subscribe","params":[]}\n{"id":2,"method":"mining.authorize","params":[' + JSON.stringify(user) + ',"x"]}\n');
       resolve(got);
     });
   });
@@ -330,6 +330,31 @@ test('pool que manda trabalho nas sessões abertas não é dada como fora por um
   await waitFor(() => b.jobs.length, 8000);
   s = await stats();
   assert.ok(!s.events.some((e) => e.type === 'pool_down'), 'nenhum aviso de pool fora');
+});
+
+test('SOLO Group (endereço.worker#grupo): o grupo vai para a pool e o nome do worker fica limpo', async (t) => {
+  const [listen, statsPort] = [await freePort(), await freePort()];
+  let seenUser = null;
+  const pool = net.createServer((c) => lines(c, (l) => {
+    const m = JSON.parse(l), send = (o) => c.write(JSON.stringify(o) + '\n');
+    if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+    else if (m.method === 'mining.authorize') { seenUser = m.params[0]; send({ id: m.id, result: true, error: null }); send({ id: null, method: 'mining.notify', params: ['g', '00'.repeat(32), '01', '02', [], '20000000', '1d00ffff', '6553f100', true] }); }
+  }));
+  const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'bitronics group' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir },
+    stdio: 'ignore',
+  });
+  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const a = await mine(listen, 'bc1qteste.bitaxe1#firstblock');
+  t.after(() => a.sock.destroy());
+  await waitFor(() => a.jobs.length);
+  assert.strictEqual(seenUser, 'bc1qteste.bitaxe1#firstblock');
+  const w = (await getJson(`http://127.0.0.1:${statsPort}/stats`)).workers.find((x) => x.name === 'bitaxe1');
+  assert.ok(w, 'worker bitaxe1 (sem o #grupo)');
+  assert.strictEqual(w.group, 'firstblock');
 });
 
 test('ping separado por pool em uso (reservas só testadas não entram)', async (t) => {

@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Port 3341 → Bitronics SOLO Group** (`pool.bitronics.store:3333`, backup ckpool solo): for Bitaxe/ASICs in a group, with the username `ADDRESS.worker#group` (1% fee; the block is split among the group members by work, only if the group finds it). The proxy passes the `#group` tag to the pool, keeps the worker name clean and the dashboard shows the group next to the pool ("⚡ bitronics group #firstblock"); the Bitaxe worker name also ignores the tag.
 - **Second pool for NerdMiners (port 3340 → pool.bitronics.store:3334):** pool.nerdminers.org seems to allow only one connection per home IP: with two NerdMiners they took turns (one dropped exactly when the other connected). Put the second one on port 3340. The two ESP32 pools now back each other up.
 - **Unstable pool, quiet events:** a pool that keeps dropping and coming back (pool.nerdminers.org on Nov 8, every minute) now shows one "is unstable" event and one "is stable again", instead of a down/back pair every minute; Telegram only says "back" once the miners have actually returned.
 - **pool.nerdminers.org has no backup anymore** (port 3335): no other pool accepts the small ESP32 shares, so sending NerdMiners to public-pool was the same as waiting. Custom `PROXY_ROUTES` can still add one.
@@ -23,6 +24,7 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **Porta 3341 → SOLO Group da Bitronics** (`pool.bitronics.store:3333`, reserva ckpool solo): para Bitaxe/ASICs em grupo, com o usuário `ENDEREÇO.worker#grupo` (taxa 1%; o bloco é dividido entre os membros do grupo pelo trabalho, só se o grupo achar). O proxy passa a etiqueta `#grupo` para a pool, mantém o nome do worker limpo e o painel mostra o grupo ao lado da pool ("⚡ bitronics group #firstblock"); o nome do worker do Bitaxe também ignora a etiqueta.
 - **Segunda pool para NerdMiners (porta 3340 → pool.bitronics.store:3334):** a pool.nerdminers.org parece aceitar só uma conexão por IP de casa: com dois NerdMiners eles se revezavam (um caía exatamente quando o outro conectava). Ponha o segundo na porta 3340. As duas pools de ESP32 agora são reserva uma da outra.
 - **Pool instável, eventos calmos:** uma pool que cai e volta sem parar (a pool.nerdminers.org em 8/11, a cada minuto) agora gera um evento "instável" e um "estável de novo", em vez de um par caiu/voltou por minuto; o Telegram só diz "voltou" quando os mineradores voltaram de fato.
 - **A pool.nerdminers.org não tem mais reserva** (porta 3335): nenhuma outra pool aceita os shares pequenos dos ESP32, então mandar os NerdMiners para a public-pool era o mesmo que esperar. Um `PROXY_ROUTES` próprio ainda pode colocar uma.
