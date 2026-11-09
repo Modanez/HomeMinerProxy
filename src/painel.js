@@ -412,7 +412,7 @@ function workersView() {
     const pw = proxy.workers[name];       // último share visto pelo proxy (fica mesmo depois de desconectar)
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
     const pxw = proxied.get(name);
-    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0 } : {};
+    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0, group: pxw.group || null } : {};
     // Bitaxe com API: o hashrate medido pelo próprio aparelho (média de 10 min) vale mais que a estimativa por shares
     const bx = bitaxeOfWorker(name);
     let device = null;
@@ -1904,7 +1904,7 @@ function renderFarm(j) {
       best += '<span class="last' + (fresh ? ' fresh' : '') + '">último ' + (w.lastDiff.diff < 1 ? nf(Number(w.lastDiff.diff.toPrecision(3)), 8) : nf(w.lastDiff.diff, w.lastDiff.diff < 10 ? 3 : 2)) + '</span>';
     }
     const seen = w.state === 'unknown' ? 'não listado' : ago(w.lastSeen);
-    const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + '</span>' : '';
+    const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + (w.group ? ' #' + esc(w.group) : '') + '</span>' : '';
     const det = [w.ip, w.shareDiff ? 'diff ' + nf(w.shareDiff, 0) : null].filter(Boolean).join(' · ');
     const netInfo = det ? ' <span class="sub" title="extranonce1: ' + esc(w.extranonce1 || '–') + '">' + esc(det) + '</span>' : '';
     const rej = w.rejected > 0 ? ' <span class="sub" title="recusados pela pool: stale = job vencido, duplicado = share repetido">✗ ' + w.rejected + ' (stale ' + (w.stale || 0) + ' · duplicado ' + (w.duplicate || 0) + ')</span>' : '';

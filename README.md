@@ -42,6 +42,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   | 3334 | solo.ckpool.org (US) | 2% |
   | 3335 | pool.nerdminers.org | 0% |
   | 3340 | pool.bitronics.store (NerdMiner port 3334) | 0% |
+  | 3341 | pool.bitronics.store SOLO Group (username `ADDRESS.worker#group`) | 1%, block split among the group |
   | 3337 | OCEAN (shared payouts, not solo) | see ocean.xyz |
   | 3338 | solo.atlaspool.io (anycast, servers on every continent) | 1.5% of the subsidy |
   | 3339 | eusolo.ckpool.org (Europe) | 2% |
@@ -375,7 +376,7 @@ Architecture & API documentation:
 ## Security
 
 - Use your **public** bitcoin address only. Nothing in this project asks for a seed or private key.
-- The proxy ports (3333–3340) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
+- The proxy ports (3333–3341) and the dashboard (3000) are meant for your home network. Do not expose them to the internet. For remote access, prefer a VPN such as Tailscale. Raw stats (`3336`) listen on `127.0.0.1` only.
 
 ## Support the project
 

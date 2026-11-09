@@ -266,3 +266,10 @@ test('°F: Telegram mostra temperaturas e limites em Fahrenheit', () => {
   const txt = tg.statusText({ farm: { hasData: true, hashrate: 1e12, workers: [], shares: { today: 1 } }, bitaxes: [{ name: 'bitaxe1', fresh: true, data: bx.normalize(fx('2.14')) }] }, { lang: 'en', tempUnit: 'F' });
   assert.match(txt, /143 °F/);   // 61,5 °C
 });
+
+test('worker do Bitaxe em SOLO Group: sem o #grupo (e sem o .hidden)', () => {
+  const d = (stratumUser) => bx.normalize({ stratumUser, hashRate: 1200 }).worker;
+  assert.strictEqual(d('bc1qx.bitaxe1#firstblock'), 'bitaxe1');
+  assert.strictEqual(d('bc1qx.bitaxe2#minhaturma.hidden'), 'bitaxe2');
+  assert.strictEqual(d('bc1qx.bitaxe3'), 'bitaxe3');
+});

@@ -119,7 +119,8 @@ function normalize(j) {
     rssi: num(j.wifiRSSI),
     pool: { url: pool.url, port: pool.port, fallback: pool.fallback },
     // o nome do worker é o que vem depois do ponto no usuário (endereço.bitaxe1)
-    worker: user.includes('.') ? user.slice(user.lastIndexOf('.') + 1) || null : null,
+    // "endereço.worker#grupo" (SOLO Group): o grupo não faz parte do nome do worker
+    worker: (() => { const u = user.split('#')[0]; return u.includes('.') ? u.slice(u.lastIndexOf('.') + 1) || null : null; })(),
     responseMs: num(j.responseTime),
     paused: !!j.miningPaused,
     overheat: !!Number(j.overheat_mode),
