@@ -22,7 +22,7 @@ services:
       - "3334:3334"   # ckpool solo
       - "3335:3335"   # nerdminers
       - "3340:3340"   # bitronics (segundo NerdMiner)
-      - "3341:3341"   # bitronics SOLO Group (Bitaxe)
+      - "3341:3341"   # bitronics ASIC (Bitaxe: solo ou #grupo)
       - "3337:3337"   # OCEAN
       - "3338:3338"   # atlaspool
       - "3339:3339"   # ckpool solo EU

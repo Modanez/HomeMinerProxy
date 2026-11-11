@@ -10,7 +10,7 @@ const DEFAULT_ROUTES = [
   { listen: 3334, label: 'ckpool solo', host: 'solo.ckpool.org', backups: ['ckpool solo EU'] },
   { listen: 3335, label: 'nerdminers', host: 'pool.nerdminers.org', backups: ['bitronics'] },
   { listen: 3340, label: 'bitronics', host: 'pool.bitronics.store', backups: ['nerdminers'] },
-  { listen: 3341, label: 'bitronics group', host: 'pool.bitronics.store', backups: ['ckpool solo'] },
+  { listen: 3341, label: 'bitronics ASIC', host: 'pool.bitronics.store', backups: ['ckpool solo'] },
   { listen: 3337, label: 'OCEAN', host: 'mine.ocean.xyz', backups: [] },
   { listen: 3338, label: 'atlaspool', host: 'solo.atlaspool.io', backups: ['ckpool solo'] },
   { listen: 3339, label: 'ckpool solo EU', host: 'eusolo.ckpool.org', backups: ['ckpool solo'] },
@@ -522,7 +522,7 @@ const T = {
       from: 'Hoje', to: 'Vai ficar', backupLbl: 'reserva', same: 'Já aponta para o proxy.', done: 'Feito.', pointDone: 'Pool gravada e conferida; o Bitaxe está reiniciando.', last: 'Última ação' },
     pools: { title: 'Pools e portas', help: 'Cada porta do proxy leva a uma pool. Aponte cada minerador para a porta que combina com ele; se a pool cair, o proxy passa para a reserva sozinho.',
       factory: 'O proxy não respondeu: estas são as portas de fábrica.', backup: 'reserva', down: 'fora do ar · usando', ms: 'ms',
-      use: { group: 'Bitaxe e ASICs em SOLO Group (Bitronics): usuário ENDEREÇO.worker#grupo, taxa 1%, divide o bloco se o grupo achar', nerd: 'NerdMiner e ESP32: aceita os shares minúsculos deles', pub: 'cpuminer (PC, celular, Raspberry): sem taxa, dificuldade mínima 1', atlas: 'Bitaxe e ASICs: servidor em São Paulo, menor ping no Brasil (taxa 1,5%; não serve para ESP32)',
+      use: { group: 'Bitaxe e ASICs (Bitronics): solo sem taxa com ENDEREÇO.worker, ou SOLO Group com ENDEREÇO.worker#grupo (taxa 1%, divide o bloco se o grupo achar)', nerd: 'NerdMiner e ESP32: aceita os shares minúsculos deles', pub: 'cpuminer (PC, celular, Raspberry): sem taxa, dificuldade mínima 1', atlas: 'Bitaxe e ASICs: servidor em São Paulo, menor ping no Brasil (taxa 1,5%; não serve para ESP32)',
         ck: 'Bitaxe e ASICs: a pool solo mais conhecida (taxa 2%)', ckeu: 'Bitaxe e ASICs na Europa (taxa 2%)', ocean: 'Não é solo: a recompensa é dividida entre todos (pagamentos pequenos e regulares)', other: 'Pool configurada no PROXY_ROUTES' },
       howTitle: 'Como apontar os mineradores', server: 'Servidor', user: 'Usuário', userHint: 'seu endereço + ponto + um nome para o minerador', pass: 'Senha',
       bitaxe: 'Bitaxe (AxeOS → Pool)', bitaxeHow: 'Stratum URL: %h · Porta: %p · Usuário: %u · Senha: x. Em "Fallback", coloque solo.ckpool.org porta 3333 com o mesmo usuário.',
@@ -630,7 +630,7 @@ const T = {
       from: 'Now', to: 'Will be', backupLbl: 'backup', same: 'Already points at the proxy.', done: 'Done.', pointDone: 'Pool saved and checked; the Bitaxe is restarting.', last: 'Last action' },
     pools: { title: 'Pools and ports', help: 'Each proxy port leads to a pool. Point each miner at the port that suits it; if the pool goes down, the proxy switches to the backup on its own.',
       factory: 'The proxy did not answer: these are the factory ports.', backup: 'backup', down: 'down · using', ms: 'ms',
-      use: { group: 'Bitaxe and ASICs in a SOLO Group (Bitronics): username ADDRESS.worker#group, 1% fee, splits the block if the group finds one', nerd: 'NerdMiner and ESP32: accepts their tiny shares', pub: 'cpuminer (PC, phone, Raspberry): no fee, minimum difficulty 1', atlas: 'Bitaxe and ASICs: server in São Paulo, lowest ping in Brazil (1.5% fee; not for ESP32)',
+      use: { group: 'Bitaxe and ASICs (Bitronics): solo with no fee using ADDRESS.worker, or a SOLO Group with ADDRESS.worker#group (1% fee, splits the block if the group finds one)', nerd: 'NerdMiner and ESP32: accepts their tiny shares', pub: 'cpuminer (PC, phone, Raspberry): no fee, minimum difficulty 1', atlas: 'Bitaxe and ASICs: server in São Paulo, lowest ping in Brazil (1.5% fee; not for ESP32)',
         ck: 'Bitaxe and ASICs: the best-known solo pool (2% fee)', ckeu: 'Bitaxe and ASICs in Europe (2% fee)', ocean: 'Not solo: the reward is split among everyone (small, regular payouts)', other: 'Pool set in PROXY_ROUTES' },
       howTitle: 'How to point your miners', server: 'Server', user: 'User', userHint: 'your address + dot + a name for the miner', pass: 'Password',
       bitaxe: 'Bitaxe (AxeOS → Pool)', bitaxeHow: 'Stratum URL: %h · Port: %p · User: %u · Password: x. Under "Fallback", set solo.ckpool.org port 3333 with the same user.',
@@ -1587,7 +1587,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
 // Guia "Pools e portas" (aba Mineradores)
 (() => {
   const P = M.pools, $ = (id) => document.getElementById(id);
-  const useOf = (r) => { const host = r.host || ''; return /bitronics/.test(host) && /group/i.test(r.label || '') ? P.use.group : useHost(host); };
+  const useOf = (r) => { const host = r.host || ''; return /bitronics/.test(host) && /asic|group/i.test(r.label || '') ? P.use.group : useHost(host); };
   const useHost = (host) => /nerdminers|bitronics/.test(host) ? P.use.nerd : /public-pool/.test(host) ? P.use.pub : /atlaspool/.test(host) ? P.use.atlas
     : /eusolo\\.ckpool/.test(host) ? P.use.ckeu : /ckpool/.test(host) ? P.use.ck : /ocean/.test(host) ? P.use.ocean : P.use.other;
   const txt = (tag, cls, t) => { const e = document.createElement(tag); if (cls) e.className = cls; e.textContent = t; return e; };

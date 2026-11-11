@@ -343,7 +343,7 @@ test('SOLO Group (endereço.worker#grupo): o grupo vai para a pool e o nome do w
   const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
   const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
-    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'bitronics group' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir },
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'bitronics ASIC' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir },
     stdio: 'ignore',
   });
   t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });

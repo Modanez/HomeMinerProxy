@@ -24,8 +24,8 @@ const ROUTES = safeJson(process.env.PROXY_ROUTES) || [
   // aceitar uma conexão por IP: o segundo NerdMiner da casa vai para a 3340 (Bitronics, porta 3334 dela).
   { listen: 3335, host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers', backup: [{ host: 'pool.bitronics.store', port: 3334, label: 'bitronics' }] },
   { listen: 3340, host: 'pool.bitronics.store', port: 3334, label: 'bitronics', backup: [{ host: 'pool.nerdminers.org', port: 3333, label: 'nerdminers' }] },
-  // Bitaxe/ASIC em SOLO Group da Bitronics: usuário ENDERECO.worker#grupo, taxa 1% (só divide se o grupo achar o bloco)
-  { listen: 3341, host: 'pool.bitronics.store', port: 3333, label: 'bitronics group', backup: [CKPOOL] },
+  // Bitaxe/ASIC na Bitronics: solo sem taxa (ENDERECO.worker) ou SOLO Group com ENDERECO.worker#grupo (taxa 1%, divide se o grupo achar)
+  { listen: 3341, host: 'pool.bitronics.store', port: 3333, label: 'bitronics ASIC', backup: [CKPOOL] },
   { listen: 3337, host: 'mine.ocean.xyz', port: 3334, label: 'OCEAN' },                // sem reserva: o pagamento da OCEAN é outro modelo
   { listen: 3338, host: 'solo.atlaspool.io', port: 3333, label: 'atlaspool', backup: [CKPOOL] },   // dificuldade mínima 2.000: ASICs, não ESP32
   { listen: 3339, host: 'eusolo.ckpool.org', port: 3333, label: 'ckpool solo EU', backup: [CKPOOL] },
