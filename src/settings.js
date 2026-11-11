@@ -763,7 +763,7 @@ function page(lang, hasPin, theme) {
       input = `<div class="pw"><input type="password" name="${f.key}" autocomplete="new-password" spellcheck="false" autocapitalize="off"><button type="button" class="ghost eye" data-eye="${f.key}">👁</button></div><div class="hint" id="${f.key}_state"></div>` +
         `<label class="inline" id="${f.key}_clearbox" hidden><input type="checkbox" name="${f.key}_clear"> ${S.tokenClear}</label>`;
     } else {
-      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'watchdog' ? ' inputmode="numeric" maxlength="4" placeholder="10"' : f.type === 'threads' ? ' inputmode="numeric" maxlength="3"' : f.type === 'bitaxes' ? ' placeholder="bitaxe1=192.168.0.140, bitaxe2=192.168.0.141"' : f.type === 'range' ? ` inputmode="decimal" maxlength="5" placeholder="${{ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80, BITAXE_HASH_MIN: 70 }[f.key] || ''}"${f.temp ? ' data-temp="1"' : ''}` : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
+      const extra = f.type === 'price' ? ' inputmode="decimal"' : f.type === 'hour' ? ' inputmode="numeric" maxlength="2"' : f.type === 'watchdog' ? ' inputmode="numeric" maxlength="4" placeholder="10"' : f.type === 'threads' ? ' inputmode="numeric" maxlength="3"' : f.type === 'bitaxes' ? ' placeholder="bitaxe1=192.168.0.140, bitaxe2=192.168.0.141"' : f.type === 'range' ? ` inputmode="decimal" maxlength="5" placeholder="${{ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 95, BITAXE_HASH_MIN: 70 }[f.key] || ''}"${f.temp ? ' data-temp="1"' : ''}` : f.type === 'mqtturl' ? ' placeholder="mqtt://homeassistant.local:1883"' : f.type === 'mqtttopic' ? ' placeholder="homeminerproxy"' : '';
       input = `<input name="${f.key}"${extra} autocomplete="off" spellcheck="false">`;
     }
     const test = f.key === 'CUBE_IP' ? ` <button type="button" class="ghost" data-test="cube">${S.testCube}</button>`
@@ -774,7 +774,7 @@ function page(lang, hasPin, theme) {
     const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
-    const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80 }[f.key]) : null;
+    const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 95 }[f.key]) : null;
     const isF = String(process.env.TEMP_UNIT || '').toUpperCase() === 'F';
     const helpTxt = tdef != null ? help.replace('{def}', isF ? Math.round(tdef * 9 / 5 + 32) + ' °F' : tdef + ' °C') : help;
     return `<div class="f${half}" data-key="${f.key}"${hideLegacy}><div class="fl"><label>${htmlEsc(label)}</label><div class="hint help"${tdef != null ? ` data-tpl="${htmlEsc(help)}" data-def="${tdef}"` : ''}>${htmlEsc(helpTxt)}</div></div><div class="fc">${input}${test}<div class="ferr"></div></div></div>`;
@@ -1072,7 +1072,7 @@ const tUnit = (c) => (tempUnitNow === 'F' ? Math.round(c * 9 / 5 + 32) + ' °F' 
 function tempUnitUI(from, to) {
   const u = String(to || '').toUpperCase() === 'F' ? 'F' : 'C';
   for (const inp of form.querySelectorAll('input[data-temp]')) {
-    const base = { BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 80 }[inp.name];
+    const base = { BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 95 }[inp.name];
     inp.placeholder = u === 'F' ? String(Math.round(base * 9 / 5 + 32)) : String(base);
     if (from && from !== u && inp.value.trim() !== '' && Number.isFinite(Number(inp.value.replace(',', '.')))) {
       const n = Number(inp.value.replace(',', '.'));

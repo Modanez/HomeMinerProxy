@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Bitaxe "regulator hot" alert at 95 °C (was 80 °C):** the first real Gamma 602 runs its voltage regulator at ~82 °C with the chip at 60 °C, which is normal; the old limit fired a false alarm. AxeOS itself stops hashing only above 105 °C (and resumes at 95 °C), so 95 °C warns before that.
 - **Port 3341 → Bitronics for Bitaxe/ASICs** (`pool.bitronics.store:3333`, backup ckpool solo): solo with no fee (`ADDRESS.worker`), or a SOLO Group with the username `ADDRESS.worker#group` (1% fee; the block is split among the group members by work, only if the group finds it). The proxy passes the `#group` tag to the pool, keeps the worker name clean and the dashboard shows the group next to the pool ("⚡ bitronics ASIC #firstblock"); the Bitaxe worker name also ignores the tag.
 - **Second pool for NerdMiners (port 3340 → pool.bitronics.store:3334):** pool.nerdminers.org seems to allow only one connection per home IP: with two NerdMiners they took turns (one dropped exactly when the other connected). Put the second one on port 3340. The two ESP32 pools now back each other up.
 - **Unstable pool, quiet events:** a pool that keeps dropping and coming back (pool.nerdminers.org on Nov 8, every minute) now shows one "is unstable" event and one "is stable again", instead of a down/back pair every minute; Telegram only says "back" once the miners have actually returned.
@@ -24,6 +25,7 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **Alerta "regulador quente" do Bitaxe em 95 °C (era 80 °C):** o primeiro Gamma 602 de verdade trabalha com o regulador a ~82 °C e o chip a 60 °C, o que é normal; o limite antigo dava alarme falso. O próprio AxeOS só para de minerar acima de 105 °C (e volta a 95 °C), então 95 °C avisa antes disso.
 - **Porta 3341 → Bitronics para Bitaxe/ASICs** (`pool.bitronics.store:3333`, reserva ckpool solo): solo sem taxa (`ENDEREÇO.worker`) ou SOLO Group com o usuário `ENDEREÇO.worker#grupo` (taxa 1%; o bloco é dividido entre os membros do grupo pelo trabalho, só se o grupo achar). O proxy passa a etiqueta `#grupo` para a pool, mantém o nome do worker limpo e o painel mostra o grupo ao lado da pool ("⚡ bitronics ASIC #firstblock"); o nome do worker do Bitaxe também ignora a etiqueta.
 - **Segunda pool para NerdMiners (porta 3340 → pool.bitronics.store:3334):** a pool.nerdminers.org parece aceitar só uma conexão por IP de casa: com dois NerdMiners eles se revezavam (um caía exatamente quando o outro conectava). Ponha o segundo na porta 3340. As duas pools de ESP32 agora são reserva uma da outra.
 - **Pool instável, eventos calmos:** uma pool que cai e volta sem parar (a pool.nerdminers.org em 8/11, a cada minuto) agora gera um evento "instável" e um "estável de novo", em vez de um par caiu/voltou por minuto; o Telegram só diz "voltou" quando os mineradores voltaram de fato.
