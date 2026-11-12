@@ -1841,7 +1841,7 @@ function renderBitaxes(j) {
   $('bxlist').innerHTML = list.map((b) => {
     const d = b.data;
     const addr = (d && d.ip) || b.host;   // IP primeiro: nome .local não abre em todo celular
-    const link = /^[\w.:\-]+$/.test(addr) ? '<a class="axeos" href="http://' + esc(addr) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + ' <span>' + esc(addr) + '</span> ↗</a>' : '';
+    const link = /^[0-9A-Za-z_.:-]+$/.test(addr) ? '<a class="axeos" href="http://' + esc(addr) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + ' <span>' + esc(addr) + '</span> ↗</a>' : '';
     const head = '<div class="bxh"><b>' + esc(b.name) + '</b><span class="sub">' + esc([d && d.model, d && d.version, b.host].filter(Boolean).join(' · ')) + '</span>' +
       (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '<a href="/config#miners">' + BXT.actions + '</a></div>';
     if (!d) return '<div class="bx">' + head + '</div>';

@@ -73,3 +73,10 @@ test('botão PT|EN: o cookie vence o LANGUAGE do servidor, mas não o ?lang', ()
   assert.strictEqual(pickLang(req('/', 'xlang=en'), 'pt'), 'pt');   // nome de cookie parecido não conta
   assert.strictEqual(pickLang(req('/', 'lang=<script>'), 'pt'), 'pt');
 });
+
+// O script do navegador mora num template literal: uma barra invertida sozinha some ("\w" vira "w").
+// Foi assim que o botão do AxeOS nunca apareceu (/^[\w.:\-]+$/ virou /^[w.:-]+$/ e recusava o IP).
+test('script da página sem barra invertida solta (some no template literal)', () => {
+  const bad = PAGE.split('\n').filter((l) => /(^|[^\\])\\(?![\\`$])/.test(l)).map((l) => l.trim().slice(0, 80));
+  assert.deepStrictEqual(bad, []);
+});
