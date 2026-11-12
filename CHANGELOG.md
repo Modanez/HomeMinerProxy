@@ -3,9 +3,11 @@
 ## Unreleased
 
 ### English
+- **Worker details (last 24 h):** click a worker in the table to open a dialog with its last 24 hours through the proxy: accepted and rejected shares, best share and average hashrate, a chart of shares per hour (rejections in red), a chart of the best difficulty per hour (log scale, so the ESP32 fit too), the 10 best hashes with their time and the latest shares. The proxy keeps this per hour in its stats file (survives restarts) and serves it at `/stats/worker?name=`; the dashboard at `/api/worker?name=`. Not in kiosk mode.
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Detalhes do worker (últimas 24 h):** clique num worker da tabela para abrir um modal com as últimas 24 horas dele pelo proxy: shares aceitos e recusados, melhor share e hashrate médio, gráfico de shares por hora (recusados em vermelho), gráfico da melhor dificuldade por hora (escala logarítmica, para os ESP32 caberem), os 10 melhores hashes com a hora e os últimos shares. O proxy guarda isso por hora no arquivo de estatísticas (sobrevive ao reinício) e entrega em `/stats/worker?name=`; o painel, em `/api/worker?name=`. Não abre no modo quiosque.
 - **Duas conquistas novas:** 🌋 **Um trilhão** (um share com dificuldade acima de 1 trilhão) e o 🏆 **Prêmio de ouro: bloco achado!**, que desbloqueia quando um share passa da dificuldade da rede. O prêmio de ouro fica numa linha inteira só para ele, mostra o troféu mesmo trancado e acende em dourado quando sai.
 
 ## v0.6.0 — 2026-11-12

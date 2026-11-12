@@ -166,6 +166,46 @@ function addBin(w, at, target) {
   const cut = Date.now() - DAY_MS;
   while (bins.length && bins[0][0] < cut) bins.shift();
 }
+// Últimas 24 h por worker, para o modal do painel: por hora [início, aceitos, recusados, melhor dificuldade, trabalho]
+// e os 10 melhores hashes [hora, dificuldade]. Ficam no arquivo de estatísticas (sobrevivem ao reinício).
+const HOUR_MS = 3600e3, TOP_N = 10;
+function noteHour(w, at, ok, diff, target) {
+  const t = Math.floor(at / HOUR_MS) * HOUR_MS;
+  const hours = w.hours || (w.hours = []);
+  let h = hours[hours.length - 1];
+  if (!h || h[0] !== t) { h = [t, 0, 0, 0, 0]; hours.push(h); }
+  if (ok) { h[1]++; if (diff > h[3]) h[3] = diff; h[4] += target || 0; } else h[2]++;
+  const cut = Date.now() - DAY_MS;
+  while (hours.length && hours[0][0] + HOUR_MS <= cut) hours.shift();
+  if (ok && diff > 0) {
+    const top = (w.top24 || []).filter(([ta]) => ta > cut);
+    top.push([at, diff]);
+    top.sort((x, y) => y[1] - x[1]);
+    w.top24 = top.slice(0, TOP_N);
+  }
+}
+function workerDay(w, now = Date.now()) {
+  const cut = now - DAY_MS;
+  const byT = new Map((w.hours || []).filter(([t]) => t + HOUR_MS > cut).map((h) => [h[0], h]));
+  const first = Math.floor(now / HOUR_MS) * HOUR_MS - 23 * HOUR_MS;
+  const hours = [];
+  for (let t = first; t <= now; t += HOUR_MS) {
+    const h = byT.get(t) || [t, 0, 0, 0, 0];
+    const span = Math.min(HOUR_MS, now - t) / 1000;
+    hours.push({ t, accepted: h[1], rejected: h[2], best: h[3], hashrate: span > 0 ? h[4] * 4294967296 / span : 0 });
+  }
+  const top = (w.top24 || []).filter(([t]) => t > cut).map(([at, diff]) => ({ at, diff }));
+  return {
+    name: w.name, pool: w.pool || null, ip: w.ip || null, online: w.online > 0,
+    hours, top,
+    accepted: hours.reduce((n, h) => n + h.accepted, 0),
+    rejected: hours.reduce((n, h) => n + h.rejected, 0),
+    best: hours.reduce((m, h) => Math.max(m, h.best), 0),
+    bestEver: w.bestEver || 0,
+    hashrate24h: hashrateOver(w, DAY_MS),
+    recent: recent.filter((r) => r.worker === w.name).slice(0, 15),
+  };
+}
 function hashrateOver(w, ms) {
   const now = Date.now();
   if (ms >= DAY_MS) {
@@ -419,6 +459,7 @@ function session(down, route) {
             w.lastShareDiff = p.diff;
             w.window.push([p.at, p.target]);
             addBin(w, p.at, p.target);
+            noteHour(w, p.at, true, p.diff, p.target);
             if (p.diff > w.bestSession) w.bestSession = p.diff;
             if (p.diff > w.bestEver) w.bestEver = p.diff;
             if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
@@ -443,6 +484,7 @@ function session(down, route) {
             return;
           } else {
             w.rejected++;
+            noteHour(w, p.at, false);
             const kind = rejectKind(m.error);
             if (kind === 'stale' || kind === 'duplicate') w[kind] = (w[kind] || 0) + 1;
             entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
@@ -502,10 +544,16 @@ function startServers() {
 
   const statsServer = http.createServer((req, res) => {
     if (!req.url.startsWith('/stats')) { res.writeHead(404); return res.end(); }
+    if (req.url.startsWith('/stats/worker')) {
+      const name = new URL(req.url, 'http://x').searchParams.get('name') || '';
+      const w = Object.prototype.hasOwnProperty.call(workers, name) ? workers[name] : null;
+      res.writeHead(w ? 200 : 404, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+      return res.end(JSON.stringify(w ? workerDay(w) : { error: 'noworker' }));
+    }
     const list = Object.values(workers).map((w) => {
       const { window, subs, ...rest } = w;
       const hr = hashrate(w);   // poda a janela antes de contar
-      const { bins, ...slim } = rest;
+      const { bins, hours, top24, ...slim } = rest;
       return { ...slim, hashrate: hr, shares1h: w.window.length, hashrate15m: hashrateOver(w, 15 * 60e3), hashrate24h: hashrateOver(w, DAY_MS), stale: w.stale || 0, duplicate: w.duplicate || 0 };
     });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -579,6 +627,8 @@ module.exports = {
   hashrateOver,
   rejectKind,
   addBin,
+  noteHour,
+  workerDay,
   safeJson,
   saveStats,
   session,

@@ -172,3 +172,23 @@ test('hashrate de ESP32 na reserva: um share aceito por sorte não vira 100x mai
   const hn = proxy.hashrate(n);
   assert.ok(Math.abs(hn - 60 * 4294967296 / 1800) / hn < 0.05);
 });
+
+test('últimas 24 h do worker (modal): por hora, top 10 e o que passou de 24 h sai', () => {
+  const now = Date.now();
+  const w = { name: 'orangeone', pool: 'atlaspool', ip: '192.168.0.138', online: 1, bestEver: 15e6 };
+  proxy.noteHour(w, now - 30 * 3600e3, true, 9e9, 2000);   // velho: não conta
+  for (let i = 0; i < 12; i++) proxy.noteHour(w, now - i * 1000, true, 1000 * (i + 1), 2000);
+  proxy.noteHour(w, now - 3 * 3600e3, true, 5e6, 2000);
+  proxy.noteHour(w, now - 3 * 3600e3, false);
+  const d = proxy.workerDay(w, now);
+  assert.strictEqual(d.hours.length, 24);
+  assert.strictEqual(d.hours[23].t, Math.floor(now / 3600e3) * 3600e3);
+  assert.strictEqual(d.accepted, 13);
+  assert.strictEqual(d.rejected, 1);
+  assert.strictEqual(d.best, 5e6);
+  assert.strictEqual(d.top.length, 10);
+  assert.strictEqual(d.top[0].diff, 5e6);
+  assert.ok(d.top.every((t) => t.diff !== 9e9));
+  assert.strictEqual(d.name, 'orangeone');
+  assert.ok(d.hours[23].hashrate > 0);
+});
