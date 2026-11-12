@@ -728,3 +728,16 @@ test('recordes com dificuldade fracionária (< 1, ex.: NerdMiner / ESP32)', () =
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Regressão (#44): com workers.json e records.json já preenchidos (qualquer instalação em uso), carregar o painel quebrava
+// ("Cannot access 'sameShare' before initialization") e o serviço ficava reiniciando.
+test('carrega com workers.json e records.json existentes', () => {
+  const { execFileSync } = require('child_process');
+  const os = require('os'), fs = require('fs'), path = require('path');
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'pn-'));
+  fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({ nerd: { name: 'nerd', bestDifficulty: 0.42, lastSeen: new Date().toISOString() } }));
+  fs.writeFileSync(path.join(dir, 'records.json'), JSON.stringify([{ worker: 'nerd', value: 0.3, at: new Date().toISOString() }]));
+  const out = execFileSync(process.execPath, ['-e', "const p=require('./src/painel'); console.log(JSON.stringify(p.recordsList ? p.recordsList() : 'ok'))"], { env: { ...process.env, DATA_DIR: dir }, encoding: 'utf8' });
+  assert.ok(out.trim().length > 0);
+  fs.rmSync(dir, { recursive: true, force: true });
+});
