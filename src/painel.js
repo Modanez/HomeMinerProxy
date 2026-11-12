@@ -1202,6 +1202,8 @@ const PAGE = `<!doctype html>
   .bx .bxh { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
   .bx .bxh b { font-size:15px; }
   .bx .bxh a { margin-left:auto; font-size:12px; color:var(--dim); }
+  .bx .bxh a.axeos { font-size:13px; color:var(--ok); border:1px solid var(--line); border-radius:8px; padding:3px 9px; text-decoration:none; }
+  .bx .bxh a.axeos span { color:var(--dim); }
   .bxg { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px 14px; margin-top:8px; }
   .bxg div { font-size:14px; }
   .bxg span { display:block; font-size:11px; color:var(--dim); }
@@ -1783,7 +1785,7 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: 'abrir o AxeOS ↗', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: '🌐 AxeOS', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras' };
 // Gráficos de 24 h do Bitaxe: dois pequenos lado a lado (hashrate e chip), cada um com o seu eixo, nunca dois eixos no mesmo
 const BXCH = {};   // id do gráfico → pontos, para o tooltip
 function bxChart(id, title, pts, fmt) {
@@ -1838,7 +1840,8 @@ function renderBitaxes(j) {
   const st = (label, val) => '<div><span>' + label + '</span>' + val + '</div>';
   $('bxlist').innerHTML = list.map((b) => {
     const d = b.data;
-    const link = /^[\w.:\-]+$/.test(b.host) ? '<a href="http://' + esc(b.host) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + '</a>' : '';
+    const addr = (d && d.ip) || b.host;   // IP primeiro: nome .local não abre em todo celular
+    const link = /^[\w.:\-]+$/.test(addr) ? '<a class="axeos" href="http://' + esc(addr) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + ' <span>' + esc(addr) + '</span> ↗</a>' : '';
     const head = '<div class="bxh"><b>' + esc(b.name) + '</b><span class="sub">' + esc([d && d.model, d && d.version, b.host].filter(Boolean).join(' · ')) + '</span>' +
       (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '<a href="/config#miners">' + BXT.actions + '</a></div>';
     if (!d) return '<div class="bx">' + head + '</div>';

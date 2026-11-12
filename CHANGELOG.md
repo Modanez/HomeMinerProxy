@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **"🌐 AxeOS" button on each Bitaxe card:** opens the miner's own AxeOS page by IP (the address AxeOS reports, falling back to the registered host), since `.local` names don't open on every phone. The IP is shown on the button.
 - **Umbrel app (community store):** the `umbrel/` folder is an Umbrel community app store with HomeMinerProxy (dashboard behind Umbrel's login, Stratum ports open on the Umbrel's IP, data in the app folder, multi-arch image from GHCR). See `umbrel/README.md`. The Docker image now also exposes ports 3340 and 3341.
 - **Record sound ("tam-tam-tam-tammm"):** the record celebration now plays a short fanfare in the browser, generated live with Web Audio (no audio file): the full fanfare for a farm record, a short "tam-tammm" for a personal one. 🔊/🔇 in the top bar turns it on or off (remembered per browser). Browsers only allow sound after a tap on the page; for kiosk mode, start Chromium with `--autoplay-policy=no-user-gesture-required`.
 - **Bitaxe "regulator hot" alert at 95 °C (was 80 °C):** the first real Gamma 602 runs its voltage regulator at ~82 °C with the chip at 60 °C, which is normal; the old limit fired a false alarm. AxeOS itself stops hashing only above 105 °C (and resumes at 95 °C), so 95 °C warns before that.
@@ -27,6 +28,7 @@
 - Fixed in Settings: "Use these" after the Bitaxe scan always named them bitaxe1, bitaxe2… instead of their worker name, and a Sonoff address with a port (`host:8081`) was refused in the browser.
 
 ### Português
+- **Botão "🌐 AxeOS" em cada cartão do Bitaxe:** abre a página do próprio AxeOS pelo IP (o endereço que o AxeOS informa; sem ele, o host cadastrado), porque nome `.local` não abre em todo celular. O IP aparece no botão.
 - **App para Umbrel (loja comunitária):** a pasta `umbrel/` é uma loja comunitária do Umbrel com o HomeMinerProxy (painel atrás do login do Umbrel, portas Stratum abertas no IP do Umbrel, dados na pasta do app, imagem multi-arquitetura do GHCR). Veja `umbrel/README.md`. A imagem Docker também passa a expor as portas 3340 e 3341.
 - **Som de recorde ("tam-tam-tam-tammm"):** a comemoração de recorde agora toca uma fanfarra curta no navegador, gerada na hora com Web Audio (sem arquivo de áudio): a fanfarra inteira no recorde da fazenda, um "tam-tammm" curto no recorde pessoal. O 🔊/🔇 da barra superior liga ou desliga (fica guardado em cada navegador). Os navegadores só liberam som depois de um toque na página; no modo quiosque, abra o Chromium com `--autoplay-policy=no-user-gesture-required`.
 - **Alerta "regulador quente" do Bitaxe em 95 °C (era 80 °C):** o primeiro Gamma 602 de verdade trabalha com o regulador a ~82 °C e o chip a 60 °C, o que é normal; o limite antigo dava alarme falso. O próprio AxeOS só para de minerar acima de 105 °C (e volta a 95 °C), então 95 °C avisa antes disso.
