@@ -1,0 +1,50 @@
+manifestVersion: 1
+id: modanez-homeminerproxy
+category: bitcoin
+name: HomeMinerProxy
+version: "0.6.0"
+tagline: Stratum proxy and dashboard for home solo "lottery" mining
+icon: https://raw.githubusercontent.com/Modanez/HomeMinerProxy/main/umbrel/icon.svg
+description: >-
+  Point every miner in the house (Bitaxe, NerdMiner/ESP32, cpuminer on a PC or phone) at your Umbrel and
+  follow the whole farm on one dashboard.
+
+
+  - Local Stratum proxy: one port per pool (public-pool, ckpool solo, nerdminers, Bitronics, OCEAN, atlaspool),
+  with automatic backup pools and failback once the main pool is stable again.
+
+  - Dashboard: best difficulty, hashrate, odds of a block, "almost a block" shares, history charts,
+  championship and achievements, kiosk mode for a small screen.
+
+  - Bitaxe: temperature, power, fan and pool through the AxeOS API, alerts and actions (restart, pause,
+  point at the proxy).
+
+  - Miner discovery on your network, Telegram bot, MQTT / Home Assistant, smart plugs (Tuya, Sonoff),
+  English and Brazilian Portuguese.
+
+
+  It never asks for a seed or private key, only your public Bitcoin address. Home mining is a lottery,
+  not an income.
+
+
+  Miner ports (open on your Umbrel's IP): 3333 public-pool · 3334 ckpool solo · 3335 nerdminers ·
+  3340 Bitronics (NerdMiner) · 3341 Bitronics (Bitaxe, solo or #group) · 3337 OCEAN · 3338 atlaspool ·
+  3339 ckpool solo EU.
+developer: Paulo Modanez
+website: https://github.com/Modanez/HomeMinerProxy
+dependencies: []
+repo: https://github.com/Modanez/HomeMinerProxy
+support: https://github.com/Modanez/HomeMinerProxy/issues
+port: 3098
+gallery:
+  - https://raw.githubusercontent.com/Modanez/HomeMinerProxy/main/docs/img/dashboard.png
+  - https://raw.githubusercontent.com/Modanez/HomeMinerProxy/main/docs/img/almost-a-block.png
+  - https://raw.githubusercontent.com/Modanez/HomeMinerProxy/main/docs/img/history.png
+path: ""
+defaultUsername: ""
+defaultPassword: ""
+releaseNotes: >-
+  First Umbrel release. On first open, a short wizard asks for your Bitcoin address, language and a PIN
+  for the settings.
+submitter: Paulo Modanez
+submission: https://github.com/Modanez/HomeMinerProxy

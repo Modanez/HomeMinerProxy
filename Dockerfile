@@ -13,6 +13,6 @@ ENV DATA_DIR=/data NODE_ENV=production
 VOLUME /data
 USER node
 
-# 3000 dashboard · 3333-3339 Stratum proxy (3336 is internal stats, not published)
-EXPOSE 3000 3333 3334 3335 3337 3338 3339
+# 3000 dashboard · 3333-3341 Stratum proxy (3336 is internal stats, not published)
+EXPOSE 3000 3333 3334 3335 3337 3338 3339 3340 3341
 CMD ["node", "painel.js"]
