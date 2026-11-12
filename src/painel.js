@@ -1300,6 +1300,17 @@ const PAGE = `<!doctype html>
   .pm-btns { flex-wrap:wrap; } a.pm-btn { text-decoration:none; display:inline-flex; align-items:center; }
   .dn-foot { font-size:12px; }
   .cx-item.cx-donate .ic { filter:none; opacity:.9; }
+  /* modal do worker: últimas 24 h */
+  #rows tr[data-w] { cursor:pointer; } #rows tr[data-w]:hover td { background:var(--gold-soft); }
+  .wk-box { max-width:680px; max-height:calc(100vh - 32px); overflow:auto; }
+  .wk-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; } .wk-head b { font-size:18px; } .wk-head .sub { color:var(--dim); font-size:13px; }
+  .wk-sum { display:grid; grid-template-columns:repeat(4, 1fr); gap:8px; }
+  .wk-sum div { border:1px solid var(--line); border-radius:8px; padding:8px 10px; } .wk-sum span { display:block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; } .wk-sum strong { font-size:16px; }
+  .wk-ch { width:100%; height:auto; display:block; } .wk-l { color:var(--dim); font-size:12px; text-transform:uppercase; letter-spacing:.06em; margin-top:4px; }
+  .wk-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px 12px; font-size:13px; font-variant-numeric:tabular-nums; }
+  .wk-list span { color:var(--dim); } .wk-list .bad { color:var(--warn); }
+  #wkMsg { color:var(--dim); font-size:13px; }
+  @media (max-width:560px) { .wk-sum { grid-template-columns:repeat(2, 1fr); } }
   .pm-btn.pm-ok { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #111); font-weight:600; }
   .tooltip { position:fixed; pointer-events:none; background:var(--tip-bg); box-shadow:var(--shadow); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
   .tooltip b { color:var(--txt); } .tooltip span { color:var(--dim); }
@@ -1525,6 +1536,10 @@ const PAGE = `<!doctype html>
 <span class="dn-ok" id="dnOk"></span>
 <div class="pm-btns"><button type="button" class="pm-btn" id="dnClose">Fechar</button><a class="pm-btn" id="dnOpen" href="#">Abrir na carteira</a><button type="button" class="pm-btn pm-ok" id="dnCopy">Copiar endereço</button></div>
 <p class="pm-hint dn-foot">Dá para esconder este item em Configurações → Fazenda.</p></div></div>
+<div class="pinmodal" id="wkModal" hidden role="dialog" aria-modal="true"><div class="pm-box wk-box">
+<div class="wk-head"><b id="wkName"></b><span class="sub" id="wkSub"></span></div>
+<div id="wkMsg"></div><div id="wkBody"></div>
+<div class="pm-btns"><button type="button" class="pm-btn" id="wkClose">Fechar</button></div></div></div>
 <div class="tooltip" id="tip"></div>
 <div class="ticket" id="ticket">
   <img id="ticketImg" alt="">
@@ -1564,6 +1579,7 @@ const MESES = ['jan','fev','mar','abr','mai','jun','jul','ago','set','out','nov'
 const mesAno = (ms) => { const d = new Date(ms); return MESES[d.getMonth()] + '/' + d.getFullYear(); };
 const diaMes = (ms) => new Date(ms).toLocaleDateString(LOC, { day: '2-digit', month: '2-digit' });
 const hora = (ms) => new Date(ms).toLocaleTimeString(LOC, { hour: '2-digit', minute: '2-digit' });
+const WKT = { click: 'ver as últimas 24 h', loading: 'carregando…', none: 'Sem dados do proxy para este worker (ele minera direto numa pool ou ainda não mandou shares pelo proxy).', acc: 'Shares aceitos', rej: 'Recusados', best: 'Melhor (24 h)', hr: 'Hashrate (24 h)', perHour: 'Shares por hora', bestHour: 'Melhor dificuldade por hora', top: 'Melhores hashes (24 h)', last: 'Últimos shares', ever: 'recorde', online: 'conectado', offline: 'desconectado', noShares: 'nenhum share nas últimas 24 h' };
 const money = (v) => v.toLocaleString(LOC, { style: 'currency', currency: CUR });
 const moneyCompact = (v) => v >= 1e6 ? v.toLocaleString(LOC, { style: 'currency', currency: CUR, notation: 'compact', maximumFractionDigits: 2 }) : money(v);
 
@@ -1919,7 +1935,7 @@ function renderFarm(j) {
     const netInfo = det ? ' <span class="sub" title="extranonce1: ' + esc(w.extranonce1 || '–') + '">' + esc(det) + '</span>' : '';
     const rej = w.rejected > 0 ? ' <span class="sub" title="recusados pela pool: stale = job vencido, duplicado = share repetido">✗ ' + w.rejected + ' (stale ' + (w.stale || 0) + ' · duplicado ' + (w.duplicate || 0) + ')</span>' : '';
     const trophy = j.championship && j.championship.leader && j.championship.leader.name === w.name ? ' 🏆' : '';
-    return '<tr><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + netInfo + rej + temp +
+    return '<tr data-w="' + esc(w.name) + '" title="' + WKT.click + '"><td><span class="dot' + cls + '"></span>' + esc(w.name) + trophy + pool + netInfo + rej + temp +
       '</td><td' + dim + '>' + hr + '</td><td>' + best +
       '</td><td' + dim + '>' + seen + '</td></tr>';
   }).join('') : '<tr><td colspan="4" class="sub">nenhum worker enviou shares ainda</td></tr>';
@@ -2395,6 +2411,48 @@ $('dnCopy').addEventListener('click', async () => {
   let ok = false; try { ok = document.execCommand('copy'); } catch (_) { /* segue */ }
   set('dnOk', ok ? DN.copied : DN.select);
 });
+// ---- modal do worker: as últimas 24 h que o proxy guardou (shares por hora e dificuldade dos hashes)
+function wkChart(hours, val, color, logScale, fmt, stack) {
+  const W = 640, H = 120, P = 22, n = hours.length, bw = (W - 8) / n;
+  const tr = (v) => (logScale ? (v > 0 ? Math.max(0.05, Math.log10(v) + 3) : 0) : v);   // log: 0,001 → 0 (cabem os ESP32)
+  const max = Math.max(1e-9, ...hours.map((h) => tr(val(h)) + (stack ? tr(stack(h)) : 0)));
+  let svg = '<svg class="wk-ch" viewBox="0 0 ' + W + ' ' + (H + P) + '" role="img">';
+  hours.forEach((h, i) => {
+    const x = 4 + i * bw, v = val(h), y = (H - 14) * tr(v) / max;
+    const tip = hora(h.t) + ' · ' + fmt(h);
+    if (v > 0) svg += '<rect x="' + (x + 1).toFixed(1) + '" y="' + (H - y).toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + y.toFixed(1) + '" rx="2" fill="' + color + '"><title>' + esc(tip) + '</title></rect>';
+    if (stack && stack(h) > 0) { const y2 = (H - 14) * tr(stack(h)) / max; svg += '<rect x="' + (x + 1).toFixed(1) + '" y="' + (H - y - y2).toFixed(1) + '" width="' + (bw - 2).toFixed(1) + '" height="' + y2.toFixed(1) + '" rx="2" fill="var(--warn)"><title>' + esc(tip) + '</title></rect>'; }
+    if (i % 6 === 0 || i === n - 1) svg += '<text x="' + (i === 0 ? x : i === n - 1 ? x + bw : x + bw / 2).toFixed(1) + '" y="' + (H + 15) + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '" font-size="14" fill="var(--dim)">' + hora(h.t) + '</text>';
+  });
+  const top = hours.reduce((b, h) => (val(h) > val(b) ? h : b), hours[0]);
+  if (top && val(top) > 0) { const i = hours.indexOf(top), x = 4 + i * bw + bw / 2, y = H - (H - 14) * tr(val(top)) / max - 3; svg += '<text x="' + Math.min(Math.max(x, 30), W - 30).toFixed(1) + '" y="' + Math.max(y, 11).toFixed(1) + '" text-anchor="middle" font-size="14" fill="var(--txt)">' + esc(fmt(top)) + '</text>'; }
+  return svg + '<line x1="0" y1="' + H + '" x2="' + W + '" y2="' + H + '" stroke="var(--line)"/></svg>';
+}
+async function openWorker(name) {
+  $('wkModal').hidden = false;
+  set('wkName', name); set('wkSub', ''); set('wkMsg', WKT.loading); $('wkBody').innerHTML = '';
+  let d = null;
+  try { const r = await fetch('/api/worker?name=' + encodeURIComponent(name)); if (r.ok) d = await r.json(); } catch (_) { /* segue */ }
+  if ($('wkModal').hidden || $('wkName').textContent !== name) return;
+  if (!d || !d.hours) { set('wkMsg', WKT.none); return; }
+  set('wkMsg', '');
+  set('wkSub', [d.online ? '🟢 ' + WKT.online : '⚪ ' + WKT.offline, d.pool, d.ip, WKT.ever + ' ' + diffTxt(d.bestEver)].filter(Boolean).join(' · '));
+  const card = (l, v) => '<div><span>' + l + '</span><strong>' + v + '</strong></div>';
+  let html = '<div class="wk-sum">' + card(WKT.acc, nf(d.accepted)) + card(WKT.rej, nf(d.rejected)) + card(WKT.best, d.best > 0 ? diffTxt(d.best) : '–') + card(WKT.hr, fmtHash(d.hashrate24h)) + '</div>';
+  if (!d.accepted && !d.rejected) html += '<p class="pm-hint">' + WKT.noShares + '</p>';
+  else {
+    html += '<div class="wk-l">' + WKT.perHour + '</div>' + wkChart(d.hours, (h) => h.accepted, 'var(--ok)', false, (h) => nf(h.accepted) + (h.rejected ? ' · ✗ ' + h.rejected : '') + ' · ' + fmtHash(h.hashrate), (h) => h.rejected);
+    html += '<div class="wk-l">' + WKT.bestHour + '</div>' + wkChart(d.hours, (h) => h.best, 'var(--gold)', true, (h) => diffTxt(h.best));
+  }
+  if (d.top && d.top.length) html += '<div class="wk-l">' + WKT.top + '</div><div class="wk-list">' + d.top.map((t, i) => '<div>' + (i === 0 ? '🏆 ' : '') + '<b>' + diffTxt(t.diff) + '</b> <span>' + hora(t.at) + '</span></div>').join('') + '</div>';
+  if (d.recent && d.recent.length) html += '<div class="wk-l">' + WKT.last + '</div><div class="wk-list">' + d.recent.map((r) => '<div' + (r.ok ? '' : ' class="bad" title="' + esc(r.error || '') + '"') + '>' + (r.ok ? '' : '✗ ') + diffTxt(r.diff) + ' <span>' + hora(r.at) + '</span></div>').join('') + '</div>';
+  $('wkBody').innerHTML = html;
+}
+const closeWorker = () => { $('wkModal').hidden = true; set('wkName', ''); };
+$('rows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-w]'); if (tr && !document.body.classList.contains('kiosk')) openWorker(tr.dataset.w); });
+$('wkClose').addEventListener('click', closeWorker);
+$('wkModal').addEventListener('click', (e) => { if (e.target === $('wkModal')) closeWorker(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('wkModal').hidden) closeWorker(); });
 const closeDonate = () => { $('donateModal').hidden = true; set('dnOk', ''); };
 $('dnClose').addEventListener('click', closeDonate);
 $('donateModal').addEventListener('click', (e) => { if (e.target === $('donateModal')) closeDonate(); });
@@ -2706,6 +2764,16 @@ function requestHandler(req, res) {
     // resumo enxuto e já formatado, para widgets (KWGT etc.)
     res.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(widgetData(pickLang(req, LANGUAGE))));
+  }
+  if (req.url.startsWith('/api/worker?')) {
+    // últimas 24 h de um worker (modal do painel): o proxy guarda por hora
+    const name = (new URL(req.url, 'http://x').searchParams.get('name') || '').slice(0, 128);
+    const base = PROXY_URL();
+    const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
+    if (!base || !name) return send(404, { error: 'noproxy' });
+    getJson(base.replace(/\/stats\/?$/, '') + '/stats/worker?name=' + encodeURIComponent(name))
+      .then((d) => send(200, d)).catch(() => send(404, { error: 'noworker' }));
+    return;
   }
   if (req.url.startsWith('/api/alarm')) {
     // teste manual: /api/alarm?e=T (recorde), P, S, 0, 1 ou 2
