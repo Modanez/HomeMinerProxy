@@ -89,7 +89,7 @@ const EN = [
   ["' parado(s)'", "' stopped'"],
   ["' inativo(s) oculto(s)'", "' inactive hidden'"],
   ["'esconder inativos' : 'mostrar inativos ('", "'hide inactive' : 'show inactive ('"],
-  ["' · pool mediu ~' + fmtHash(f.poolHashrate) + ' na última hora'", "' · pool measured ~' + fmtHash(f.poolHashrate) + ' in the last hour'"],
+  ["' mediu ~' + fmtHash(f.poolHashrate) + ' na última hora (só quem minera lá)'", "' measured ~' + fmtHash(f.poolHashrate) + ' in the last hour (only miners pointed there)'"],
   ["set('odds', '1 em ' + fmtBig(od.perYear)); set('eta', 'tempo esperado: ~' + fmtBig(od.years) + ' de anos');", "set('odds', '1 in ' + fmtBig(od.perYear)); set('eta', 'expected time: ~' + fmtBig(od.years) + ' years');"],
   ["nf(sh.lastHour) + ' na última hora' + (ls ? ' · último: '", "nf(sh.lastHour) + ' in the last hour' + (ls ? ' · latest: '"],
   ["(ago(ls.at) === 'agora' ? 'agora' : 'há ' + ago(ls.at))", "(ago(ls.at) === 'now' ? 'now' : ago(ls.at) + ' ago')"],

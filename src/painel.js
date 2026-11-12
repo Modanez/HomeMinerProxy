@@ -980,6 +980,8 @@ function snapshot(internal = false) {
         : { today: Number((client.accounting || {}).acceptedSharesLastDay) || 0, lastHour: Number((client.accounting || {}).acceptedSharesLastHour) || 0, source: 'public-pool' },
       lastShare: proxyUp() ? proxy.recent.find((r) => r.ok) || null : null,
       poolHashrate: Number((client.accounting || {}).hashRateLastHour) || 0,
+      // só o que chega no POOL_API (public-pool): quem minera em outra pool não entra nessa conta
+      poolName: (() => { try { return new URL(POOL_API()).hostname.replace(/\.(io|org|com)$/, ''); } catch (_) { return 'pool'; } })(),
     },
     wallet: SHOW_WALLET || internal
       ? { ...wallet, hidden: false, fiat: CURRENCY === 'USD' ? wallet.usd : wallet.brl, fiatChange24h: CURRENCY === 'USD' ? wallet.changeUsd24h : wallet.change24h }
@@ -1878,7 +1880,7 @@ function renderFarm(j) {
   const tg = $('toggleOld');
   tg.style.display = inactive ? '' : 'none';
   tg.textContent = showInactive ? 'esconder inativos' : 'mostrar inativos (' + inactive + ')';
-  set('workers', parts.join(' · ') + (f.poolHashrate ? ' · pool mediu ~' + fmtHash(f.poolHashrate) + ' na última hora' : ''));
+  set('workers', parts.join(' · ') + (f.poolHashrate ? ' · ' + (f.poolName || 'pool') + ' mediu ~' + fmtHash(f.poolHashrate) + ' na última hora (só quem minera lá)' : ''));
   const od = odds(f.hashrate, D);
   if (od) { set('odds', '1 em ' + fmtBig(od.perYear)); set('eta', 'tempo esperado: ~' + fmtBig(od.years) + ' de anos'); }
   const sh = f.shares || { today: a.acceptedSharesLastDay || 0, lastHour: a.acceptedSharesLastHour || 0 };
