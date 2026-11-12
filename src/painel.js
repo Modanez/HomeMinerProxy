@@ -309,7 +309,8 @@ for (const w of Object.values(known)) {
   }
 }
 // O mesmo share chega por mais de um caminho (pool com 2 casas, proxy com mais): 1410,95 e 1410,9534 são um recorde só
-const sameShare = (a, b) => Math.abs(a - b) <= Math.max(Math.min(0.011, Math.max(a, b) * 0.01), Math.max(a, b) * 1e-4);
+// function (e não const): é usada logo acima, na carga dos recordes, antes desta linha rodar
+function sameShare(a, b) { return Math.abs(a - b) <= Math.max(Math.min(0.011, Math.max(a, b) * 0.01), Math.max(a, b) * 1e-4); }
 function dedupeRecords(list) {
   const out = [];
   for (const r of [...list].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0))) {
