@@ -156,5 +156,5 @@ elif [ -n "$settings_pin" ]; then
 else
   m "  Configurações: http://${ip:-IP-DO-SERVIDOR}:${port:-3000}/config (PIN criado no assistente)" "  Settings: http://${ip:-SERVER-IP}:${port:-3000}/config (PIN set in the wizard)"
 fi
-m "  Aponte os mineradores para ${ip:-IP-DO-SERVIDOR}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3340 bitronics · 3341 bitronics group · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU" \
-  "  Point your miners to ${ip:-SERVER-IP}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3340 bitronics · 3341 bitronics group · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU"
+m "  Aponte os mineradores para ${ip:-IP-DO-SERVIDOR}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3340 bitronics · 3341 bitronics ASIC · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU" \
+  "  Point your miners to ${ip:-SERVER-IP}: 3333 public-pool · 3334 ckpool solo · 3335 nerdminers · 3340 bitronics · 3341 bitronics ASIC · 3337 OCEAN · 3338 atlaspool · 3339 ckpool EU"

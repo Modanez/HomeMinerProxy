@@ -42,7 +42,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   | 3334 | solo.ckpool.org (US) | 2% |
   | 3335 | pool.nerdminers.org | 0% |
   | 3340 | pool.bitronics.store (NerdMiner port 3334) | 0% |
-  | 3341 | pool.bitronics.store SOLO Group (username `ADDRESS.worker#group`) | 1%, block split among the group |
+  | 3341 | pool.bitronics.store ASIC port: solo (`ADDRESS.worker`) or SOLO Group (`ADDRESS.worker#group`) | 0% solo · 1% group, block split among the group |
   | 3337 | OCEAN (shared payouts, not solo) | see ocean.xyz |
   | 3338 | solo.atlaspool.io (anycast, servers on every continent) | 1.5% of the subsidy |
   | 3339 | eusolo.ckpool.org (Europe) | 2% |
