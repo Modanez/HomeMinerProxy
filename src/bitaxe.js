@@ -93,6 +93,8 @@ function normalize(j) {
     board: j.boardVersion || null,
     version: j.version || null,
     hostname: j.hostname || null,
+    // IP que o próprio AxeOS informa (2.x): o link abre por ele, porque nome .local não resolve em todo celular
+    ip: [j.ipv4, j.ip].find((v) => typeof v === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(v)) || null,
     hashRate,
     hashRate1m: ghs(j.hashRate_1m),
     hashRate10m: ghs(j.hashRate_10m),

@@ -276,3 +276,9 @@ test('worker do Bitaxe em SOLO Group: sem o #grupo (e sem o .hidden)', () => {
   assert.strictEqual(d('bc1qx.bitaxe2#minhaturma.hidden'), 'bitaxe2');
   assert.strictEqual(d('bc1qx.bitaxe3'), 'bitaxe3');
 });
+
+test('IP do AxeOS para o link (ipv4 válido; senão nada)', () => {
+  assert.strictEqual(bx.normalize({ ipv4: '192.168.0.138' }).ip, '192.168.0.138');
+  assert.strictEqual(bx.normalize({ ipv4: '<script>' }).ip, null);
+  assert.strictEqual(bx.normalize({}).ip, null);
+});
