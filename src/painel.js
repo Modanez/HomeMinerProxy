@@ -1064,6 +1064,8 @@ const PAGE = `<!doctype html>
   body[data-theme="ocean"] { --bg:#0b111e; --card:#131c31; --line:#223254; --txt:#e2e8f0; --dim:#8ea0c2; --gold:#38bdf8; --on-gold:#081221; --gold-soft:rgba(56,189,248,.08); --gold-border:rgba(56,189,248,.45); --ok:#34d399; --warn:#fb7185; --backdrop:rgba(11,17,30,.88); --tip-bg:#080d18; --shadow:0 4px 18px rgba(0,0,0,.28); --radius:16px; }
   /* Neon: grafite azulado e verde neon */
   body[data-theme="neon"] { --bg:#0a111b; --card:#20272e; --line:#343d46; --txt:#eef2f5; --dim:#97a3ad; --gold:#36cf8c; --on-gold:#04140d; --gold-soft:rgba(54,207,140,.08); --gold-border:rgba(54,207,140,.5); --ok:#52eeaf; --warn:#f87171; --backdrop:rgba(10,17,27,.88); --tip-bg:#070c13; --shadow:0 4px 18px rgba(0,0,0,.3); --radius:14px; --quiet:#f2c94c; }
+  /* Preto e amarelo: estilo exchange */
+  body[data-theme="gold"] { --bg:#0b0e11; --card:#181a20; --line:#2b3139; --txt:#eaecef; --dim:#848e9c; --gold:#fcd535; --on-gold:#181a20; --gold-soft:rgba(252,213,53,.08); --gold-border:rgba(252,213,53,.5); --ok:#0ecb81; --warn:#f6465d; --backdrop:rgba(11,14,17,.9); --tip-bg:#050607; --shadow:none; --radius:8px; --quiet:#f0b90b; }
   body[data-theme="latte"] { --bg:#f5f3ee; --card:#ffffff; --line:#e2ded5; --txt:#1c1b18; --dim:#666159; --gold:#d97706; --on-gold:#ffffff; --gold-soft:rgba(217,119,6,.08); --gold-border:rgba(217,119,6,.42); --ok:#16a34a; --warn:#dc2626; --backdrop:rgba(28,27,24,.72); --tip-bg:#ffffff; --shadow:0 2px 10px rgba(28,27,24,.06); --radius:16px; }
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:var(--bg); color:var(--txt); font-family:-apple-system, "Segoe UI", Roboto, sans-serif; padding:16px; min-height:100vh; transition:background .2s, color .2s; }

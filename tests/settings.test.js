@@ -32,6 +32,7 @@ test('validação dos campos', () => {
   assert.strictEqual(st.normTheme('ocean'), 'ocean');
   assert.strictEqual(st.normTheme('latte'), 'latte');
   assert.strictEqual(st.normTheme('neon'), 'neon');
+  assert.strictEqual(st.normTheme('gold'), 'gold');
   assert.strictEqual(st.normTheme('invalido'), 'obsidian');
   assert.deepStrictEqual(st.clean(field('ALARM_IGNORE'), ['macbook', 'macbook', ' tablet ']), { value: 'macbook,tablet' });
   assert.ok(st.clean(field('ALARM_IGNORE'), ['a b']).error);
@@ -347,7 +348,7 @@ test('testCube, testTelegram, validateBackupData e rotas desconhecidas em settin
   assert.match(st.page('pt', true, 'ocean'), /data-theme="ocean"/);
   assert.match(st.page('en', true, 'latte'), /data-theme="latte"/);
   // clicar num cartão de tema troca na hora: a lista de temas precisa ir escrita no script do navegador
-  assert.ok(st.page('pt', true, 'obsidian').includes('["obsidian","ocean","neon","latte"].includes(val)'));
+  assert.ok(st.page('pt', true, 'obsidian').includes('["obsidian","ocean","neon","gold","latte"].includes(val)'));
 
   // 2. testTelegram
   assert.deepStrictEqual(await st.testTelegram('invalido', '123'), { ok: false, error: 'missing' });
