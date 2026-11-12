@@ -1,6 +1,6 @@
 {
   "name": "home-miner-proxy",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Proxy Stratum e painel para mineração solo caseira (Bitaxe, NerdMiner, cpuminer) — sem dependências",
   "license": "MIT",
   "private": true,
