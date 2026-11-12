@@ -1014,6 +1014,7 @@ function snapshot(internal = false) {
       const topRec = [...records].sort((a, b) => b.value - a.value)[0];
       const ach = evaluateAchievements({
         best,
+        networkDifficulty: pool.difficulty,
         bestWorker: topRec ? topRec.worker : null,
         totalShares: Math.max(proxyTotalShares, poolTotalShares),
         workers: view,
@@ -1244,6 +1245,9 @@ const PAGE = `<!doctype html>
   .ach-i { font-size:18px; line-height:1.2; }
   .ach-t { font-size:13px; font-weight:600; color:var(--txt); }
   .ach.on .ach-t { color:var(--gold); }
+  .ach.golden { grid-column:1 / -1; border-style:dashed; }
+  .ach.golden.on { border:2px solid #f2a900; background:linear-gradient(90deg, rgba(242,169,0,.18), rgba(242,169,0,.04)); box-shadow:0 0 18px rgba(242,169,0,.35); }
+  .ach.golden.on .ach-t { color:#f2a900; font-size:15px; }
   .ach-d { font-size:11px; color:var(--dim); line-height:1.3; margin-top:2px; }
   .hist-card .chart { height:240px; }
   body.kiosk .luck-duo { flex:1; min-height:0; }
@@ -2131,11 +2135,11 @@ function renderGamification(j) {
     const isEn = LOC !== 'pt-BR';
     for (const a of list) {
       const box = document.createElement('div');
-      box.className = 'ach' + (a.unlocked ? ' on' : '');
+      box.className = 'ach' + (a.unlocked ? ' on' : '') + (a.golden ? ' golden' : '');
       const pair = (isEn ? a.en : a.pt) || a.pt || ['', ''];
       const ico = document.createElement('span');
       ico.className = 'ach-i';
-      ico.textContent = a.unlocked ? a.icon : '🔒';
+      ico.textContent = a.unlocked || a.golden ? a.icon : '🔒';   // o troféu de ouro aparece mesmo trancado, para dar vontade
       const txt = document.createElement('div');
       const t = document.createElement('div');
       t.className = 'ach-t';

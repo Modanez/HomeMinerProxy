@@ -227,3 +227,19 @@ test('cobertura de todas as conquistas e edge cases de evaluateAchievements', ()
   assert.ok(nonArrayRes.map.first_share);
   assert.strictEqual(nonArrayRes.map.first_share.worker, null);
 });
+
+test('conquistas: 1 trilhão e o prêmio de ouro (bloco = share acima da dificuldade da rede)', () => {
+  const net = 148.4e12, now = Date.now();
+  const quase = evaluateAchievements({ best: 2e12, bestWorker: 'orangeone', networkDifficulty: net }, {}, now);
+  const ids = quase.newlyUnlocked.map((a) => a.id);
+  assert.ok(ids.includes('diff_1t'));
+  assert.ok(!ids.includes('block'));
+  const semRede = evaluateAchievements({ best: 2e14, bestWorker: 'orangeone' }, {}, now);   // sem dificuldade conhecida, não inventa bloco
+  assert.ok(!semRede.newlyUnlocked.some((a) => a.id === 'block'));
+  const bloco = evaluateAchievements({ best: 150e12, bestWorker: 'orangeone', networkDifficulty: net }, quase.map, now);
+  assert.deepStrictEqual(bloco.newlyUnlocked.map((a) => a.id), ['block']);
+  assert.strictEqual(bloco.map.block.worker, 'orangeone');
+  const g = bloco.list.find((a) => a.id === 'block');
+  assert.ok(g.golden && g.unlocked);
+  assert.strictEqual(ACHIEVEMENTS[ACHIEVEMENTS.length - 1].id, 'block', 'o prêmio de ouro fica por último');
+});

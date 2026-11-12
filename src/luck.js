@@ -73,17 +73,21 @@ const ACHIEVEMENTS = [
   { id: 'diff_1k', icon: '🎯', pt: ['Clube dos 1.000', 'Um share com dificuldade acima de 1.000'], en: ['1,000 club', 'A share with difficulty over 1,000'] },
   { id: 'diff_1m', icon: '🚀', pt: ['Um em um milhão', 'Um share com dificuldade acima de 1 milhão'], en: ['One in a million', 'A share with difficulty over 1 million'] },
   { id: 'diff_1b', icon: '☄️', pt: ['Quase bloco (1 bi)', 'Um share com dificuldade acima de 1 bilhão'], en: ['Billionaire hash', 'A share with difficulty over 1 billion'] },
+  { id: 'diff_1t', icon: '🌋', pt: ['Um trilhão', 'Um share com dificuldade acima de 1 trilhão'], en: ['Trillion hash', 'A share with difficulty over 1 trillion'] },
   { id: 'shares_1k', icon: '📦', pt: ['Mil tentativas', '1.000 shares aceitos na fazenda'], en: ['A thousand tries', '1,000 accepted shares on the farm'] },
   { id: 'shares_100k', icon: '🏭', pt: ['100 mil tentativas', '100.000 shares aceitos na fazenda'], en: ['100,000 tries', '100,000 accepted shares on the farm'] },
   { id: 'luck_2x', icon: '🍀', pt: ['Dobro da sorte', 'Worker com sorte de pelo menos 2× o esperado'], en: ['Double luck', 'A worker with at least 2× expected luck'] },
   { id: 'luck_10x', icon: '⚡', pt: ['Raio na cabeça (10×)', 'Worker com sorte de pelo menos 10× o esperado'], en: ['Lightning strike (10×)', 'A worker with at least 10× expected luck'] },
   { id: 'week_nonstop', icon: '🛡️', pt: ['Uma semana sem parar', '7 dias seguidos minerando sem cair'], en: ['One week nonstop', '7 days in a row mining without stopping'] },
   { id: 'underdog', icon: '🐢', pt: ['Troféu vovô', 'Líder da semana com menos de 10% do maior hashrate'], en: ['Underdog trophy', 'Weekly leader with under 10% of the top hashrate'] },
+  // o prêmio de ouro: um share acima da dificuldade da rede é um bloco
+  { id: 'block', icon: '🏆', golden: true, pt: ['Prêmio de ouro: bloco achado!', 'Um share acima da dificuldade da rede: a fazenda achou um bloco'], en: ['Golden prize: block found!', 'A share above the network difficulty: the farm found a block'] },
 ];
 
 // Avalia quais conquistas já foram atingidas e preserva as já desbloqueadas em `saved`.
 function evaluateAchievements(ctx = {}, saved = {}, now = Date.now()) {
   const best = Number(ctx.best) || 0;
+  const netDiff = Number(ctx.networkDifficulty) || 0;
   const bestWorker = ctx.bestWorker && ctx.bestWorker !== '—' ? ctx.bestWorker : null;
   const totalShares = Number(ctx.totalShares) || 0;
   const workers = Array.isArray(ctx.workers) ? ctx.workers : [];
@@ -104,12 +108,14 @@ function evaluateAchievements(ctx = {}, saved = {}, now = Date.now()) {
     diff_1k: () => (best >= 1e3 ? { worker: bestWorker } : null),
     diff_1m: () => (best >= 1e6 ? { worker: bestWorker } : null),
     diff_1b: () => (best >= 1e9 ? { worker: bestWorker } : null),
+    diff_1t: () => (best >= 1e12 ? { worker: bestWorker } : null),
     shares_1k: () => (totalShares >= 1e3 ? { worker: null } : null),
     shares_100k: () => (totalShares >= 1e5 ? { worker: null } : null),
     luck_2x: () => (topLuck && topLuck.factor >= 2 ? { worker: topLuck.name } : null),
     luck_10x: () => (topLuck && topLuck.factor >= 10 ? { worker: topLuck.name } : null),
     week_nonstop: () => (nonstop ? { worker: nonstop.name } : null),
     underdog: () => (isUnderdog ? { worker: leaderName } : null),
+    block: () => (netDiff > 0 && best >= netDiff ? { worker: bestWorker } : null),
   };
 
   const map = {};
@@ -130,6 +136,7 @@ function evaluateAchievements(ctx = {}, saved = {}, now = Date.now()) {
   const list = ACHIEVEMENTS.map((a) => ({
     id: a.id,
     icon: a.icon,
+    golden: !!a.golden,
     pt: a.pt,
     en: a.en,
     unlocked: !!map[a.id],
