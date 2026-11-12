@@ -299,14 +299,17 @@ const proxyUp = () => !!PROXY_URL() && Date.now() - proxy.okAt < 2 * 60e3;
 let known = loadJson('workers.json', {});
 
 let records = loadJson('records.json', null);
-if (!Array.isArray(records)) {
-  records = Object.values(known)
-    .filter((w) => Number(w.bestDifficulty) > 0)
-    .map((w) => ({ worker: w.name, value: Number(w.bestDifficulty), at: w.lastSeen }));
-  saveJson('records.json', records);
+let recordsDirty = false;
+if (!Array.isArray(records)) { records = []; recordsDirty = true; }
+for (const w of Object.values(known)) {
+  const v = Number(w.bestDifficulty);
+  if (v > 0 && !records.some((r) => (r.worker === w.name || r.worker === '—') && sameShare(r.value, v))) {
+    records.push({ worker: w.name, value: v, at: w.lastSeen || new Date().toISOString() });
+    recordsDirty = true;
+  }
 }
 // O mesmo share chega por mais de um caminho (pool com 2 casas, proxy com mais): 1410,95 e 1410,9534 são um recorde só
-const sameShare = (a, b) => Math.abs(a - b) <= Math.max(0.011, Math.max(a, b) * 1e-4);
+const sameShare = (a, b) => Math.abs(a - b) <= Math.max(Math.min(0.011, Math.max(a, b) * 0.01), Math.max(a, b) * 1e-4);
 function dedupeRecords(list) {
   const out = [];
   for (const r of [...list].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0))) {
@@ -318,7 +321,8 @@ function dedupeRecords(list) {
 }
 {
   const clean = dedupeRecords(records);
-  if (clean.length !== records.length) { console.log(`recordes: ${records.length - clean.length} repetido(s) removido(s)`); records = clean; saveJson('records.json', records); }
+  if (clean.length !== records.length) { console.log(`recordes: ${records.length - clean.length} repetido(s) removido(s)`); records = clean; recordsDirty = true; }
+  if (recordsDirty) saveJson('records.json', records);
 }
 
 let history = loadJson('history.json', []);
@@ -348,7 +352,8 @@ function rememberWorkers(workers, poolName) {
     const prev = known[w.name] || {};
     const prevBest = Number(prev.bestDifficulty || 0);
     const best = Number(w.bestDifficulty || 0);
-    if (best > prevBest && best >= 1 && !sameShare(best, prevBest)) addRecord(w.name, best);
+    const hasRec = records.some((r) => (r.worker === w.name || r.worker === '—') && sameShare(r.value, best));
+    if (((best > prevBest && !sameShare(best, prevBest)) || (!hasRec && best > 0)) && best > 0) addRecord(w.name, best);
     known[w.name] = {
       name: w.name,
       hashRate: Number(w.hashRate || 0),
@@ -934,7 +939,8 @@ async function tickTuya() {
 function snapshot(internal = false) {
   const view = workersView();
   const client = pool.client || {};
-  const best = Math.max(Number(client.bestDifficulty || 0), topRecord());
+  const proxyBest = Number((proxy.bestHash && proxy.bestHash.diff) || 0);
+  const best = Math.max(Number(client.bestDifficulty || 0), topRecord(), proxyBest);
   const halving = net.tip ? (() => {
     const remaining = Math.max(0, NEXT_HALVING - net.tip.height);
     return { remaining, at: Date.now() + remaining * ((net.adj && net.adj.timeAvg) || 600000) };
@@ -1888,7 +1894,7 @@ function renderBitaxes(j) {
 function renderFarm(j) {
   const f = j.farm, a = f.accounting || {}, D = f.difficulty;
   if (!f.hasData) return;
-  set('best', f.best >= 1e7 ? fmtBig(f.best) : nf(f.best, 2));   // recordes enormes não cabem no cartão
+  set('best', f.best >= 1e7 ? fmtBig(f.best) : f.best > 0 && f.best < 0.01 ? nf(f.best, 4) : nf(f.best, 2));   // recordes enormes não cabem no cartão
   set('dist', f.best > 0 ? 'faltam ' + fmtBig(D / f.best) + ' de vezes' : '–');
   set('hash', fmtHash(f.hashrate));
   const av = f.hashrateAvg;
@@ -2319,7 +2325,7 @@ function renderHistory(j) {
   const medals = ['1º', '2º', '3º', '4º', '5º'];
   const hall = j.hall || [];
   $('hall').innerHTML = hall.length ? hall.map((r, i) =>
-    '<li><span class="pos' + (i === 0 ? ' first' : '') + '">' + medals[i] + '</span><span class="val">' + nf(r.value, 2) +
+    '<li><span class="pos' + (i === 0 ? ' first' : '') + '">' + medals[i] + '</span><span class="val">' + (r.value > 0 && r.value < 0.01 ? nf(r.value, 4) : nf(r.value, 2)) +
     '</span><span class="who">' + esc(r.worker) + '<br>' + (r.at ? diaMes(r.at) : '') + '</span></li>').join('')
     : '<li><span></span><span class="sub">nenhum recorde ainda</span></li>';
 
@@ -2728,7 +2734,7 @@ function widgetData(lang) {
   const pingMs = px && px.pingMs;
   const pingLabel = (W.ping && W.ping[pingScore]) || pingScore || '';
   return {
-    recorde: fmtNum(f.best, 2),
+    recorde: fmtNum(f.best, f.best > 0 && f.best < 0.01 ? 4 : 2),
     recordeNum: f.best,
     recordista: holder ? holder.worker : '',
     faltam: f.best > 0 ? fmtBigW(f.difficulty / f.best) + W.times : '',

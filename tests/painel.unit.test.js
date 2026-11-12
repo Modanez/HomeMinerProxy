@@ -694,3 +694,37 @@ test('recordes repetidos já gravados: limpa mantendo o mais antigo e o nome do 
     ['tablet', 774.93, '2026-11-05T09:02:00Z'],
   ]);
 });
+
+test('recordes com dificuldade fracionária (< 1, ex.: NerdMiner / ESP32)', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-nerd-'));
+  const oldDataDir = process.env.DATA_DIR;
+  process.env.DATA_DIR = dir;
+  const state = painel._state();
+  const oldRecords = state.records.slice();
+  const oldPoolClient = state.pool.client;
+  state.records.length = 0;
+  state.pool.client = {};
+  try {
+    const at = new Date().toISOString();
+    // Share inicial com diff < 1 deve ser registrado
+    painel.rememberWorkers([{ name: 'nmminer', hashRate: 994000, bestDifficulty: 0.297, lastSeen: at }], 'nerdminers');
+    assert.strictEqual(painel.topRecord(), 0.297);
+    assert.strictEqual(painel.snapshot().farm.best, 0.297);
+
+    // Novo recorde fracionário
+    painel.rememberWorkers([{ name: 'nmminer', hashRate: 994000, bestDifficulty: 0.5339238, lastSeen: at }], 'nerdminers');
+    assert.strictEqual(painel.topRecord(), 0.5339238);
+    assert.strictEqual(painel.snapshot().farm.best, 0.5339238);
+
+    // O mesmo share vindo com menos casas decimais (ex.: 0.53) não duplica
+    painel.rememberWorkers([{ name: 'nmminer', hashRate: 994000, bestDifficulty: 0.53, lastSeen: at }], 'nerdminers');
+    const records = painel.snapshot().hall.filter((r) => r.worker === 'nmminer');
+    assert.strictEqual(records.length, 2); // 0.297 e 0.5339238
+  } finally {
+    state.records.length = 0;
+    state.records.push(...oldRecords);
+    state.pool.client = oldPoolClient;
+    process.env.DATA_DIR = oldDataDir;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
