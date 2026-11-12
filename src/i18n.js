@@ -140,6 +140,8 @@ const EN = [
   ["id=\"dnCopy\">Copiar endereço</button>", "id=\"dnCopy\">Copy address</button>"],
   ["<p class=\"pm-hint dn-foot\">Dá para esconder este item em Configurações → Fazenda.</p>", "<p class=\"pm-hint dn-foot\">You can hide this item in Settings → Farm.</p>"],
   ["const DN = { copied: 'Endereço copiado. Obrigado! 🧡', select: 'Selecionado: use Ctrl+C / Copiar.' };", "const DN = { copied: 'Address copied. Thank you! 🧡', select: 'Selected: use Ctrl+C / Copy.' };"],
+  ["id=\"cxSound\" title=\"Som dos recordes\">", "id=\"cxSound\" title=\"Record sound\">"],
+  ["const SND = { on: 'Som dos recordes: ligado', off: 'Som dos recordes: desligado' };", "const SND = { on: 'Record sound: on', off: 'Record sound: off' };"],
   ['<button type="button" class="pm-btn pm-ok" id="enPinOk">Confirmar</button>', '<button type="button" class="pm-btn pm-ok" id="enPinOk">Confirm</button>'],
   ['<button type="button" class="pm-btn" id="enPinCancel">Cancelar</button>', '<button type="button" class="pm-btn" id="enPinCancel">Cancel</button>'],
   ['<b>Digite o PIN para continuar</b><p class="pm-hint">O mesmo PIN das Configurações.</p>', '<b>Type the PIN to continue</b><p class="pm-hint">The same PIN as in Settings.</p>'],

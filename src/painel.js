@@ -1074,6 +1074,7 @@ const PAGE = `<!doctype html>
   .cx-badge { font:11px/1 ui-monospace, Menlo, monospace; color:var(--dim); border:1px solid var(--line); border-radius:4px; padding:4px 6px; }
   .cx-btn, body.console .cx-top .langsw { font-size:13px; border:1px solid var(--line); border-radius:6px; padding:6px 11px; color:var(--txt); text-decoration:none; white-space:nowrap; background:transparent; }
   .cx-btn:hover { border-color:var(--gold); color:var(--gold); }
+  button.cx-btn { font-family:inherit; cursor:pointer; line-height:1.2; }
   body.console .cx-shell { display:grid; grid-template-columns:var(--cxside) minmax(0, 1fr); min-height:calc(100vh / var(--z, 1) - var(--cxtop)); }
   body.console .cx-side { display:block; position:sticky; top:var(--cxtop); align-self:start; height:calc(100vh / var(--z, 1) - var(--cxtop)); overflow-y:auto; background:var(--card); border-right:1px solid var(--line); padding:10px 10px 24px; }
   .cx-sec { font-size:11px; font-weight:600; letter-spacing:.07em; text-transform:uppercase; color:var(--dim); padding:16px 10px 6px; }
@@ -1346,7 +1347,7 @@ const PAGE = `<!doctype html>
 </style>
 </head>
 <body data-theme="obsidian">
-<div class="cx-top" id="cxTop"><a class="cx-brand" href="#overview"><span class="cx-logo">⛏</span><b>HomeMinerProxy</b></a><span class="cx-sep">/</span><span class="cx-crumb" id="cxCrumb"></span><span class="cx-grow"></span><span class="cx-pill" id="cxWorkers"></span><span class="cx-pill" id="cxPing" hidden></span><span class="cx-badge" id="cxVer" hidden></span><span id="cxLangSlot"></span><a class="cx-btn cx-gear" href="/config" id="cxGear">⚙️</a></div>
+<div class="cx-top" id="cxTop"><a class="cx-brand" href="#overview"><span class="cx-logo">⛏</span><b>HomeMinerProxy</b></a><span class="cx-sep">/</span><span class="cx-crumb" id="cxCrumb"></span><span class="cx-grow"></span><span class="cx-pill" id="cxWorkers"></span><span class="cx-pill" id="cxPing" hidden></span><span class="cx-badge" id="cxVer" hidden></span><span id="cxLangSlot"></span><button type="button" class="cx-btn" id="cxSound" title="Som dos recordes">🔊</button><a class="cx-btn cx-gear" href="/config" id="cxGear">⚙️</a></div>
 <div class="cx-shell"><aside class="cx-side"><nav id="cxNav"></nav></aside><div class="cx-main">
 <div class="cx-head"><div><h2 id="cxTitle"></h2><p id="cxDesc"></p></div><span class="cx-grow"></span><div class="cx-actions" id="cxActions"></div></div>
 <header>
@@ -2476,7 +2477,62 @@ function checkRecords(j) {
   const byValue = (a, b) => b.value - a.value;
   celebrate(fresh.filter((r) => r.farm).sort(byValue)[0] || fresh.sort(byValue)[0], j);
 }
+// Som do recorde ("tam-tam-tam-tammm"), feito na hora com Web Audio: sem arquivo de áudio. Recorde da fazenda toca a
+// fanfarra inteira; recorde pessoal, só "tam-tammm". Liga/desliga no 🔊 da barra (fica guardado neste navegador).
+// O navegador só libera som depois de um toque na página; no quiosque, o Chromium precisa de
+// --autoplay-policy=no-user-gesture-required.
+const SND = { on: 'Som dos recordes: ligado', off: 'Som dos recordes: desligado' };
+let soundOn = true;
+try { soundOn = localStorage.getItem('hmSound') !== '0'; } catch (_) { /* sem armazenamento: fica ligado */ }
+let actx = null;
+function audio() {
+  try {
+    actx = actx || new (window.AudioContext || window.webkitAudioContext)();
+    if (actx.state === 'suspended') actx.resume();
+  } catch (_) { actx = null; }
+  return actx;
+}
+for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, () => { if (soundOn) audio(); }, { passive: true });
+function fanfare(big) {
+  if (!soundOn) return;
+  const a = audio();
+  if (!a) return;
+  const t0 = a.currentTime + 0.05;
+  // [frequência, início, duração]: dó-mi-sol e o dó agudo longo (com o acorde embaixo); o pessoal é sol-dó
+  const notes = big
+    ? [[523.25, 0, 0.13], [659.25, 0.15, 0.13], [783.99, 0.3, 0.13], [1046.5, 0.48, 1.2], [783.99, 0.48, 1.2], [523.25, 0.48, 1.2]]
+    : [[783.99, 0, 0.12], [1046.5, 0.16, 0.7]];
+  const master = a.createGain();
+  master.gain.value = 0.16;
+  master.connect(a.destination);
+  for (const [f, at, dur] of notes) {
+    for (const [type, det, g] of [['sawtooth', 0, 0.45], ['square', 6, 0.2], ['triangle', -6, 0.45]]) {   // "metal" de fanfarra
+      const o = a.createOscillator(), v = a.createGain(), lp = a.createBiquadFilter();
+      o.type = type; o.frequency.value = f; o.detune.value = det;
+      lp.type = 'lowpass'; lp.frequency.value = 2200;
+      v.gain.setValueAtTime(0, t0 + at);
+      v.gain.linearRampToValueAtTime(g, t0 + at + 0.02);
+      v.gain.setValueAtTime(g * 0.8, t0 + at + dur * 0.7);
+      v.gain.exponentialRampToValueAtTime(0.0001, t0 + at + dur);
+      o.connect(lp); lp.connect(v); v.connect(master);
+      o.start(t0 + at); o.stop(t0 + at + dur + 0.05);
+    }
+  }
+}
+function showSound() {
+  $('cxSound').textContent = soundOn ? '🔊' : '🔇';
+  $('cxSound').title = soundOn ? SND.on : SND.off;
+}
+$('cxSound').addEventListener('click', () => {
+  soundOn = !soundOn;
+  try { localStorage.setItem('hmSound', soundOn ? '1' : '0'); } catch (_) { /* segue */ }
+  showSound();
+  if (soundOn) fanfare(false);   // amostra: "tam-tammm"
+});
+showSound();
+
 function celebrate(r, j) {
+  fanfare(!!r.farm);
   const D = j.farm.difficulty;
   const who = r.worker && r.worker !== '—' ? r.worker : 'A fazenda';
   let prev = null;
