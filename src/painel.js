@@ -298,6 +298,9 @@ const proxyUp = () => !!PROXY_URL() && Date.now() - proxy.okAt < 2 * 60e3;
 // Para esquecer um worker, apague-o de workers.json e reinicie o serviço.
 let known = loadJson('workers.json', {});
 
+// O mesmo share chega por mais de um caminho (pool com 2 casas, proxy com mais): 1410,95 e 1410,9534 são um recorde só
+const sameShare = (a, b) => Math.abs(a - b) <= Math.max(Math.min(0.011, Math.max(a, b) * 0.01), Math.max(a, b) * 1e-4);
+
 let records = loadJson('records.json', null);
 let recordsDirty = false;
 if (!Array.isArray(records)) { records = []; recordsDirty = true; }
@@ -308,8 +311,6 @@ for (const w of Object.values(known)) {
     recordsDirty = true;
   }
 }
-// O mesmo share chega por mais de um caminho (pool com 2 casas, proxy com mais): 1410,95 e 1410,9534 são um recorde só
-const sameShare = (a, b) => Math.abs(a - b) <= Math.max(Math.min(0.011, Math.max(a, b) * 0.01), Math.max(a, b) * 1e-4);
 function dedupeRecords(list) {
   const out = [];
   for (const r of [...list].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0))) {

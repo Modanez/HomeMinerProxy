@@ -728,3 +728,15 @@ test('recordes com dificuldade fracionária (< 1, ex.: NerdMiner / ESP32)', () =
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('inicialização com workers.json preexistente não causa ReferenceError de sameShare', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-init-'));
+  fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({
+    miner1: { name: 'miner1', bestDifficulty: 0.5, lastSeen: new Date().toISOString() }
+  }));
+  const { execFileSync } = require('child_process');
+  assert.doesNotThrow(() => {
+    execFileSync(process.execPath, ['-e', `process.env.DATA_DIR = ${JSON.stringify(dir)}; require('./src/painel');`]);
+  });
+  fs.rmSync(dir, { recursive: true, force: true });
+});
