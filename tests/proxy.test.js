@@ -239,7 +239,8 @@ test('failback espera a principal ficar estável; quem não volta aparece em mis
   await waitFor(() => a.closed, 10000);
 
   // não reconectou: vira "missing" e um evento
-  await waitFor(async () => (await stats()).missing.length, 6000);
+  // a lista sai na hora; o evento vem na próxima volta do health check: espera os dois
+  await waitFor(async () => { const x = await stats(); return x.missing.length && x.events.some((e) => e.type === 'missing'); }, 6000);
   s = await stats();
   assert.strictEqual(s.missing[0].name, 'esp');
   assert.strictEqual(s.missing[0].why, 'pool');

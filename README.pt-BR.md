@@ -179,7 +179,7 @@ O `/status` do Telegram ganha uma linha por Bitaxe, e o MQTT / Home Assistant ga
 | Alerta | Quando | Padrão (Configurações → Mineradores) |
 | --- | --- | --- |
 | Chip quente | chip acima do limite em 2 leituras seguidas | 68 °C (`BITAXE_TEMP_MAX`) |
-| Regulador quente | regulador de tensão acima do limite em 2 leituras | 80 °C (`BITAXE_VR_MAX`) |
+| Regulador quente | regulador de tensão acima do limite em 2 leituras | 95 °C (`BITAXE_VR_MAX`; o próprio firmware para de minerar acima de 105 °C) |
 | Hashrate baixo | média de 10 min abaixo de uma fração do esperado por 10 min (fora os primeiros 15 min depois de ligar) | 70% (`BITAXE_HASH_MIN`) |
 | Na pool reserva | o AxeOS passou para a pool de fallback | — |
 | Falha | falha de energia, de hardware ou modo de superaquecimento | — |

@@ -143,8 +143,11 @@ test('alertas: temperatura só com 2 leituras seguidas acima do limite; volta ao
   assert.ok(!s.active.hot);
   s = bx.evaluate(bx.evaluate(null, read({ tempC: 62 }), { tempMax: 60 }), read({ tempC: 62 }), { tempMax: 60 });
   assert.strictEqual(s.active.hot.max, 60);                   // limite configurado
-  s = bx.evaluate(bx.evaluate(null, read({ vrTempC: 85 })), read({ vrTempC: 85 }));
-  assert.deepStrictEqual(s.active.vrhot, { tempC: 85, max: 80 });
+  // regulador a 82 °C é normal no Gamma (caso real do primeiro Bitaxe do Paulo): sem alerta
+  s = bx.evaluate(bx.evaluate(null, read({ vrTempC: 82 })), read({ vrTempC: 82 }));
+  assert.ok(!s.active.vrhot);
+  s = bx.evaluate(bx.evaluate(null, read({ vrTempC: 98 })), read({ vrTempC: 98 }));
+  assert.deepStrictEqual(s.active.vrhot, { tempC: 98, max: 95 });
 });
 
 test('alertas: hashrate baixo só depois de 10 min, fora do aquecimento e sem pausa', () => {

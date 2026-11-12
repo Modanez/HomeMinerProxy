@@ -179,7 +179,7 @@ Telegram `/status` gets one line per Bitaxe, and MQTT / Home Assistant gets hash
 | Alert | When | Default (Settings → Miners) |
 | --- | --- | --- |
 | Chip hot | chip over the limit in 2 reads in a row | 68 °C (`BITAXE_TEMP_MAX`) |
-| Regulator hot | voltage regulator over the limit in 2 reads | 80 °C (`BITAXE_VR_MAX`) |
+| Regulator hot | voltage regulator over the limit in 2 reads | 95 °C (`BITAXE_VR_MAX`; the firmware itself stops hashing above 105 °C) |
 | Low hashrate | 10-min average under a share of the expected hashrate for 10 min (not in the first 15 min after power-on) | 70% (`BITAXE_HASH_MIN`) |
 | On the backup pool | AxeOS switched to the fallback pool | — |
 | Fault | power fault, hardware fault or overheat mode | — |

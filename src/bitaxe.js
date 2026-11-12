@@ -218,7 +218,7 @@ async function discover(addresses, { timeoutMs = 1200, concurrency = 32, probe =
 // Avaliados a cada leitura, com folga para não alarmar por um pico: temperatura acima do limite em 2 leituras
 // seguidas, hashrate baixo por 10 min (e não nos primeiros 15 min depois de ligar), sem resposta em 3 leituras.
 // Também conta reinícios (o uptime voltou) e blocos achados pelo próprio Bitaxe.
-const LIMITS = { tempMax: 68, vrMax: 80, hashMin: 0.7, lowMs: 10 * 60e3, offlineFails: 3, warmupS: 900 };
+const LIMITS = { tempMax: 68, vrMax: 95, hashMin: 0.7, lowMs: 10 * 60e3, offlineFails: 3, warmupS: 900 };
 const ALERT_KINDS = ['offline', 'hot', 'vrhot', 'lowhash', 'fallback', 'fault'];
 
 function evaluate(prev, reading, limits = {}, now = Date.now()) {
