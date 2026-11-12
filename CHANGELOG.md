@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
+
+### Português
+- **Duas conquistas novas:** 🌋 **Um trilhão** (um share com dificuldade acima de 1 trilhão) e o 🏆 **Prêmio de ouro: bloco achado!**, que desbloqueia quando um share passa da dificuldade da rede. O prêmio de ouro fica numa linha inteira só para ele, mostra o troféu mesmo trancado e acende em dourado quando sai.
+
 ## v0.6.0 — 2026-11-12
 
 ### English
