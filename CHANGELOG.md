@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Port 80:** the dashboard (and the first-setup wizard) also answers on port 80, so `http://homeminer.local` or the board's IP works without `:3000`. Old `:3000` links keep working. Only when running as root (the `install.sh` services); if port 80 is busy it keeps retrying every minute and stays on 3000. `HTTP80=0` turns it off.
 - Fixed: on phones the Bitaxe card header broke into an odd centered line (AxeOS button floating in the middle); now the model line takes its own row and the AxeOS button sits left with "actions" on the right. The "quiet" headline no longer says "quiet for now" ("quiet há agora" in Portuguese).
 - **Bitaxe top 20:** each Bitaxe card now has a collapsible **🏆 Bitaxe top 20**, the 20 best shares stored on the Bitaxe itself (AxeOS scoreboard, `GET /api/system/scoreboard`, firmware 2.14+), with difficulty and how long ago. Read every 5 minutes; older firmware without it is asked again only every 6 hours. Hidden in kiosk mode.
 - Fixed (Umbrel): the first-setup wizard failed with `EACCES: permission denied, open '/data/settings.json.tmp'`. The app now ships its `data/` folder (so Umbrel creates it owned by 1000:1000) and runs both containers as `1000:1000`.
@@ -12,6 +13,7 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Porta 80:** o painel (e o assistente de primeira configuração) também atende na porta 80, então `http://homeminer.local` ou o IP da placa funciona sem o `:3000`. Os links antigos com `:3000` continuam valendo. Só quando roda como root (os serviços do `install.sh`); se a 80 estiver ocupada, tenta de novo a cada minuto e fica na 3000. `HTTP80=0` desliga.
 - Corrigido: no celular, o cabeçalho do cartão do Bitaxe quebrava numa linha estranha, com o botão do AxeOS solto no meio; agora o modelo fica numa linha própria e o botão do AxeOS à esquerda, com "ações" à direita. A frase "está quieto há agora" virou "está quieto agora".
 - **Top 20 do Bitaxe:** cada cartão da aba Bitaxe ganha um **🏆 Top 20 do Bitaxe** recolhível, com os 20 melhores shares guardados no próprio Bitaxe (scoreboard do AxeOS, `GET /api/system/scoreboard`, firmware 2.14+), a dificuldade e há quanto tempo saiu. Lido a cada 5 minutos; firmware antigo, sem a rota, só é consultado de novo a cada 6 horas. Não aparece no modo quiosque.
 - Corrigido (Umbrel): o assistente de primeira configuração falhava com `EACCES: permission denied, open '/data/settings.json.tmp'`. O app agora traz a pasta `data/` (assim o Umbrel cria com dono 1000:1000) e roda os dois contêineres como `1000:1000`.
