@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/discover.js "$HERE"/src/hotspot.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/discover.js "$HERE"/src/hotspot.js "$HERE"/src/kiosk.js "$HERE"/src/kiosk.sh "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -109,6 +109,38 @@ if command -v nmcli >/dev/null; then
   unit mineracao-hotspot "HomeMinerProxy setup Wi-Fi (hotspot when there is no network)" "$NODE_BIN $APP_DIR/hotspot.js"
   services="$services mineracao-hotspot"
 fi
+
+# Tela ligada na placa (opção KIOSK): serviço criado desligado. Quem liga é o painel, que instala o cage e o
+# Chromium pelo apt na primeira vez. Abre o painel em tela cheia na tela 1 (tty1) no lugar do login de texto.
+chmod 755 "$APP_DIR/kiosk.sh"
+cat > /etc/systemd/system/mineracao-kiosk.service <<UNIT
+[Unit]
+Description=HomeMinerProxy dashboard on the board's screen (kiosk, managed by the dashboard)
+After=mineracao-painel.service systemd-user-sessions.service plymouth-quit-wait.service
+Wants=mineracao-painel.service
+Conflicts=getty@tty1.service
+After=getty@tty1.service
+
+[Service]
+EnvironmentFile=$ENV_FILE
+Environment=XDG_RUNTIME_DIR=/run/user/0
+Environment=WLR_LIBINPUT_NO_DEVICES=1
+ExecStart=/bin/sh $APP_DIR/kiosk.sh
+User=root
+PAMName=login
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=yes
+StandardInput=tty-fail
+StandardOutput=journal
+UtmpIdentifier=tty1
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=graphical.target multi-user.target
+UNIT
 
 # Minerador local opcional: com o cpuminer instalado (imagens prontas), cria o serviço desligado.
 # Quem liga e desliga é o painel, pela opção "Minerar também com este servidor".

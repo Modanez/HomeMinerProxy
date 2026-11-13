@@ -58,7 +58,7 @@ Bitaxe / NerdMiner / cpuminer ──► proxy (port 3333, 3334, 3335…) ──�
   - **Almost a block:** your best hash vs. the latest block hash, leading zeros side by side. The 🎟️ button turns today's best hash into a lottery-ticket image ("NOT A WINNER", until the day it is) to share or save.
   - **Luck:** each worker's best share compared with what its work should statistically produce (1× is normal, 2× is twice as lucky), a histogram of all share difficulties against the theoretical curve, the **Weekly Championship** (ranked by relative luck so an ESP32/devkit can beat an ASIC), and **Farm Achievements**.
 
-  For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden.
+  For a screen attached to the server, use `?kiosk`: screens rotate on their own and the cursor is hidden. On the ready-made images (or any Debian/Armbian install with systemd), ⚙️ Settings → Farm → **Screen on this board (kiosk)** (`KIOSK=1`) does it for you: the first time it installs a minimal full-screen browser (cage + Chromium, about 300 MB, a few minutes online) and from then on opens `?kiosk` on the HDMI screen at every boot, in place of the text login (Ctrl+Alt+F2 still gives you a console). Turning it off gives the screen back.
 - **Optional extras:**
   - **Telegram bot:** alerts on your phone for farm records, stopped workers, pool failover and money arriving in the wallet (a found block!), a daily summary, and commands such as `/status` and `/luck`. See [Telegram bot](#telegram-bot-optional).
   - **Siren:** an Arduino with LEDs and a speaker, see `extras/sirene`.
