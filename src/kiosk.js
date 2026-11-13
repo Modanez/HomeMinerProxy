@@ -49,7 +49,10 @@ function installThenStart(dataDir) {
   writeState(dataDir, { installing: Date.now(), error: null });
   const log = fs.openSync(path.join(dataDir, 'kiosk-install.log'), 'w');
   const apt = process.env.KIOSK_APT || 'apt-get';
-  const sh = `${apt} update -q && DEBIAN_FRONTEND=noninteractive ${apt} install -y -q --no-install-recommends ${PACKAGES.join(' ')}`;
+  // prioridade mínima de CPU e de disco: numa placa pequena (Odroid-C2, cartão SD) a instalação não pode
+  // travar o proxy e o painel, que continuam atendendo os mineradores enquanto isso
+  const low = [fs.existsSync('/usr/bin/nice') ? 'nice -n 19' : '', fs.existsSync('/usr/bin/ionice') ? 'ionice -c 3' : ''].filter(Boolean).join(' ');
+  const sh = `${low} ${apt} update -q && DEBIAN_FRONTEND=noninteractive ${low} ${apt} install -y -q --no-install-recommends ${PACKAGES.join(' ')}`;
   return new Promise((resolve) => {
     const child = spawn('/bin/sh', ['-c', sh], { stdio: ['ignore', log, log] });
     child.on('error', (e) => { writeState(dataDir, { installing: null, error: e.message }); resolve({ ok: false }); });
