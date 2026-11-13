@@ -2851,6 +2851,7 @@ function start(port = PORT, host = '0.0.0.0') {
     server.on('error', reject);
     server.listen(port, host, async () => {
       console.log(`Painel de mineração em http://${host}:${port}`);
+      const port80 = require('./port80').mirror(server, { mainPort: port, host });
       // placas sem bateria ligam com a hora errada: espera o relógio antes de coletar e gravar histórico
       const clk = await require('./clock').waitOk({
         appDir: __dirname, dataDir: process.env.DATA_DIR || __dirname,
@@ -2887,6 +2888,7 @@ function start(port = PORT, host = '0.0.0.0') {
           timers.forEach((t) => clearInterval(t));
           if (tgBot && tgBot.stop) tgBot.stop();
           if (mqttClient && mqttClient.stop) mqttClient.stop();
+          port80.close();
           return new Promise((res) => server.close(res));
         }
       });
