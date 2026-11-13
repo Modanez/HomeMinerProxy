@@ -25,3 +25,13 @@ test('Umbrel: manifesto e compose coerentes', () => {
   assert.match(/^version: "([^"]+)"/m.exec(manifest)[1], /^\d+\.\d+\.\d+$/);
   assert.ok(!/restart: on-failure/.test(compose), 'o painel sai com 0 para reiniciar: precisa de unless-stopped');
 });
+
+// O Umbrel cria a pasta de dados do app com dono 1000:1000 só se ela vier no pacote (data/.gitkeep);
+// sem ela, o Docker cria como root e o painel (usuário node, 1000) não consegue gravar: EACCES no assistente.
+test('umbrel: pasta de dados no pacote e serviços como 1000:1000', () => {
+  const fs = require('fs'), path = require('path');
+  const dir = path.join(__dirname, '..', 'umbrel', 'modanez-homeminerproxy');
+  assert.ok(fs.existsSync(path.join(dir, 'data', '.gitkeep')));
+  const compose = fs.readFileSync(path.join(dir, 'docker-compose.yml'), 'utf8');
+  assert.strictEqual((compose.match(/user: "1000:1000"/g) || []).length, 2);
+});

@@ -10,6 +10,7 @@ services:
   proxy:
     image: ghcr.io/modanez/homeminerproxy:latest
     command: ["node", "proxy.js"]
+    user: "1000:1000"   # o mesmo dono da pasta de dados que o Umbrel cria (data/.gitkeep)
     restart: unless-stopped   # o painel sai com código 0 para reiniciar depois do assistente e ao salvar
     stop_grace_period: 30s
     environment:
@@ -31,6 +32,7 @@ services:
   painel:
     image: ghcr.io/modanez/homeminerproxy:latest
     command: ["node", "painel.js"]
+    user: "1000:1000"
     restart: unless-stopped   # o painel sai com código 0 para reiniciar depois do assistente e ao salvar
     stop_grace_period: 30s
     environment:

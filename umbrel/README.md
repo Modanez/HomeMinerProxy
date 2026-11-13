@@ -17,7 +17,7 @@ Umbrel reads a store from the **root** of a git repository, so they live in thei
 ## Notes
 
 - The image is `ghcr.io/modanez/homeminerproxy` (multi-arch: amd64 and arm64), built by CI on every push.
-- Data lives in the app's data folder on the Umbrel (`${APP_DATA_DIR}/data`), so it survives updates.
+- Data lives in the app's data folder on the Umbrel (`${APP_DATA_DIR}/data`, shipped as `data/.gitkeep` so Umbrel creates it owned by 1000:1000, the user the containers run as), so it survives updates.
 - Updating from the dashboard (git/systemd) doesn't apply here: Umbrel updates the app.
 - Smart plugs, MQTT, Telegram and miner discovery work. Wi-Fi, Tailscale, SSH and the setup hotspot are
   managed by umbrelOS itself, not by the app.
