@@ -83,6 +83,12 @@ async function tickBitaxe() {
     st.alerts = bitaxe.evaluate(st.alerts, r, BITAXE_LIMITS, st.at);
     if (!r.ok) { st.ok = false; st.error = r.error; st.fails++; continue; }
     Object.assign(st, { ok: true, okAt: st.at, error: null, fails: 0, data: r.data });
+    // scoreboard do AxeOS (top 20 do próprio Bitaxe): a cada 5 min basta; firmware sem a rota → para de pedir por 6 h
+    if (!st.sbAt || st.at - st.sbAt >= (st.sbMissing ? 6 * 3600e3 : BITAXE_HIST_MS)) {
+      st.sbAt = st.at;
+      const sb = await bitaxe.scoreboard(b.host).catch(() => ({ ok: false }));
+      if (sb.ok) { st.scoreboard = sb.list; st.sbMissing = false; } else if (['http404', 'noscoreboard', 'json'].includes(sb.error)) st.sbMissing = true;
+    }
     // histórico curto para o gráfico: um ponto a cada 5 min, 24 h
     const last = st.hist.at(-1);
     if (!last || st.at - last.t >= BITAXE_HIST_MS) {
@@ -151,7 +157,7 @@ function bitaxesView() {
     const st = bitaxeState.get(b.name) || {};
     const al = st.alerts || {};
     return { name: b.name, host: b.host, worker: bitaxeWorker(b), ok: !!st.ok, fresh: !!bitaxeFresh(st), okAt: st.okAt || null, error: st.error || null, fails: st.fails || 0, data: st.data || null, hist: st.hist || [],
-      alerts: al.active || {}, reboots: al.reboots || 0, lastReset: al.lastReset || null, blocks: al.blocks || 0, lastAction: st.lastAction || null };
+      alerts: al.active || {}, reboots: al.reboots || 0, lastReset: al.lastReset || null, blocks: al.blocks || 0, lastAction: st.lastAction || null, scoreboard: st.scoreboard || null };
   });
 }
 let tuyaPlugsState = new Map();
@@ -1214,6 +1220,13 @@ const PAGE = `<!doctype html>
   .bx .bxh a { margin-left:auto; font-size:12px; color:var(--dim); }
   .bx .bxh a.axeos { font-size:13px; color:var(--ok); border:1px solid var(--line); border-radius:8px; padding:3px 9px; text-decoration:none; }
   .bx .bxh a.axeos span { color:var(--dim); }
+  .bxsb { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
+  .bxsb summary { cursor:pointer; font-size:13px; color:var(--gold); } .bxsb summary span { color:var(--dim); }
+  .bxsb ol { margin:6px 0 0; padding-left:28px; columns:2; column-gap:24px; font-size:13px; font-variant-numeric:tabular-nums; }
+  .bxsb li { break-inside:avoid; padding:1px 0; } .bxsb li span { color:var(--dim); font-size:12px; }
+  .bxsb li:first-child b { color:var(--gold); }
+  @media (max-width:560px) { .bxsb ol { columns:1; } }
+  body.kiosk .bxsb { display:none; }
   .bxg { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:8px 14px; margin-top:8px; }
   .bxg div { font-size:14px; }
   .bxg span { display:block; font-size:11px; color:var(--dim); }
@@ -1814,7 +1827,7 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: '🌐 AxeOS', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: '🌐 AxeOS', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras', sb: '🏆 Top 20 do Bitaxe', sbBest: 'melhor', sbHint: 'os melhores shares guardados no próprio Bitaxe (scoreboard do AxeOS)' };
 // Gráficos de 24 h do Bitaxe: dois pequenos lado a lado (hashrate e chip), cada um com o seu eixo, nunca dois eixos no mesmo
 const BXCH = {};   // id do gráfico → pontos, para o tooltip
 function bxChart(id, title, pts, fmt) {
@@ -1891,9 +1904,19 @@ function renderBitaxes(j) {
       (d.rssi != null ? st(BXT.wifi, nf(d.rssi) + ' dBm') : '') +
       (b.lastAction ? st(BXT.lastAct, (BXT.acts[b.lastAction.action] || esc(b.lastAction.action)) + ' · ' + agoTxt(b.lastAction.at) + (b.lastAction.ok ? '' : ' <b class="hot">' + BXT.actFail + '</b>')) : '') +
       (b.reboots ? st(BXT.reboots, nf(b.reboots) + (b.lastReset ? ' <span>' + esc(b.lastReset) + '</span>' : '')) : '') +
-      '</div>' + bxCharts(b) + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
+      '</div>' + bxCharts(b) + bxScoreboard(b) + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
 }
+// Top 20 do scoreboard do AxeOS, recolhido; lembra quem estava aberto (a lista é redesenhada a cada atualização)
+const bxSbOpen = new Set();
+function bxScoreboard(b) {
+  const sb = b.scoreboard;
+  if (!sb || !sb.length) return '';
+  const fmt = (v) => (v >= 1e6 ? fmtBig(v) : nf(v, v < 100 ? 2 : 0));
+  return '<details class="bxsb" data-n="' + esc(b.name) + '"' + (bxSbOpen.has(b.name) ? ' open' : '') + '><summary>' + BXT.sb + ' <span>· ' + BXT.sbBest + ' ' + fmt(sb[0].diff) + '</span></summary>' +
+    '<p class="pm-hint">' + BXT.sbHint + '</p><ol>' + sb.map((e) => '<li><b>' + fmt(e.diff) + '</b>' + (e.at ? ' <span>' + agoTxt(e.at) + '</span>' : '') + '</li>').join('') + '</ol></details>';
+}
+document.addEventListener('toggle', (e) => { const d = e.target; if (d.classList && d.classList.contains('bxsb')) { if (d.open) bxSbOpen.add(d.dataset.n); else bxSbOpen.delete(d.dataset.n); } }, true);
 function renderFarm(j) {
   const f = j.farm, a = f.accounting || {}, D = f.difficulty;
   if (!f.hasData) return;
