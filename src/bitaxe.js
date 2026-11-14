@@ -139,6 +139,23 @@ async function info(host, timeoutMs) {
   return d && (d.model || d.hashRate != null) ? { ok: true, data: d, raw: r.json } : { ok: false, error: 'notbitaxe' };
 }
 
+// Scoreboard do AxeOS (2.14+): os 20 melhores shares que o próprio Bitaxe achou, guardados nele (sobrevivem ao
+// reinício). GET /api/system/scoreboard → [{ rank, since (segundos atrás), difficulty, … }]. Firmware antigo: 404.
+function normalizeScoreboard(list, now = Date.now()) {
+  if (!Array.isArray(list)) return null;
+  return list.map((e, i) => {
+    const diff = parseDiff(e && e.difficulty);
+    const since = Number(e && e.since);
+    return diff > 0 ? { rank: Number(e.rank) || i + 1, diff, at: Number.isFinite(since) && since >= 0 ? now - since * 1000 : null } : null;
+  }).filter(Boolean).sort((a, b) => b.diff - a.diff).slice(0, 20).map((e, i) => ({ ...e, rank: i + 1 }));
+}
+async function scoreboard(host, timeoutMs) {
+  const r = await getJson(host, '/api/system/scoreboard', timeoutMs);
+  if (!r.ok) return r;
+  const list = normalizeScoreboard(Array.isArray(r.json) ? r.json : r.json && (r.json.scoreboard || r.json.entries));
+  return list ? { ok: true, list } : { ok: false, error: 'noscoreboard' };
+}
+
 // ---------------------------------------------------------------- ações (fase 3)
 // Só uma lista fechada de ações e de campos: overclock (frequência, tensão), firmware e Wi-Fi do Bitaxe ficam de fora.
 function request(host, method, path, body, timeoutMs = 8000) {
@@ -256,4 +273,4 @@ function evaluate(prev, reading, limits = {}, now = Date.now()) {
   return { ...s, active };
 }
 
-module.exports = { simpleAction, fanPatch, poolPatch, poolMatches, patch, request, LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson };
+module.exports = { simpleAction, fanPatch, poolPatch, poolMatches, patch, request, LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson, scoreboard, normalizeScoreboard };

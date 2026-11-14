@@ -282,3 +282,16 @@ test('IP do AxeOS para o link (ipv4 válido; senão nada)', () => {
   assert.strictEqual(bx.normalize({ ipv4: '<script>' }).ip, null);
   assert.strictEqual(bx.normalize({}).ip, null);
 });
+
+test('scoreboard do AxeOS: top 20 em ordem, "since" vira horário, texto com sufixo', () => {
+  const now = 1_800_000_000_000;
+  const raw = [{ rank: 2, since: 60, difficulty: 15279226 }, { rank: 1, since: 3600, difficulty: '338.99M' }, { rank: 3, since: 10, difficulty: 0 }];
+  const l = bx.normalizeScoreboard(raw, now);
+  assert.strictEqual(l.length, 2);
+  assert.strictEqual(l[0].rank, 1);
+  assert.ok(Math.abs(l[0].diff - 338.99e6) < 1e3);
+  assert.strictEqual(l[0].at, now - 3600e3);
+  assert.strictEqual(l[1].diff, 15279226);
+  assert.strictEqual(bx.normalizeScoreboard({ nope: 1 }), null);
+  assert.strictEqual(bx.normalizeScoreboard(Array.from({ length: 30 }, (_, i) => ({ difficulty: i + 1, since: 1 }))).length, 20);
+});
