@@ -170,7 +170,7 @@ const EN = [
   ["'Luz: ' + money(e.costMonth) + '/mês. Lucro: ' + money(0) + '. Negócio impecável.'", "'Power: ' + money(e.costMonth) + '/month. Profit: ' + money(0) + '. Flawless business.'"],
   ["'Se o bloco sair, a conta de luz fica paga por ' + fmtBig(anos) + ' anos.'", "'If the block comes, the power bill is paid for ' + fmtBig(anos) + ' years.'"],
   ["out.push('O ' + wk.name + ' está parado há ' + ago(wk.lastSeen) + '. Pediu demissão?');", "out.push(wk.name + ' has been stopped for ' + ago(wk.lastSeen) + '. Did it quit?');"],
-  ["out.push('O ' + wk.name + ' está quieto há ' + ago(wk.lastSeen) + '. Deve estar pensando.');", "out.push(wk.name + ' has been quiet for ' + ago(wk.lastSeen) + '. Must be thinking.');"],
+  ["out.push('O ' + wk.name + ' está quieto ' + (ago(wk.lastSeen) === 'agora' ? 'agora' : 'há ' + ago(wk.lastSeen)) + '. Deve estar pensando.');", "out.push(wk.name + ' is quiet ' + (ago(wk.lastSeen) === 'now' ? 'right now' : 'for ' + ago(wk.lastSeen)) + '. Must be thinking.');"],
   ["out.push('O ' + wk.name + ' trabalha em silêncio. A pool nem sabe que ele existe.');", "out.push(wk.name + ' works in silence. The pool doesn\\'t even know it exists.');"],
   ["'O Odroid é de 2016 e segue minerando. Respeita o vovô.'", "'The Odroid is from 2016 and still mining. Respect your elders.'"],
   ["' lidera o hall da fama com ' + nf(hall[0].value, 2) + '. Os outros que lutem.'", "' leads the hall of fame with ' + nf(hall[0].value, 2) + '. The others can try harder.'"],
