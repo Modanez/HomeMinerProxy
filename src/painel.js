@@ -1220,6 +1220,12 @@ const PAGE = `<!doctype html>
   .bx .bxh a { margin-left:auto; font-size:12px; color:var(--dim); }
   .bx .bxh a.axeos { font-size:13px; color:var(--ok); border:1px solid var(--line); border-radius:8px; padding:3px 9px; text-decoration:none; }
   .bx .bxh a.axeos span { color:var(--dim); }
+  .bx .bxh a.axeos + a { margin-left:12px; }   /* só o primeiro link empurra para a direita; dois "auto" centralizavam quando quebrava a linha */
+  @media (max-width:560px) {
+    .bx .bxh .sub { flex-basis:100%; }
+    .bx .bxh a.axeos { margin-left:0; }
+    .bx .bxh a.axeos + a { margin-left:auto; }
+  }
   .bxsb { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
   .bxsb summary { cursor:pointer; font-size:13px; color:var(--gold); } .bxsb summary span { color:var(--dim); }
   .bxsb ol { margin:6px 0 0; padding-left:28px; columns:2; column-gap:24px; font-size:13px; font-variant-numeric:tabular-nums; }
@@ -2522,7 +2528,7 @@ function narrate(j) {
   }
   for (const wk of (f.workers || []).filter((x) => !x.inactive)) {
     if (wk.state === 'stale') out.push('O ' + wk.name + ' está parado há ' + ago(wk.lastSeen) + '. Pediu demissão?');
-    else if (wk.state === 'quiet') out.push('O ' + wk.name + ' está quieto há ' + ago(wk.lastSeen) + '. Deve estar pensando.');
+    else if (wk.state === 'quiet') out.push('O ' + wk.name + ' está quieto ' + (ago(wk.lastSeen) === 'agora' ? 'agora' : 'há ' + ago(wk.lastSeen)) + '. Deve estar pensando.');
     else if (wk.state === 'unknown') out.push('O ' + wk.name + ' trabalha em silêncio. A pool nem sabe que ele existe.');
     if (wk.name === 'odroid' && wk.state === 'ok') out.push('O Odroid é de 2016 e segue minerando. Respeita o vovô.');
   }
