@@ -343,6 +343,8 @@ function serve(opts) {
     return res.end();
   });
   server.listen(opts.port, opts.host || '0.0.0.0', () => console.log(`Modo instalação: abra http://${os.hostname()}.local:${opts.port}/setup (ou o IP deste servidor)`));
+  if (opts.port80 !== false) server.on('listening', () => { server.port80 = require('./port80').mirror(server, { mainPort: opts.port, host: opts.host || '0.0.0.0' }); });
+  server.on('close', () => { if (server.port80) server.port80.close(); });
   return server;
 }
 

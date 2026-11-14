@@ -22,7 +22,7 @@ NODE_MAJOR=$("$NODE_BIN" -p 'process.versions.node.split(".")[0]')
 
 m "==> Copiando os arquivos para $APP_DIR" "==> Copying files to $APP_DIR"
 mkdir -p "$APP_DIR"
-cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/discover.js "$HERE"/src/hotspot.js "$HERE"/src/kiosk.js "$HERE"/src/kiosk.sh "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
+cp "$HERE"/src/painel.js "$HERE"/src/proxy.js "$HERE"/src/stratum.js "$HERE"/src/i18n.js "$HERE"/src/luck.js "$HERE"/src/telegram.js "$HERE"/src/mqtt.js "$HERE"/src/tuya.js "$HERE"/src/sonoff.js "$HERE"/src/settings.js "$HERE"/src/setup.js "$HERE"/src/update.js "$HERE"/src/localminer.js "$HERE"/src/netctl.js "$HERE"/src/clock.js "$HERE"/src/bitaxe.js "$HERE"/src/store.js "$HERE"/src/discover.js "$HERE"/src/hotspot.js "$HERE"/src/kiosk.js "$HERE"/src/kiosk.sh "$HERE"/src/port80.js "$HERE"/src/cubo.py "$HERE"/src/ticket.py "$APP_DIR/"
 
 m "==> Configuração em $ENV_FILE" "==> Configuration in $ENV_FILE"
 if [ ! -f "$ENV_FILE" ]; then
@@ -180,7 +180,7 @@ ip=$(hostname -I 2>/dev/null | awk '{print $1}')
 port=$(grep -E '^PORT=' "$ENV_FILE" | cut -d= -f2 || true)
 echo
 m "Pronto." "Done."
-m "  Painel:  http://${ip:-IP-DO-SERVIDOR}:${port:-3000}" "  Dashboard:  http://${ip:-SERVER-IP}:${port:-3000}"
+m "  Painel:  http://${ip:-IP-DO-SERVIDOR}  (ou :${port:-3000})" "  Dashboard:  http://${ip:-SERVER-IP}  (or :${port:-3000})"
 if [ "$wizard" = 1 ]; then
   m "  Primeira configuração: abra http://$(hostname).local:${port:-3000} ou http://${ip:-IP-DO-SERVIDOR}:${port:-3000} no navegador" "  First setup: open http://$(hostname).local:${port:-3000} or http://${ip:-SERVER-IP}:${port:-3000} in your browser"
 elif [ -n "$settings_pin" ]; then
