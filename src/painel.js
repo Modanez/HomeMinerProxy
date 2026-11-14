@@ -1065,6 +1065,7 @@ const PAGE = `<!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Fazenda de Mineração</title>
+<!--PWA-->
 <style>
   :root, body[data-theme="obsidian"] { --bg:#0e1117; --card:#171c26; --line:#252c3a; --txt:#e6e9ef; --dim:#8a93a6; --gold:#f2a900; --on-gold:#14161c; --gold-soft:rgba(242,169,0,.06); --gold-border:rgba(242,169,0,.45); --ok:#3ecf8e; --warn:#e5534b; --backdrop:rgba(14,17,23,.88); --tip-bg:#0b0e14; --shadow:none; --radius:12px; }
   body[data-theme="ocean"] { --bg:#0b111e; --card:#131c31; --line:#223254; --txt:#e2e8f0; --dim:#8ea0c2; --gold:#38bdf8; --on-gold:#081221; --gold-soft:rgba(56,189,248,.08); --gold-border:rgba(56,189,248,.45); --ok:#34d399; --warn:#fb7185; --backdrop:rgba(11,17,30,.88); --tip-bg:#080d18; --shadow:0 4px 18px rgba(0,0,0,.28); --radius:16px; }
@@ -2740,6 +2741,8 @@ async function load() {
 }
 window.addEventListener('resize', () => { fitPages(); if (lastData) { renderHistory(lastData); renderNear(lastData); renderLuck(lastData); fitBig(); } });
 load(); setInterval(load, 20000);
+// app instalável (PWA): o service worker só funciona em contexto seguro (HTTPS ou localhost)
+if ('serviceWorker' in navigator && window.isSecureContext) navigator.serviceWorker.register('/sw.js').catch(() => {});
 </script>
 </body>
 </html>`;
@@ -2851,12 +2854,14 @@ function requestHandler(req, res) {
     });
     return;
   }
+  // app instalável no celular: manifesto, ícones e service worker
+  if (require('./pwa').handle(req, res, { lang: pickLang(req, LANGUAGE), theme: THEME })) return;
   if (req.url === '/api/mining') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify(snapshot()));
   }
   const lang = pickLang(req, LANGUAGE);
-  const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY, THEME));
+  const html = pageCache[lang] || (pageCache[lang] = localizePage(PAGE, lang, CURRENCY, THEME).replace('<!--PWA-->', require('./pwa').headTags(THEME)));
   res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Language': LOCALES[lang] });
   res.end(html);
 }

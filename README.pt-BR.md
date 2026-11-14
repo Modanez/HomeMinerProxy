@@ -302,6 +302,19 @@ O antivírus pode marcar qualquer minerador como software indesejado. Se acontec
 
 **Como saber se funcionou:** o `minerd` mostra `accepted: 1/1 (100.00%)` e, no painel, o worker aparece com ⚡ (conectado pelo proxy). Uma CPU de poucos MH/s leva alguns minutos por share na dificuldade 1, então o primeiro pode demorar.
 
+## App no celular
+
+O painel pode ficar na tela inicial do celular como um app, com ícone próprio, em tela cheia e sem a barra do navegador.
+
+- **iPhone (Safari):** abra o painel → **Compartilhar** → **Adicionar à Tela de Início**. Funciona pelo endereço normal (`http://homeminer.local:3000`).
+- **Android (Chrome):** pelo endereço normal (`http://…`), o menu ⋮ → **Adicionar à tela inicial** cria um atalho que abre no Chrome. Para virar **app de verdade** (botão **Instalar app**, janela própria), o Chrome exige **HTTPS**. O jeito mais simples é o Tailscale, que já dá um endereço HTTPS com certificado válido e ainda funciona fora de casa:
+  ```bash
+  sudo tailscale serve --bg 3000        # no servidor; mostra o endereço https://NOME.SEU-TAILNET.ts.net
+  ```
+  Abra esse endereço no Chrome do celular (com o Tailscale ligado nele) → **Instalar app**.
+
+O app sempre mostra os dados ao vivo; sem conexão com a fazenda, aparece uma tela de "sem conexão" com um botão para tentar de novo.
+
 ## Bot do Telegram (opcional)
 
 1. No Telegram, abra o **@BotFather**, mande `/newbot`, escolha um nome e copie o token que ele devolve.
