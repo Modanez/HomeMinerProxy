@@ -302,6 +302,19 @@ The antivirus may flag any miner as unwanted software. If it does, allow that fo
 
 **Check that it worked:** within a minute, `minerd` prints `accepted: 1/1 (100.00%)` and, on the dashboard, the worker appears with ⚡ (connected through the proxy). A CPU at a few MH/s needs some minutes per share at difficulty 1, so the first one can take a while.
 
+## Phone app
+
+The dashboard can live on your phone's home screen like an app: its own icon, full screen, no browser bar.
+
+- **iPhone (Safari):** open the dashboard → **Share** → **Add to Home Screen**. Works with the plain address (`http://homeminer.local:3000`).
+- **Android (Chrome):** with the plain `http://…` address, menu ⋮ → **Add to Home screen** creates a shortcut that opens in Chrome. To get a **real app** (an **Install app** button, its own window), Chrome requires **HTTPS**. The easiest way is Tailscale, which gives you an HTTPS address with a valid certificate and also works away from home:
+  ```bash
+  sudo tailscale serve --bg 3000        # on the server; prints the https://NAME.YOUR-TAILNET.ts.net address
+  ```
+  Open that address in Chrome on the phone (with Tailscale on) → **Install app**.
+
+The app always shows live data; when the farm can't be reached it shows a "can't reach the farm" screen with a retry button.
+
 ## Telegram bot (optional)
 
 1. In Telegram, open **@BotFather**, send `/newbot`, pick a name and copy the token it gives you.

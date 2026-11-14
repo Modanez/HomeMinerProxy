@@ -741,3 +741,20 @@ test('carrega com workers.json e records.json existentes', () => {
   assert.ok(out.trim().length > 0);
   fs.rmSync(dir, { recursive: true, force: true });
 });
+
+test('app instalável (PWA): manifesto, ícones, service worker e tags no <head>', () => {
+  const pwa = require('../src/pwa');
+  const m = pwa.manifest({ lang: 'en', theme: 'gold' });
+  assert.strictEqual(m.display, 'standalone');
+  assert.strictEqual(m.theme_color, '#0b0e11');
+  assert.ok(m.icons.some((i) => i.sizes === '192x192') && m.icons.some((i) => i.sizes === '512x512') && m.icons.some((i) => i.purpose === 'maskable'));
+  for (const name of ['icon-192.png', 'icon-512.png', 'maskable-512.png', 'apple-touch-icon.png']) {
+    assert.strictEqual(Buffer.from(pwa.PNG[name], 'base64').subarray(1, 4).toString(), 'PNG', name);
+  }
+  assert.doesNotThrow(() => new Function(pwa.serviceWorker('pt')));
+  const res = { h: null, body: null, setHeader() {}, writeHead(c, h) { this.code = c; this.h = h; }, end(b) { this.body = b; } };
+  assert.ok(pwa.handle({ url: '/manifest.webmanifest' }, res, { lang: 'pt' }));
+  assert.strictEqual(JSON.parse(res.body).short_name, 'HomeMiner');
+  assert.strictEqual(pwa.handle({ url: '/api/mining' }, res), false);
+  assert.match(pwa.headTags('obsidian'), /rel="manifest"/);
+});
