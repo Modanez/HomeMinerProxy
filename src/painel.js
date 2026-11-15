@@ -579,7 +579,7 @@ async function tickPrice() {
 const news = require('./news');
 const NEWS_ON = process.env.NEWS !== '0';
 let newsState = { at: 0, feeds: [] };
-async function tickNews() { if (NEWS_ON) await news.refresh(newsState, news.feedsFromEnv(process.env.NEWS_FEEDS, LANGUAGE)).catch(() => {}); }
+async function tickNews() { if (NEWS_ON) await news.refresh(newsState, news.feedsFromEnv(process.env.NEWS_FEEDS)).catch(() => {}); }
 
 // ---------------------------------------------------------------- rede Bitcoin (mempool.space)
 let net = { at: 0, okAt: 0, error: null, tip: null, prize: null, adj: null, fees: null };
@@ -2032,15 +2032,17 @@ function renderNews() {
   $('nwList').innerHTML = items.length ? items.map((it) => '<a class="nw-item" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer"><div class="nw-t">' + esc(it.title) + '</div>' +
     '<div class="nw-m">' + esc(it.source) + (it.at ? ' · ' + agoTxt(it.at) : '') + '</div>' + (it.summary ? '<div class="nw-s">' + esc(it.summary) + '</div>' : '') + '</a>').join('') : '<p class="sub">' + NWT.none + '</p>';
   const okAt = Math.max(0, ...feeds.map((f) => f.okAt || 0));
-  set('nwFoot', okAt ? NWT.updated + ' ' + hora(okAt) : '');
+  const bad = feeds.filter((f) => f.error).map((f) => f.name + ': ' + f.error);
+  set('nwFoot', (okAt ? NWT.updated + ' ' + hora(okAt) : '') + (bad.length ? (okAt ? ' · ' : '') + NWT.off + ' — ' + bad.join(' · ') : ''));
 }
 async function loadNews(force) {
-  if (!force && nwData && Date.now() - nwAt < 10 * 60e3) return renderNews();
+  const empty = !nwData || !(nwData.items || []).length;
+  if (!force && nwData && Date.now() - nwAt < (empty ? 20e3 : 10 * 60e3)) return renderNews();
   try { const r = await fetch('/api/news'); if (r.ok) { nwData = await r.json(); nwAt = Date.now(); } } catch (_) { /* segue */ }
   renderNews();
 }
 $('nwSrc').addEventListener('click', (e) => { const b = e.target.closest('button[data-s]'); if (b) { nwSource = b.dataset.s; renderNews(); } });
-setInterval(() => { const sec = document.querySelector('.page[data-page="news"]'); if (sec && sec.offsetParent !== null) loadNews(); }, 60e3);
+setInterval(() => { const sec = document.querySelector('.page[data-page="news"]'); if (sec && sec.offsetParent !== null) loadNews(); }, 20e3);
 window.addEventListener('hashchange', () => { if (location.hash === '#news') loadNews(); });
 loadNews(true);   // também esconde a aba logo se NEWS=0
 
@@ -3071,9 +3073,11 @@ function requestHandler(req, res) {
     });
     return;
   }
-  if (req.url === '/api/news') {
+  if (req.url.split('?')[0] === '/api/news') {
+    // feeds do idioma de quem está vendo (PT | EN do painel), não do servidor
+    const lang = pickLang(req, LANGUAGE);
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
-    return res.end(JSON.stringify({ enabled: NEWS_ON, at: newsState.at, items: news.merged(newsState), feeds: (newsState.feeds || []).map((f) => ({ name: f.name, okAt: f.okAt, error: f.error, n: f.items.length })) }));
+    return res.end(JSON.stringify({ enabled: NEWS_ON, at: newsState.at, lang, items: news.merged(newsState, 40, lang), feeds: news.forLang(newsState, lang).map((f) => ({ name: f.name, okAt: f.okAt, error: f.error, n: f.items.length })) }));
   }
   if (req.url === '/api/price') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });

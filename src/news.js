@@ -1,5 +1,5 @@
 // Notícias de bitcoin (aba Notícias): manchetes de alguns feeds RSS/Atom, sem dependências.
-// NEWS_FEEDS="Nome|https://site/feed, Outro|https://…" troca a lista; NEWS=0 desliga a aba.
+// NEWS_FEEDS="Nome|https://site/feed, Outro|https://…" troca a lista (vale nos dois idiomas); NEWS=0 desliga a aba.
 // Padrão: em português, Livecoins, Portal do Bitcoin e No Bullshit Bitcoin; em inglês, No Bullshit Bitcoin,
 // Bitcoin Magazine e Bitcoin Optech. Cada feed é buscado a cada 30 min; um feed fora do ar não derruba os outros.
 
@@ -19,14 +19,23 @@ const DEFAULT_FEEDS = {
   ],
 };
 
-function feedsFromEnv(value, lang = 'pt') {
+// Todos os feeds de fábrica, marcados com o idioma: o servidor busca os dois idiomas e cada visitante vê os do idioma
+// que escolheu no painel (PT | EN). Lista própria em NEWS_FEEDS vale para os dois idiomas.
+function feedsFromEnv(value) {
   const raw = String(value || '').trim();
-  if (!raw) return DEFAULT_FEEDS[lang === 'en' ? 'en' : 'pt'].map(([name, url]) => ({ name, url }));
+  if (!raw) {
+    const out = [];
+    for (const [lang, list] of Object.entries(DEFAULT_FEEDS)) for (const [name, url] of list) {
+      const f = out.find((x) => x.url === url);
+      if (f) f.langs.push(lang); else out.push({ name, url, langs: [lang] });
+    }
+    return out;
+  }
   return raw.split(/[,\n]/).map((s) => s.trim()).filter(Boolean).map((s) => {
     const i = s.lastIndexOf('|');
     const name = i > 0 ? s.slice(0, i).trim() : null, url = (i > 0 ? s.slice(i + 1) : s).trim();
     let host = url; try { host = new URL(url).hostname.replace(/^www\./, ''); } catch (_) { /* nome = url */ }
-    return /^https?:\/\//i.test(url) ? { name: name || host, url } : null;
+    return /^https?:\/\//i.test(url) ? { name: name || host, url, langs: ['pt', 'en'] } : null;
   }).filter(Boolean).slice(0, 8);
 }
 
@@ -68,7 +77,7 @@ function getText(url, { timeoutMs = 15000, maxBytes = 3e6, redirects = 3 } = {})
   return new Promise((resolve, reject) => {
     const req = (url.startsWith('http:') ? http : https).get(url, {
       timeout: timeoutMs, family: 4,
-      headers: { 'User-Agent': 'HomeMinerProxy/1.0 (+https://github.com/Modanez/HomeMinerProxy)', Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5' },
+      headers: { 'User-Agent': 'Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36 HomeMinerProxy/1.0', 'Accept-Language': 'pt-BR,pt;q=0.9,en;q=0.8', Accept: 'application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.5' },
     }, (res) => {
       if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location && redirects > 0) {
         res.resume();
@@ -93,19 +102,20 @@ async function refresh(state, feeds, { fetchText = getText, now = Date.now(), pe
     try {
       const items = parseFeed(await fetchText(f.url)).slice(0, perFeed);
       if (!items.length) throw new Error('feed vazio ou formato desconhecido');
-      return { name: f.name, url: f.url, okAt: now, error: null, items };
+      return { name: f.name, url: f.url, langs: f.langs, okAt: now, error: null, items };
     } catch (e) {
-      return { name: f.name, url: f.url, okAt: prev.okAt || 0, error: e.message, items: prev.items || [] };
+      return { name: f.name, url: f.url, langs: f.langs, okAt: prev.okAt || 0, error: e.message, items: prev.items || [] };
     }
   }));
   return state;
 }
 
 // Lista única, mais novas primeiro, sem repetir o mesmo link
-function merged(state, limit = 40) {
+function forLang(state, lang) { return (state.feeds || []).filter((f) => !f.langs || f.langs.includes(lang)); }
+function merged(state, limit = 40, lang) {
   const seen = new Set(), out = [];
-  for (const f of state.feeds || []) for (const it of f.items) if (!seen.has(it.link)) { seen.add(it.link); out.push({ ...it, source: f.name }); }
+  for (const f of lang ? forLang(state, lang) : state.feeds || []) for (const it of f.items) if (!seen.has(it.link)) { seen.add(it.link); out.push({ ...it, source: f.name }); }
   return out.sort((a, b) => (b.at || 0) - (a.at || 0)).slice(0, limit);
 }
 
-module.exports = { DEFAULT_FEEDS, feedsFromEnv, parseFeed, getText, refresh, merged, decode, text };
+module.exports = { DEFAULT_FEEDS, feedsFromEnv, forLang, parseFeed, getText, refresh, merged, decode, text };
