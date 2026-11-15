@@ -302,6 +302,18 @@ The antivirus may flag any miner as unwanted software. If it does, allow that fo
 
 **Check that it worked:** within a minute, `minerd` prints `accepted: 1/1 (100.00%)` and, on the dashboard, the worker appears with ⚡ (connected through the proxy). A CPU at a few MH/s needs some minutes per share at difficulty 1, so the first one can take a while.
 
+## HTTPS on the home network
+
+The dashboard also opens at **https://homeminer.local** (port 443), with a padlock. No domain and no router port forwarding: the farm creates **its own certificate authority** the first time and signs the server certificate (for `homeminer`, `homeminer.local` and the board's IPs). Let's Encrypt doesn't fit here, since it only issues for public domains.
+
+For browsers to trust it, **install the farm's certificate once on each device**. Download it from `http://homeminer.local:3000/homeminer-ca.crt`:
+- **Android:** Settings → Security → More security settings → Install from storage → **CA certificate** → pick the downloaded file.
+- **iPhone:** open the link in Safari → Allow → Settings → **Profile Downloaded** → Install. Then Settings → General → About → **Certificate Trust Settings** and turn on "HomeMinerProxy local CA".
+- **Mac:** open the file → Keychain Access (System) → double-click the certificate → Trust → **Always Trust**.
+- **Windows:** open the file → Install Certificate → Local Machine → **Trusted Root Certification Authorities**.
+
+After that, Chrome's **Install app** also works on the home network. The authority's key never leaves the board; the server certificate renews itself with no need to reinstall anything on the devices. `HTTPS=0` turns it off.
+
 ## Phone app
 
 The dashboard can live on your phone's home screen like an app: its own icon, full screen, no browser bar.

@@ -302,6 +302,18 @@ O antivírus pode marcar qualquer minerador como software indesejado. Se acontec
 
 **Como saber se funcionou:** o `minerd` mostra `accepted: 1/1 (100.00%)` e, no painel, o worker aparece com ⚡ (conectado pelo proxy). Uma CPU de poucos MH/s leva alguns minutos por share na dificuldade 1, então o primeiro pode demorar.
 
+## HTTPS na rede de casa
+
+O painel também abre em **https://homeminer.local** (porta 443), com cadeado. Sem domínio e sem abrir porta no roteador: a fazenda cria uma **autoridade certificadora própria** na primeira vez e assina o certificado do servidor (para `homeminer`, `homeminer.local` e os IPs da placa). Let's Encrypt não serve aqui, porque só emite para domínio público.
+
+Para o navegador confiar, **instale o certificado da fazenda uma vez em cada aparelho**. Baixe em `http://homeminer.local:3000/homeminer-ca.crt`:
+- **Android:** Configurações → Segurança → Mais configurações de segurança → Instalar do armazenamento → **Certificado CA** → escolha o arquivo baixado.
+- **iPhone:** abra o link no Safari → Permitir → Ajustes → **Perfil Baixado** → Instalar. Depois, em Ajustes → Geral → Sobre → **Ajustes de Confiança de Certificados**, ative "HomeMinerProxy local CA".
+- **Mac:** abra o arquivo → Acesso às Chaves (Sistema) → clique duas vezes no certificado → Confiar → **Sempre confiar**.
+- **Windows:** abra o arquivo → Instalar certificado → Máquina local → **Autoridades de Certificação Raiz Confiáveis**.
+
+Com isso, o **Instalar app** do Chrome também passa a funcionar pela rede de casa. A chave da autoridade nunca sai da placa; o certificado do servidor é renovado sozinho, sem precisar reinstalar nada nos aparelhos. `HTTPS=0` desliga.
+
 ## App no celular
 
 O painel pode ficar na tela inicial do celular como um app, com ícone próprio, em tela cheia e sem a barra do navegador.

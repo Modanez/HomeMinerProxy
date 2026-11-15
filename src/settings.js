@@ -39,6 +39,7 @@ const FIELDS = [
   { key: 'SHOW_WALLET', group: 'farm', type: 'bool', unset: '1' },
   { key: 'SHOW_DONATE', group: 'farm', type: 'bool', unset: '1' },
   { key: 'KIOSK', group: 'farm', type: 'bool' },
+  { key: 'HTTPS', group: 'farm', type: 'bool', unset: '1' },
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
   { key: 'LOCAL_MINER', group: 'miners', type: 'bool' },
   { key: 'MINER_THREADS', group: 'miners', type: 'threads' },
@@ -561,6 +562,7 @@ const T = {
     POWER_PRICE_KWH: ['Preço do kWh', 'Na moeda escolhida, para a estimativa da conta de luz.'],
     SHOW_DONATE: ['Mostrar "Apoiar o projeto"', 'O item ❤️ no fim do menu do painel, com o endereço para doar ao HomeMinerProxy. Nunca aparece no modo quiosque.'],
     KIOSK: ['Tela ligada nesta placa (quiosque)', 'Abre o painel em tela cheia, sozinho, numa tela ligada no HDMI desta placa (sem área de trabalho). Na primeira vez instala o navegador (uns 300 MB; de 5 a 20 minutos numa placa pequena, que fica lenta enquanto isso); depois liga em cada boot. Desligar devolve a tela ao login de texto.'],
+    HTTPS: ['HTTPS na rede de casa (cadeado)', 'O painel também abre em https://homeminer.local (porta 443) com um certificado de uma autoridade própria da fazenda, criada na primeira vez. Para o cadeado e o "Instalar app" funcionarem, instale uma vez em cada aparelho o certificado em /homeminer-ca.crt (veja o README). Let\'s Encrypt não emite para .local nem para IP da rede de casa.'],
     kiosk: { installing: '⏳ Instalando o navegador (de 5 a 20 minutos numa placa pequena; ela fica lenta enquanto isso, mas a mineração continua). A tela liga sozinha quando terminar.', error: '⚠️ Não consegui instalar o navegador; veja kiosk-install.log na pasta de dados', noscreen: 'Nenhuma tela detectada no HDMI agora. Ligue a tela e reinicie a placa.' },
     SHOW_WALLET: ['Mostrar a carteira', 'Saldo, valor e movimentação na tela da fazenda. Desligue se a tela fica à vista de visitas ou se o painel é aberto de fora de casa. A cotação continua aparecendo, e o aviso de dinheiro entrando continua chegando no Telegram.'],
     BITAXES: ['Bitaxe (API do AxeOS)', 'nome=IP de cada Bitaxe, separados por vírgula (ex.: bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). O painel lê hashrate, temperatura, consumo e fan direto do aparelho. Use o mesmo nome do worker (o que vem depois do ponto no usuário da pool) e reserve um IP fixo no roteador.'],
@@ -673,6 +675,7 @@ const T = {
     POWER_PRICE_KWH: ['Price per kWh', 'In the chosen currency, for the power bill estimate.'],
     SHOW_DONATE: ['Show "Support the project"', 'The ❤️ item at the end of the dashboard menu, with the address to donate to HomeMinerProxy. Never shown in kiosk mode.'],
     KIOSK: ['Screen on this board (kiosk)', 'Opens the dashboard full screen on its own on a screen plugged into this board\'s HDMI (no desktop). The first time it installs the browser (about 300 MB; 5 to 20 minutes on a small board, which is slow meanwhile); after that it starts on every boot. Turning it off gives the screen back to the text login.'],
+    HTTPS: ['HTTPS on the home network (padlock)', 'The dashboard also opens at https://homeminer.local (port 443) with a certificate from the farm\'s own authority, created the first time. For the padlock and "Install app" to work, install the certificate at /homeminer-ca.crt once on each device (see the README). Let\'s Encrypt does not issue for .local names or home-network IPs.'],
     kiosk: { installing: '⏳ Installing the browser (5 to 20 minutes on a small board; it is slow meanwhile, but mining goes on). The screen turns on by itself when it is done.', error: '⚠️ Could not install the browser; see kiosk-install.log in the data folder', noscreen: 'No screen detected on HDMI right now. Plug it in and restart the board.' },
     SHOW_WALLET: ['Show the wallet', 'Balance, value and activity on the farm screen. Turn it off if the screen is in view of visitors or the dashboard is opened from outside your home. The BTC price still shows, and Telegram still alerts when money arrives.'],
     BITAXES: ['Bitaxe (AxeOS API)', 'name=IP of each Bitaxe, comma separated (e.g. bitaxe1=192.168.0.140, bitaxe2=192.168.0.141). The dashboard reads hashrate, temperature, power and fan straight from the device. Use the worker name (what comes after the dot in the pool user) and reserve a fixed IP in your router.'],
@@ -781,7 +784,7 @@ function page(lang, hasPin, theme) {
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>`
       : f.key === 'BITAXES' ? `<div class="bbar"><button type="button" class="ghost" data-test="bitaxe">${S.testBitaxe}</button><button type="button" class="ghost" id="bitaxe_scan">${S.scanBitaxe}</button></div><div id="bitaxe_res" class="pools"></div>` : '';
-    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'MINER_PORT', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'KIOSK', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'MINER_PORT', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'KIOSK', 'HTTPS', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
     const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 95 }[f.key]) : null;

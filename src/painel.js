@@ -3083,6 +3083,14 @@ function requestHandler(req, res) {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ currency: CURRENCY, now: wallet[CURRENCY === 'BRL' ? 'brl' : 'usd'] || null, ...priceHist }));
   }
+  // certificado da autoridade local, para instalar nos aparelhos (só a parte pública; a chave nunca sai da placa)
+  if (req.url.split('?')[0] === '/homeminer-ca.crt') {
+    let crt = null;
+    try { crt = fs.readFileSync(path.join(process.env.DATA_DIR || __dirname, 'tls', 'ca.crt')); } catch (_) { /* HTTPS desligado */ }
+    if (!crt) { res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' }); return res.end('HTTPS desligado (HTTPS=0) ou openssl ausente'); }
+    res.writeHead(200, { 'Content-Type': 'application/x-x509-ca-cert', 'Content-Disposition': 'attachment; filename="homeminer-ca.crt"', 'Cache-Control': 'no-cache' });
+    return res.end(crt);
+  }
   // app instalável no celular: manifesto, ícones e service worker
   if (require('./pwa').handle(req, res, { lang: pickLang(req, LANGUAGE), theme: THEME })) return;
   if (req.url === '/api/mining') {
@@ -3115,6 +3123,8 @@ function start(port = PORT, host = '0.0.0.0') {
     server.listen(port, host, async () => {
       console.log(`Painel de mineração em http://${host}:${port}`);
       const port80 = require('./port80').mirror(server, { mainPort: port, host });
+      // HTTPS na rede de casa (CA própria): mesma resposta em https://…:443 (HTTPS=0 desliga)
+      const tlsSrv = require('./tlslocal').serve(server, { dataDir: process.env.DATA_DIR || __dirname, host });
       // placas sem bateria ligam com a hora errada: espera o relógio antes de coletar e gravar histórico
       const clk = await require('./clock').waitOk({
         appDir: __dirname, dataDir: process.env.DATA_DIR || __dirname,
@@ -3154,6 +3164,7 @@ function start(port = PORT, host = '0.0.0.0') {
           if (tgBot && tgBot.stop) tgBot.stop();
           if (mqttClient && mqttClient.stop) mqttClient.stop();
           port80.close();
+          if (tlsSrv) tlsSrv.close();
           return new Promise((res) => server.close(res));
         }
       });
