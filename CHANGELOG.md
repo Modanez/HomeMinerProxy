@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **New 📰 News page:** bitcoin headlines from RSS/Atom feeds (Portuguese default: Livecoins, Portal do Bitcoin and No Bullshit Bitcoin; English: No Bullshit Bitcoin, Bitcoin Magazine and Bitcoin Optech), newest first, with source filter chips; a click opens the original article. Fetched every 30 min by the server; a feed that is down keeps its last headlines and shows struck through. `NEWS_FEEDS` sets your own list, `NEWS=0` hides the page. Also in the kiosk rotation (8 headlines, no summaries).
 - **New 💹 Price page:** bitcoin price in the dashboard currency with the change over 24 h, 7 days, 30 days and 1 year, and a chart (1D/7D/30D/1Y) that shows the value under the finger or mouse, plus the period's high and low. The server fetches the series every 15 minutes from CoinGecko, falling back to Binance candles, and serves them at `/api/price`. Also in the kiosk rotation.
 - Fixed: on phones a big empty gap opened above the title on short pages (Bitaxe, Price), because the menu row of the layout stretched to fill the screen.
 - New app icon: a clear pickaxe (handle plus crescent head) replaces the old drawing that didn't read as one. Used by the phone app (PWA), the favicon and the Umbrel app.
@@ -17,6 +18,7 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Aba nova 📰 Notícias:** manchetes de bitcoin de feeds RSS/Atom (padrão em português: Livecoins, Portal do Bitcoin e No Bullshit Bitcoin; em inglês: No Bullshit Bitcoin, Bitcoin Magazine e Bitcoin Optech), as mais novas primeiro, com filtro por fonte; o clique abre a matéria original. O servidor busca a cada 30 min; um feed fora do ar mantém as últimas manchetes e aparece riscado. `NEWS_FEEDS` define a sua lista, `NEWS=0` esconde a aba. Entra também na rotação do quiosque (8 manchetes, sem resumo).
 - **Aba nova 💹 Preço:** o preço do bitcoin na moeda do painel, com a variação em 24 h, 7 dias, 30 dias e 1 ano, e um gráfico (1D/7D/30D/1A) que mostra o valor sob o dedo ou o mouse, além da máxima e da mínima do período. O servidor busca as séries a cada 15 minutos na CoinGecko (com os candles da Binance de reserva) e entrega em `/api/price`. Entra também na rotação do modo quiosque.
 - Corrigido: no celular abria um vão grande acima do título nas páginas curtas (Bitaxe, Preço), porque a linha do menu se esticava para preencher a tela.
 - Ícone novo do app: uma picareta de verdade (cabo e cabeça em crescente) no lugar do desenho antigo, que não parecia uma. Vale para o app no celular (PWA), o ícone da aba e o app do Umbrel.
