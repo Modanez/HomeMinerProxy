@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### English
+- **New 💹 Price page:** bitcoin price in the dashboard currency with the change over 24 h, 7 days, 30 days and 1 year, and a chart (1D/7D/30D/1Y) that shows the value under the finger or mouse, plus the period's high and low. The server fetches the series every 15 minutes from CoinGecko, falling back to Binance candles, and serves them at `/api/price`. Also in the kiosk rotation.
+- Fixed: on phones a big empty gap opened above the title on short pages (Bitaxe, Price), because the menu row of the layout stretched to fill the screen.
 - New app icon: a clear pickaxe (handle plus crescent head) replaces the old drawing that didn't read as one. Used by the phone app (PWA), the favicon and the Umbrel app.
 - **Phone app (PWA):** the dashboard can be added to the home screen as an app, with its own icon (the same as the Umbrel app), theme-coloured system bar and full screen. iPhone: Share → Add to Home Screen, also over plain http. Android: Chrome offers **Install app** over HTTPS (e.g. `tailscale serve --bg 3000`); over http it's a shortcut. A minimal service worker shows a "can't reach the farm" page when offline and never caches data.
 - **Port 80:** the dashboard (and the first-setup wizard) also answers on port 80, so `http://homeminer.local` or the board's IP works without `:3000`. Old `:3000` links keep working. Only when running as root (the `install.sh` services); if port 80 is busy it keeps retrying every minute and stays on 3000. `HTTP80=0` turns it off.
@@ -15,6 +17,8 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Aba nova 💹 Preço:** o preço do bitcoin na moeda do painel, com a variação em 24 h, 7 dias, 30 dias e 1 ano, e um gráfico (1D/7D/30D/1A) que mostra o valor sob o dedo ou o mouse, além da máxima e da mínima do período. O servidor busca as séries a cada 15 minutos na CoinGecko (com os candles da Binance de reserva) e entrega em `/api/price`. Entra também na rotação do modo quiosque.
+- Corrigido: no celular abria um vão grande acima do título nas páginas curtas (Bitaxe, Preço), porque a linha do menu se esticava para preencher a tela.
 - Ícone novo do app: uma picareta de verdade (cabo e cabeça em crescente) no lugar do desenho antigo, que não parecia uma. Vale para o app no celular (PWA), o ícone da aba e o app do Umbrel.
 - **App no celular (PWA):** o painel pode ir para a tela inicial como app, com ícone próprio (o mesmo do app do Umbrel), barra do sistema na cor do tema e tela cheia. iPhone: Compartilhar → Adicionar à Tela de Início, também por http. Android: o Chrome oferece **Instalar app** por HTTPS (ex.: `tailscale serve --bg 3000`); por http vira atalho. Um service worker mínimo mostra uma página "sem conexão" quando a fazenda não responde e nunca guarda dados em cache.
 - **Porta 80:** o painel (e o assistente de primeira configuração) também atende na porta 80, então `http://homeminer.local` ou o IP da placa funciona sem o `:3000`. Os links antigos com `:3000` continuam valendo. Só quando roda como root (os serviços do `install.sh`); se a 80 estiver ocupada, tenta de novo a cada minuto e fica na 3000. `HTTP80=0` desliga.
