@@ -73,24 +73,48 @@ function ensure(dataDir, { now = Date.now(), log = console.log, want = names() }
 }
 
 // HTTPS ao lado do HTTP: o mesmo servidor atende nas duas. Porta HTTPS_PORT (padrão 443 como root, senão 3443).
-// Porta ocupada: tenta a próxima (443 → 3443). HTTPS=0 desliga. Devolve { port, close() } ou null.
-function serve(server, { dataDir, host = '0.0.0.0', log = console.log, ensureFn = ensure } = {}) {
+// Com o "tailscale serve" ligado, o Tailscale ocupa a 443 no IP dele (100.x): aí o painel abre a 443 só nos IPs da
+// rede de casa, e o https://homeminer.local continua sem porta. Sem nenhuma 443 livre, vai para a 3443.
+// HTTPS=0 desliga. Devolve { port, hosts, close() } ou null.
+const TAILNET = (ip) => { const [a, b] = ip.split('.').map(Number); return a === 100 && b >= 64 && b <= 127; };
+function lanIps(ifaces = os.networkInterfaces()) {
+  const out = [];
+  for (const list of Object.values(ifaces || {})) for (const a of list || []) if (a && a.family === 'IPv4' && !a.internal && !TAILNET(a.address)) out.push(a.address);
+  return out;
+}
+function listenOnce(handler, opts, port, host) {
+  return new Promise((resolve) => {
+    const s = require('https').createServer(opts, handler);
+    s.once('error', (e) => resolve({ ok: false, code: e.code, message: e.message }));
+    s.listen(port, host, () => resolve({ ok: true, server: s }));
+  });
+}
+function serve(server, { dataDir, host = '0.0.0.0', log = console.log, ensureFn = ensure, ips = lanIps } = {}) {
   if (process.env.HTTPS === '0') return null;
   if (process.env.NODE_TEST_CONTEXT && process.env.HTTPS !== '1') return null;   // nos testes do painel, só quando pedido
   const tls = ensureFn(dataDir, { log });
   if (!tls) return null;
-  const https = require('https');
   const root = typeof process.getuid !== 'function' || process.getuid() === 0;
-  const ports = process.env.HTTPS_PORT ? [Number(process.env.HTTPS_PORT)] : root ? [443, 3443] : [3443];
-  const s = https.createServer({ key: tls.key, cert: tls.cert }, (req, res) => server.emit('request', req, res));
-  const state = { port: null, close: () => s.close() };
-  const tryPort = (i) => {
-    if (i >= ports.length) { log('https: nenhuma porta livre (' + ports.join(', ') + ')'); return; }
-    s.once('error', (e) => { if (e.code === 'EADDRINUSE' || e.code === 'EACCES') tryPort(i + 1); else log('https: ' + e.message); });
-    s.listen(ports[i], host, () => { state.port = ports[i]; log(`https: também em https://${host}:${ports[i]}`); });
-  };
-  tryPort(0);
+  const fixed = process.env.HTTPS_PORT ? Number(process.env.HTTPS_PORT) : null;
+  const handler = (req, res) => server.emit('request', req, res);
+  const opts = { key: tls.key, cert: tls.cert };
+  const state = { port: null, hosts: [], servers: [], close() { for (const s of state.servers) s.close(); } };
+  state.ready = (async () => {
+    const plan = fixed ? [[fixed, [host]]] : [...(root ? [[443, [host]], [443, ips()]] : []), [3443, [host]]];
+    for (const [port, hosts] of plan) {
+      if (!hosts.length) continue;
+      const got = [];
+      for (const h of hosts) { const r = await listenOnce(handler, opts, port, h); if (r.ok) got.push([h, r.server]); else if (!['EADDRINUSE', 'EACCES', 'EADDRNOTAVAIL'].includes(r.code)) log('https: ' + r.message); }
+      if (got.length) {
+        Object.assign(state, { port, hosts: got.map(([h]) => h), servers: got.map(([, s]) => s) });
+        log('https: também em ' + got.map(([h]) => `https://${h}:${port}`).join(', ') + (hosts !== plan[0][1] && port === 443 ? ' (a 443 do Tailscale fica com ele)' : ''));
+        return state;
+      }
+    }
+    log('https: nenhuma porta livre (' + plan.map(([p]) => p).join(', ') + ')');
+    return state;
+  })();
   return state;
 }
 
-module.exports = { available, names, ensure, certInfo, serve };
+module.exports = { available, names, ensure, certInfo, serve, lanIps };
