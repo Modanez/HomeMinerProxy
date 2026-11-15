@@ -758,3 +758,36 @@ test('app instalável (PWA): manifesto, ícones, service worker e tags no <head>
   assert.strictEqual(pwa.handle({ url: '/api/mining' }, res), false);
   assert.match(pwa.headTags('obsidian'), /rel="manifest"/);
 });
+
+test('recordes: o melhor da sessão recomeçando depois de reconectar não vira recorde novo', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-sess-'));
+  const oldDataDir = process.env.DATA_DIR;
+  process.env.DATA_DIR = dir;
+  try {
+    const at = new Date().toISOString();
+    painel.rememberWorkers([{ name: 'odroidsess', hashRate: 1.3e6, bestDifficulty: 1150.58, lastSeen: at }], 'public-pool');
+    const before = painel.snapshot().hall.filter((r) => r.worker === 'odroidsess').length;
+    // reconectou: a pool volta com o melhor da sessão nova
+    painel.rememberWorkers([{ name: 'odroidsess', hashRate: 1.3e6, bestDifficulty: 4.14, lastSeen: at }], 'public-pool');
+    painel.rememberWorkers([{ name: 'odroidsess', hashRate: 1.3e6, bestDifficulty: 30.16, lastSeen: at }], 'proxy');
+    assert.strictEqual(painel.snapshot().hall.filter((r) => r.worker === 'odroidsess').length, before);
+    // passou do recorde de verdade: aí sim
+    painel.rememberWorkers([{ name: 'odroidsess', hashRate: 1.3e6, bestDifficulty: 2000, lastSeen: at }], 'public-pool');
+    assert.ok(painel.snapshot().hall.some((r) => r.worker === 'odroidsess' && r.value === 2000));
+  } finally {
+    process.env.DATA_DIR = oldDataDir;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('recordes falsos já gravados (menores que um recorde anterior do mesmo worker) saem na carga', () => {
+  const out = painel.dropRegressions([
+    { worker: 'odroid', value: 535.66, at: '2026-11-10T10:00:00Z' },
+    { worker: 'odroid', value: 1150.58, at: '2026-11-14T10:00:00Z' },
+    { worker: 'odroid', value: 4.14, at: '2026-11-15T13:00:00Z' },        // sessão nova depois de reconectar
+    { worker: 'odroid', value: 1150.5799, at: '2026-11-15T13:05:00Z' },   // o mesmo share por outro caminho: fica
+    { worker: 'macbook', value: 2787.03, at: '2026-11-12T10:00:00Z' },
+    { worker: '—', value: 10, at: '2026-11-15T13:00:00Z' },
+  ]);
+  assert.deepStrictEqual(out.map((r) => [r.worker, r.value]), [['macbook', 2787.03], ['odroid', 1150.58], ['odroid', 1150.5799], ['odroid', 535.66], ['—', 10]]);
+});

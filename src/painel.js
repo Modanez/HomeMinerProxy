@@ -326,7 +326,22 @@ function dedupeRecords(list) {
   }
   return out.sort((a, b) => b.value - a.value);
 }
+// Recordes falsos já gravados (versões antigas registravam o melhor da sessão nova depois de reconectar): um
+// "recorde" menor que um recorde anterior do mesmo worker não é recorde e sai da lista.
+function dropRegressions(list) {
+  const top = {};
+  const keep = [];
+  for (const r of [...list].sort((a, b) => new Date(a.at || 0) - new Date(b.at || 0))) {
+    const m = top[r.worker] || 0;
+    if (r.worker !== '—' && r.value < m && !sameShare(r.value, m)) continue;
+    top[r.worker] = Math.max(m, r.value);
+    keep.push(r);
+  }
+  return keep.sort((a, b) => b.value - a.value);
+}
 {
+  const fixed = dropRegressions(records);
+  if (fixed.length !== records.length) { console.log(`recordes: ${records.length - fixed.length} falso(s) removido(s) (melhor de sessão após reconectar)`); records = fixed; recordsDirty = true; }
   const clean = dedupeRecords(records);
   if (clean.length !== records.length) { console.log(`recordes: ${records.length - clean.length} repetido(s) removido(s)`); records = clean; recordsDirty = true; }
   if (recordsDirty) saveJson('records.json', records);
@@ -359,8 +374,10 @@ function rememberWorkers(workers, poolName) {
     const prev = known[w.name] || {};
     const prevBest = Number(prev.bestDifficulty || 0);
     const best = Number(w.bestDifficulty || 0);
-    const hasRec = records.some((r) => (r.worker === w.name || r.worker === '—') && sameShare(r.value, best));
-    if (((best > prevBest && !sameShare(best, prevBest)) || (!hasRec && best > 0)) && best > 0) addRecord(w.name, best);
+    // Só é recorde se passar do melhor que este worker já teve. O "melhor" das pools e do proxy é da sessão e
+    // recomeça a cada reconexão: o odroid com recorde de 1.150 voltava com 4,14 e isso virava "recorde novo".
+    const top = records.reduce((m, r) => (r.worker === w.name ? Math.max(m, r.value) : m), prevBest);
+    if (best > 0 && best > top && !sameShare(best, top)) addRecord(w.name, best);
     known[w.name] = {
       name: w.name,
       hashRate: Number(w.hashRate || 0),
@@ -3179,6 +3196,7 @@ function _setTuyaForTest(client, plugs, stateMap) {
 }
 
 module.exports = {
+  dropRegressions,
   requestHandler,
   start,
   snapshot,
