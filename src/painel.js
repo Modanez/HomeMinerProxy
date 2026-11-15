@@ -1412,6 +1412,9 @@ const PAGE = `<!doctype html>
   .wk-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(150px, 1fr)); gap:4px 12px; font-size:13px; font-variant-numeric:tabular-nums; }
   .wk-list span { color:var(--dim); } .wk-list .bad { color:var(--warn); }
   #wkMsg { color:var(--dim); font-size:13px; }
+  .wk-list .wk-new { animation:wkNew 2.4s ease-out; border-radius:4px; }
+  @keyframes wkNew { 0% { background:var(--gold-soft); box-shadow:0 0 0 2px var(--gold-border, var(--gold)); } 100% { background:transparent; box-shadow:none; } }
+  @media (prefers-reduced-motion:reduce) { .wk-list .wk-new { animation:none; } }
   @media (max-width:560px) { .wk-sum { grid-template-columns:repeat(2, 1fr); } }
   .pm-btn.pm-ok { background:var(--gold); border-color:var(--gold); color:var(--on-gold, #111); font-weight:600; }
   .tooltip { position:fixed; pointer-events:none; background:var(--tip-bg); box-shadow:var(--shadow); border:1px solid var(--line); border-radius:8px; padding:6px 9px; font-size:12px; display:none; z-index:9; white-space:nowrap; }
@@ -2667,13 +2670,25 @@ function wkChart(hours, val, color, logScale, fmt, stack) {
   if (top && val(top) > 0) { const i = hours.indexOf(top), x = 4 + i * bw + bw / 2, y = H - (H - 14) * tr(val(top)) / max - 3; svg += '<text x="' + Math.min(Math.max(x, 30), W - 30).toFixed(1) + '" y="' + Math.max(y, 11).toFixed(1) + '" text-anchor="middle" font-size="14" fill="var(--txt)">' + esc(fmt(top)) + '</text>'; }
   return svg + '<line x1="0" y1="' + H + '" x2="' + W + '" y2="' + H + '" stroke="var(--line)"/></svg>';
 }
+// Ao vivo: com o modal aberto, busca de novo a cada 3 s (o proxy vê cada share na hora). Shares que chegaram desde a
+// última leitura piscam; o lugar da rolagem é mantido.
+let wkTimer = null, wkSeenAt = 0;
 async function openWorker(name) {
   $('wkModal').hidden = false;
   set('wkName', name); set('wkSub', ''); set('wkMsg', WKT.loading); $('wkBody').innerHTML = '';
+  wkSeenAt = 0;
+  clearInterval(wkTimer);
+  wkTimer = setInterval(() => { if (document.hidden) return; loadWorker(name, true); }, 3000);
+  await loadWorker(name, false);
+}
+async function loadWorker(name, live) {
   let d = null;
   try { const r = await fetch('/api/worker?name=' + encodeURIComponent(name)); if (r.ok) d = await r.json(); } catch (_) { /* segue */ }
   if ($('wkModal').hidden || $('wkName').textContent !== name) return;
-  if (!d || !d.hours) { set('wkMsg', WKT.none); return; }
+  if (!d || !d.hours) { if (!live) set('wkMsg', WKT.none); return; }
+  const prevSeen = wkSeenAt;
+  wkSeenAt = Math.max(wkSeenAt, ...(d.recent || []).map((r) => r.at || 0));
+  const isNew = (at) => live && prevSeen && at > prevSeen;
   set('wkMsg', '');
   set('wkSub', [d.online ? '🟢 ' + WKT.online : '⚪ ' + WKT.offline, d.pool, d.ip, WKT.ever + ' ' + diffTxt(d.bestEver)].filter(Boolean).join(' · '));
   const card = (l, v) => '<div><span>' + l + '</span><strong>' + v + '</strong></div>';
@@ -2683,11 +2698,13 @@ async function openWorker(name) {
     html += '<div class="wk-l">' + WKT.perHour + '</div>' + wkChart(d.hours, (h) => h.accepted, 'var(--ok)', false, (h) => nf(h.accepted) + (h.rejected ? ' · ✗ ' + h.rejected : '') + ' · ' + fmtHash(h.hashrate), (h) => h.rejected);
     html += '<div class="wk-l">' + WKT.bestHour + '</div>' + wkChart(d.hours, (h) => h.best, 'var(--gold)', true, (h) => diffTxt(h.best));
   }
-  if (d.top && d.top.length) html += '<div class="wk-l">' + WKT.top + '</div><div class="wk-list">' + d.top.map((t, i) => '<div>' + (i === 0 ? '🏆 ' : '') + '<b>' + diffTxt(t.diff) + '</b> <span>' + hora(t.at) + '</span></div>').join('') + '</div>';
-  if (d.recent && d.recent.length) html += '<div class="wk-l">' + WKT.last + '</div><div class="wk-list">' + d.recent.map((r) => '<div' + (r.ok ? '' : ' class="bad" title="' + esc(r.error || '') + '"') + '>' + (r.ok ? '' : '✗ ') + diffTxt(r.diff) + ' <span>' + hora(r.at) + '</span></div>').join('') + '</div>';
+  if (d.top && d.top.length) html += '<div class="wk-l">' + WKT.top + '</div><div class="wk-list">' + d.top.map((t, i) => '<div' + (isNew(t.at) ? ' class="wk-new"' : '') + '>' + (i === 0 ? '🏆 ' : '') + '<b>' + diffTxt(t.diff) + '</b> <span>' + hora(t.at) + '</span></div>').join('') + '</div>';
+  if (d.recent && d.recent.length) html += '<div class="wk-l">' + WKT.last + '</div><div class="wk-list">' + d.recent.map((r) => '<div class="' + (r.ok ? '' : 'bad') + (isNew(r.at) ? ' wk-new' : '') + '"' + (r.ok ? '' : ' title="' + esc(r.error || '') + '"') + '>' + (r.ok ? '' : '✗ ') + diffTxt(r.diff) + ' <span>' + hora(r.at) + '</span></div>').join('') + '</div>';
+  const box = $('wkModal').querySelector('.wk-box'), keep = box ? box.scrollTop : 0;
   $('wkBody').innerHTML = html;
+  if (box && live) box.scrollTop = keep;
 }
-const closeWorker = () => { $('wkModal').hidden = true; set('wkName', ''); };
+const closeWorker = () => { $('wkModal').hidden = true; set('wkName', ''); clearInterval(wkTimer); wkTimer = null; };
 $('rows').addEventListener('click', (e) => { const tr = e.target.closest('tr[data-w]'); if (tr && !document.body.classList.contains('kiosk')) openWorker(tr.dataset.w); });
 $('wkClose').addEventListener('click', closeWorker);
 $('wkModal').addEventListener('click', (e) => { if (e.target === $('wkModal')) closeWorker(); });
