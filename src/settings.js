@@ -42,6 +42,7 @@ const FIELDS = [
   { key: 'LOCAL_WORKER', group: 'miners', type: 'worker' },
   { key: 'LOCAL_MINER', group: 'miners', type: 'bool' },
   { key: 'MINER_THREADS', group: 'miners', type: 'threads' },
+  { key: 'MINER_PORT', group: 'miners', type: 'select', options: ['', ...DEFAULT_ROUTES.map((r) => String(r.listen))], labels: Object.fromEntries(DEFAULT_ROUTES.map((r) => [String(r.listen), r.listen + ' · ' + r.label])) },
   { key: 'ALARM_IGNORE', group: 'miners', type: 'workers' },
   { key: 'WATTS', group: 'miners', type: 'watts' },
   { key: 'EXPECTED', group: 'miners', type: 'expected' },
@@ -569,6 +570,7 @@ const T = {
     LOCAL_WORKER: ['Minerador nesta máquina', 'Worker do cpuminer que roda neste servidor (serviço minerd). O painel lê o hashrate do log e mostra a temperatura da CPU.'],
     LOCAL_MINER: ['Minerar também com este servidor', 'Liga o cpuminer deste aparelho, apontado para o próprio proxy, com o nome do campo acima (ou o nome do aparelho). Esquenta a placa: use dissipador.'],
     MINER_THREADS: ['Núcleos para minerar', 'Vazio deixa um núcleo livre para o proxy e o painel.'],
+    MINER_PORT: ['Pool do minerador local', 'Porta do proxy em que este servidor minera (Automático = 3333, public-pool). Para processador, use pools que aceitam dificuldade baixa: 3333 public-pool, 3335 nerdminers ou 3340 bitronics. Nas outras (ckpool, atlaspool, OCEAN) um processador quase nunca chega a mandar um share. A nerdminers parece aceitar só um aparelho por IP: se um NerdMiner já minera nela, ele cai.'],
     ALARM_IGNORE: ['Não acender a luz vermelha', 'Workers que podem parar sem alarme (ex.: um notebook que você desliga à noite). Também não geram aviso no Telegram.'],
     WATTS: ['Consumo por worker (W)', 'Em watts, para a estimativa da conta de luz. Vazio usa o padrão (5 W).'],
     EXPECTED: ['Hashrate esperado por worker', 'Aparece no painel mesmo quando a pool esconde o worker. Use 0 para ocultar um worker esperado no .env; vazio deixa só pelo que a pool ou o proxy informarem.'],
@@ -680,6 +682,7 @@ const T = {
     LOCAL_WORKER: ['Miner on this machine', 'The cpuminer worker running on this server (minerd service). The dashboard reads its hashrate from the log and shows the CPU temperature.'],
     LOCAL_MINER: ['Also mine with this server', 'Turns on this device\'s cpuminer, pointed at its own proxy, with the name above (or the device name). It heats the board: use a heatsink.'],
     MINER_THREADS: ['Cores for mining', 'Empty leaves one core free for the proxy and the dashboard.'],
+    MINER_PORT: ['Local miner pool', 'Proxy port this server mines on (Automatic = 3333, public-pool). For a CPU, use pools that accept low difficulty: 3333 public-pool, 3335 nerdminers or 3340 bitronics. On the others (ckpool, atlaspool, OCEAN) a CPU will almost never get a share in. nerdminers seems to allow one device per IP: a NerdMiner already on it would drop.'],
     ALARM_IGNORE: ['Don\'t turn the red light on', 'Workers that may stop without an alarm (e.g. a laptop you shut down at night). They also skip Telegram alerts.'],
     WATTS: ['Power per worker (W)', 'In watts, for the power bill estimate. Empty uses the default (5 W).'],
     EXPECTED: ['Expected hashrate per worker', 'Shows up on the dashboard even when the pool hides the worker. Use 0 to hide a worker set in .env; empty relies on the pool or proxy.'],
@@ -778,7 +781,7 @@ function page(lang, hasPin, theme) {
       : f.key === 'MQTT_URL' ? ` <button type="button" class="ghost" data-test="mqtt">${S.testMqtt}</button>`
       : f.key === 'TUYA_DEVICE_ID' ? ` <button type="button" class="ghost" data-test="tuya">${S.testTuya}</button>`
       : f.key === 'BITAXES' ? `<div class="bbar"><button type="button" class="ghost" data-test="bitaxe">${S.testBitaxe}</button><button type="button" class="ghost" id="bitaxe_scan">${S.scanBitaxe}</button></div><div id="bitaxe_res" class="pools"></div>` : '';
-    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'KIOSK', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
+    const half = ['BITAXE_TEMP_MAX', 'BITAXE_VR_MAX', 'BITAXE_HASH_MIN', 'LOCAL_MINER', 'MINER_THREADS', 'MINER_PORT', 'LANGUAGE', 'CURRENCY', 'POWER_PRICE_KWH', 'SHOW_WALLET', 'SHOW_DONATE', 'KIOSK', 'TELEGRAM_DAILY', 'TELEGRAM_PERSONAL', 'TELEGRAM_BACKUP', 'TUYA_REGION', 'TUYA_CLIENT_ID', 'MQTT_USER', 'MQTT_PASS'].includes(f.key) ? ' half' : '';
     const hideLegacy = ['TUYA_DEVICE_ID', 'TUYA_WORKER', 'TUYA_WATCHDOG_MIN'].includes(f.key) ? ' hidden' : '';
     // .fl = rótulo + ajuda (à esquerda no computador), .fc = o campo (à direita)
     const tdef = f.temp ? ({ BITAXE_TEMP_MAX: 68, BITAXE_VR_MAX: 95 }[f.key]) : null;
@@ -1327,7 +1330,7 @@ fetch('/api/config').then((r) => r.json()).then((c) => {
   tempUnitUI(null, (c.values && c.values.TEMP_UNIT) || '');
   // minerador local: só aparece onde existe (imagens prontas com cpuminer)
   const lm = c.localMiner || {};
-  for (const k of ['LOCAL_MINER', 'MINER_THREADS']) { const f = form.querySelector('.f[data-key="' + k + '"]'); if (f) f.hidden = !lm.available; }
+  for (const k of ['LOCAL_MINER', 'MINER_THREADS', 'MINER_PORT']) { const f = form.querySelector('.f[data-key="' + k + '"]'); if (f) f.hidden = !lm.available; }
   const th = el('MINER_THREADS'); if (th && lm.cores) th.placeholder = lm.defaultThreads + ' / ' + lm.cores;
   // tela na placa: só onde dá (systemd + apt); diz se está instalando, se deu erro ou se não achou a tela
   const ks = c.kiosk || {}, kf = form.querySelector('.f[data-key="KIOSK"]');
