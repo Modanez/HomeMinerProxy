@@ -558,6 +558,12 @@ async function tickPrice() {
   } catch (e) { priceHist.error += ' · binance: ' + e.message; }
 }
 
+// ---------------------------------------------------------------- notícias (aba Notícias)
+const news = require('./news');
+const NEWS_ON = process.env.NEWS !== '0';
+let newsState = { at: 0, feeds: [] };
+async function tickNews() { if (NEWS_ON) await news.refresh(newsState, news.feedsFromEnv(process.env.NEWS_FEEDS, LANGUAGE)).catch(() => {}); }
+
 // ---------------------------------------------------------------- rede Bitcoin (mempool.space)
 let net = { at: 0, okAt: 0, error: null, tip: null, prize: null, adj: null, fees: null };
 
@@ -1259,6 +1265,14 @@ const PAGE = `<!doctype html>
     .bx .bxh a.axeos { margin-left:0; }
     .bx .bxh a.axeos + a { margin-left:auto; }
   }
+  .nw-src { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
+  .nw-src button { background:none; border:1px solid var(--line); color:var(--dim); border-radius:999px; padding:3px 11px; font:inherit; font-size:12px; cursor:pointer; }
+  .nw-src button.on { border-color:var(--gold); color:var(--gold); background:var(--gold-soft); }
+  .nw-src button.bad { text-decoration:line-through; }
+  .nw-item { display:block; padding:10px 0; border-top:1px solid var(--line); color:inherit; text-decoration:none; }
+  .nw-item:first-child { border-top:0; } .nw-item:hover .nw-t { color:var(--gold); }
+  .nw-t { font-weight:600; line-height:1.3; } .nw-m { color:var(--dim); font-size:12px; margin-top:2px; } .nw-s { color:var(--dim); font-size:13px; margin-top:4px; line-height:1.4; }
+  body.kiosk .nw-s { display:none; }
   .pr-top { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-start; }
   .pr-chips { display:grid; grid-template-columns:repeat(4, auto); gap:6px 14px; font-size:13px; }
   .pr-chips div { text-align:right; } .pr-chips span { display:block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
@@ -1521,6 +1535,16 @@ const PAGE = `<!doctype html>
   <div class="err" id="nerr"></div>
 </section>
 
+<!-- Tela: notícias -->
+<section class="page" data-page="news">
+  <h2 class="sect">Notícias</h2>
+  <div class="card">
+    <div class="nw-src" id="nwSrc"></div>
+    <div class="nw-list" id="nwList"><p class="sub">carregando…</p></div>
+    <div class="sub" id="nwFoot"></div>
+  </div>
+</section>
+
 <!-- Tela: preço do bitcoin -->
 <section class="page" data-page="price">
   <h2 class="sect">Preço do bitcoin</h2>
@@ -1717,10 +1741,10 @@ if (kiosk) {
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
-const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', price: 'Preço', priceD: 'Variação do preço do bitcoin em 1 dia, 7 dias, 30 dias e 1 ano', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', price: 'Preço', priceD: 'Variação do preço do bitcoin em 1 dia, 7 dias, 30 dias e 1 ano', news: 'Notícias', newsD: 'Manchetes de bitcoin de sites que publicam RSS', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
 const CX_NAV = [
   [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
-  [CX.gMining, [['network', '🌐'], ['price', '💹'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
+  [CX.gMining, [['network', '🌐'], ['price', '💹'], ['news', '📰'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
   [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings], ['donate', '❤️', CX.donate]]],
 ];
 const cxPage = () => {
@@ -1970,6 +1994,36 @@ function renderBitaxes(j) {
       '</div>' + bxCharts(b) + bxScoreboard(b) + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
 }
+// ---- aba Notícias: manchetes dos feeds RSS (o servidor busca a cada 30 min)
+const NWT = { all: 'todas', updated: 'atualizado', off: 'fora do ar', none: 'Ainda sem notícias (o servidor busca a cada 30 min; precisa de internet).' };
+let nwData = null, nwSource = '', nwAt = 0;
+function renderNews() {
+  const d = nwData;
+  if (!d) return;
+  if (!d.enabled) {   // NEWS=0: some a aba
+    const sec = document.querySelector('.page[data-page="news"]'); if (sec) sec.hidden = true;
+    const nav = document.querySelector('.cx-item[data-page="news"]'); if (nav) nav.hidden = true;
+    return;
+  }
+  const feeds = d.feeds || [];
+  $('nwSrc').innerHTML = feeds.length > 1 ? ['<button type="button" data-s=""' + (nwSource ? '' : ' class="on"') + '>' + NWT.all + '</button>']
+    .concat(feeds.map((f) => '<button type="button" data-s="' + esc(f.name) + '" class="' + (nwSource === f.name ? 'on ' : '') + (f.error && !f.n ? 'bad' : '') + '"' + (f.error ? ' title="' + esc(NWT.off + ': ' + f.error) + '"' : '') + '>' + esc(f.name) + '</button>')).join('') : '';
+  const items = (d.items || []).filter((it) => !nwSource || it.source === nwSource).slice(0, kiosk ? 8 : 40);
+  $('nwList').innerHTML = items.length ? items.map((it) => '<a class="nw-item" href="' + esc(it.link) + '" target="_blank" rel="noopener noreferrer"><div class="nw-t">' + esc(it.title) + '</div>' +
+    '<div class="nw-m">' + esc(it.source) + (it.at ? ' · ' + agoTxt(it.at) : '') + '</div>' + (it.summary ? '<div class="nw-s">' + esc(it.summary) + '</div>' : '') + '</a>').join('') : '<p class="sub">' + NWT.none + '</p>';
+  const okAt = Math.max(0, ...feeds.map((f) => f.okAt || 0));
+  set('nwFoot', okAt ? NWT.updated + ' ' + hora(okAt) : '');
+}
+async function loadNews(force) {
+  if (!force && nwData && Date.now() - nwAt < 10 * 60e3) return renderNews();
+  try { const r = await fetch('/api/news'); if (r.ok) { nwData = await r.json(); nwAt = Date.now(); } } catch (_) { /* segue */ }
+  renderNews();
+}
+$('nwSrc').addEventListener('click', (e) => { const b = e.target.closest('button[data-s]'); if (b) { nwSource = b.dataset.s; renderNews(); } });
+setInterval(() => { const sec = document.querySelector('.page[data-page="news"]'); if (sec && sec.offsetParent !== null) loadNews(); }, 60e3);
+window.addEventListener('hashchange', () => { if (location.hash === '#news') loadNews(); });
+loadNews(true);   // também esconde a aba logo se NEWS=0
+
 // ---- aba Preço: variação do bitcoin (o servidor guarda as séries; pede ao abrir a aba e a cada 15 min)
 const PRT = { up: 'subiu', down: 'caiu', since: 'desde', src: 'fonte', updated: 'atualizado', nodata: 'Ainda sem dados de preço (o servidor busca a cada 15 min; precisa de internet).', r: { d1: '24 h', d7: '7 dias', d30: '30 dias', y1: '1 ano' } };
 let prData = null, prRange = 'd30', prAt = 0;
@@ -2983,6 +3037,10 @@ function requestHandler(req, res) {
     });
     return;
   }
+  if (req.url === '/api/news') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ enabled: NEWS_ON, at: newsState.at, items: news.merged(newsState), feeds: (newsState.feeds || []).map((f) => ({ name: f.name, okAt: f.okAt, error: f.error, n: f.items.length })) }));
+  }
   if (req.url === '/api/price') {
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     return res.end(JSON.stringify({ currency: CURRENCY, now: wallet[CURRENCY === 'BRL' ? 'brl' : 'usd'] || null, ...priceHist }));
@@ -3031,6 +3089,7 @@ function start(port = PORT, host = '0.0.0.0') {
       everyTimer(tickWallet, WALLET_MS);
       everyTimer(tickNetwork, NET_MS);
       everyTimer(tickPrice, 15 * 60e3);
+      everyTimer(tickNews, 30 * 60e3);
       everyTimer(tickDiffHist, 3600e3);
       everyTimer(tickLocal, 60e3);
       everyTimer(tickCkpools, 120e3);
