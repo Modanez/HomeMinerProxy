@@ -26,11 +26,26 @@ test('Atom: link alternate e data updated', () => {
   assert.deepStrictEqual([it[0].title, it[0].link], ['Optech #380', 'https://bitcoinops.org/n/380/']);
 });
 
-test('feeds: padrão por idioma e lista própria em NEWS_FEEDS', () => {
-  assert.strictEqual(news.feedsFromEnv('', 'pt')[0].name, 'Livecoins');
-  assert.strictEqual(news.feedsFromEnv('', 'en')[0].name, 'No Bullshit Bitcoin');
-  const f = news.feedsFromEnv('Meu|https://ex.com/rss, https://www.outro.org/feed, lixo', 'pt');
+test('feeds: os dois idiomas buscados juntos, cada visitante vê os do seu; lista própria vale para os dois', () => {
+  const all = news.feedsFromEnv('');
+  const nobs = all.filter((f) => f.name === 'No Bullshit Bitcoin');
+  assert.strictEqual(nobs.length, 1, 'feed comum aos dois idiomas aparece uma vez só');
+  assert.deepStrictEqual(nobs[0].langs.sort(), ['en', 'pt']);
+  const state = { feeds: all.map((f) => ({ ...f, items: [] })) };
+  assert.deepStrictEqual(news.forLang(state, 'pt').map((f) => f.name), ['Livecoins', 'Portal do Bitcoin', 'No Bullshit Bitcoin']);
+  assert.deepStrictEqual(news.forLang(state, 'en').map((f) => f.name), ['No Bullshit Bitcoin', 'Bitcoin Magazine', 'Bitcoin Optech']);
+  const f = news.feedsFromEnv('Meu|https://ex.com/rss, https://www.outro.org/feed, lixo');
   assert.deepStrictEqual(f.map((x) => x.name), ['Meu', 'outro.org']);
+  assert.deepStrictEqual(f[0].langs, ['pt', 'en']);
+});
+
+test('lista por idioma: manchetes só dos feeds daquele idioma', () => {
+  const state = { feeds: [
+    { name: 'PT', langs: ['pt'], items: [{ title: 'a', link: 'https://a/', at: 2 }] },
+    { name: 'EN', langs: ['en'], items: [{ title: 'b', link: 'https://b/', at: 1 }] },
+  ] };
+  assert.deepStrictEqual(news.merged(state, 40, 'pt').map((i) => i.source), ['PT']);
+  assert.deepStrictEqual(news.merged(state, 40, 'en').map((i) => i.source), ['EN']);
 });
 
 test('um feed fora do ar mantém as manchetes antigas e não derruba os outros; lista única sem repetir', async () => {

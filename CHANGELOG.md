@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- News page fixes: feeds now follow the language picked in the dashboard (PT | EN) instead of the server's, since the server fetches both languages' feeds; when there are no headlines yet the page retries every 20 s instead of 10 min; feeds that are down show the reason at the bottom; requests use a browser-like User-Agent, since some sites behind Cloudflare refuse bots.
 - **Worker dialog is live:** while open it refreshes every 3 seconds (shares, charts, best hashes), new shares flash briefly, and the scroll position is kept. It stops when closed or when the tab is in the background.
 - **Choose the local miner's pool:** new setting in Settings → Miners (`MINER_PORT`), a list of the proxy ports (Automatic = 3333, public-pool). The hint says which pools a CPU can actually get shares on. Also works with the Docker `minerador` profile.
 - Fixed: false records after a reconnect. Pools and the proxy report the best share of the *current session*, which starts over when a miner reconnects; any session best without a matching record became a "new record" (odroid at 1,150.58 got a record popup for 4.14). Now a record only counts when it beats that worker's best ever, and false records already saved are removed when the dashboard starts.
@@ -21,6 +22,7 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- Correções na aba Notícias: os feeds seguem o idioma escolhido no painel (PT | EN), e não o do servidor, que passa a buscar os feeds dos dois idiomas; sem manchetes ainda, a aba tenta de novo a cada 20 s em vez de 10 min; feeds fora do ar mostram o motivo no rodapé; as buscas usam um User-Agent de navegador, porque alguns sites atrás da Cloudflare recusam robôs.
 - **Modal do worker ao vivo:** aberto, ele se atualiza a cada 3 segundos (shares, gráficos, melhores hashes), os shares novos piscam rapidinho e a rolagem fica onde estava. Para quando fecha ou quando a aba do navegador está em segundo plano.
 - **Escolher a pool do minerador local:** opção nova em Configurações → Mineradores (`MINER_PORT`), uma lista com as portas do proxy (Automático = 3333, public-pool). A dica explica em quais pools um processador consegue mandar shares. Vale também para o perfil `minerador` do Docker.
 - Corrigido: recordes falsos depois de reconectar. As pools e o proxy informam o melhor share da *sessão atual*, que recomeça quando o minerador reconecta; qualquer melhor de sessão sem um recorde igual virava "recorde novo" (o odroid, com recorde de 1.150,58, ganhou aviso de recorde com 4,14). Agora só conta como recorde o que passa do melhor que aquele worker já teve, e os recordes falsos já gravados saem quando o painel inicia.
