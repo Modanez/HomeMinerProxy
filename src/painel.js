@@ -526,6 +526,38 @@ async function tickWallet() {
   }
 }
 
+// ---------------------------------------------------------------- variação do preço (aba Preço)
+// Séries na moeda do painel: 1 dia (5 min), 30 dias (por hora; o 7 dias sai daqui) e 1 ano (diário).
+// CoinGecko e, se falhar, os candles da Binance (BTCBRL / BTCUSDT). A cada 15 min; a aba pede em /api/price.
+let priceHist = { at: 0, okAt: 0, error: null, source: null, d1: [], d30: [], y1: [] };
+async function tickPrice() {
+  priceHist.at = Date.now();
+  const cur = CURRENCY.toLowerCase();
+  const gecko = process.env.COINGECKO_CHART || 'https://api.coingecko.com/api/v3/coins/bitcoin/market_chart';
+  const clean = (arr) => (Array.isArray(arr) ? arr : []).map(([t, v]) => [Number(t), Number(v)]).filter(([t, v]) => t > 0 && v > 0);
+  try {
+    const out = {};
+    for (const [key, days] of [['d1', 1], ['d30', 30], ['y1', 365]]) {
+      const r = await getJsonRetry(`${gecko}?vs_currency=${cur}&days=${days}`, 2);
+      out[key] = clean(r && r.prices);
+      if (!out[key].length) throw new Error('sem série');
+    }
+    Object.assign(priceHist, out, { okAt: Date.now(), error: null, source: 'coingecko' });
+    return;
+  } catch (e) { priceHist.error = 'coingecko: ' + e.message; }
+  try {
+    const sym = CURRENCY === 'BRL' ? 'BTCBRL' : 'BTCUSDT';
+    const base = process.env.BINANCE_KLINES || 'https://api.binance.com/api/v3/klines';
+    const out = {};
+    for (const [key, interval, limit] of [['d1', '5m', 288], ['d30', '1h', 720], ['y1', '1d', 365]]) {
+      const r = await getJsonRetry(`${base}?symbol=${sym}&interval=${interval}&limit=${limit}`, 2);
+      out[key] = clean((Array.isArray(r) ? r : []).map((k) => [k[6], k[4]]));   // fechamento de cada candle
+      if (!out[key].length) throw new Error('sem série');
+    }
+    Object.assign(priceHist, out, { okAt: Date.now(), error: null, source: 'binance' });
+  } catch (e) { priceHist.error += ' · binance: ' + e.message; }
+}
+
 // ---------------------------------------------------------------- rede Bitcoin (mempool.space)
 let net = { at: 0, okAt: 0, error: null, tip: null, prize: null, adj: null, fees: null };
 
@@ -1125,7 +1157,7 @@ const PAGE = `<!doctype html>
   @media (max-width:899px) {
     body.console > .cx-top { padding:0 12px; gap:8px; }
     body.console .cx-sep, body.console .cx-crumb, body.console #cxPing, body.console .cx-badge { display:none; }
-    body.console .cx-shell { grid-template-columns:minmax(0, 1fr); }
+    body.console .cx-shell { grid-template-columns:minmax(0, 1fr); align-content:start; }   /* sem isso a linha do menu esticava e abria um vão acima do título em páginas curtas */
     body.console .cx-side { position:sticky; top:var(--cxtop); z-index:30; height:auto; border-right:0; border-bottom:1px solid var(--line); padding:6px 10px; }
     body.console #cxNav { display:flex; gap:4px; overflow-x:auto; scrollbar-width:none; }
     body.console .cx-sec { display:none; }
@@ -1227,6 +1259,16 @@ const PAGE = `<!doctype html>
     .bx .bxh a.axeos { margin-left:0; }
     .bx .bxh a.axeos + a { margin-left:auto; }
   }
+  .pr-top { display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+  .pr-chips { display:grid; grid-template-columns:repeat(4, auto); gap:6px 14px; font-size:13px; }
+  .pr-chips div { text-align:right; } .pr-chips span { display:block; color:var(--dim); font-size:11px; text-transform:uppercase; letter-spacing:.05em; }
+  .pr-chips b.up { color:var(--ok); } .pr-chips b.down { color:var(--warn); }
+  .pr-ranges { display:flex; gap:6px; margin:14px 0 6px; }
+  .pr-ranges button { background:none; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:4px 12px; font:inherit; font-size:13px; cursor:pointer; }
+  .pr-ranges button.on { border-color:var(--gold); color:var(--gold); background:var(--gold-soft); }
+  .pr-chart { position:relative; } .pr-chart svg { width:100%; height:auto; display:block; touch-action:pan-y; }
+  .pr-tip { position:absolute; top:4px; pointer-events:none; background:var(--tip-bg); border:1px solid var(--line); border-radius:6px; padding:4px 8px; font-size:12px; white-space:nowrap; transform:translateX(-50%); }
+  @media (max-width:560px) { .pr-chips { grid-template-columns:repeat(2, auto); } }
   .bxsb { margin-top:10px; border-top:1px solid var(--line); padding-top:8px; }
   .bxsb summary { cursor:pointer; font-size:13px; color:var(--gold); } .bxsb summary span { color:var(--dim); }
   .bxsb ol { margin:6px 0 0; padding-left:28px; columns:2; column-gap:24px; font-size:13px; font-variant-numeric:tabular-nums; }
@@ -1479,6 +1521,20 @@ const PAGE = `<!doctype html>
   <div class="err" id="nerr"></div>
 </section>
 
+<!-- Tela: preço do bitcoin -->
+<section class="page" data-page="price">
+  <h2 class="sect">Preço do bitcoin</h2>
+  <div class="card pr-card">
+    <div class="pr-top"><div><div class="label">1 BTC</div><div class="big" id="prNow">–</div><div class="sub" id="prSub">–</div></div>
+      <div class="pr-chips" id="prChips"></div></div>
+    <div class="pr-ranges" id="prRanges"><button type="button" data-r="d1">1D</button><button type="button" data-r="d7">7D</button><button type="button" data-r="d30" class="on">30D</button><button type="button" data-r="y1">1A</button></div>
+    <div class="pr-chart" id="prChart"><p class="sub">carregando…</p></div>
+    <div class="sub" id="prSrc"></div>
+  </div>
+  <div class="err" id="prErr"></div>
+</section>
+
+
 <!-- Tela 3: histórico, servidor e energia -->
 <section class="page" data-page="history">
   <h2 class="sect">Histórico</h2>
@@ -1661,10 +1717,10 @@ if (kiosk) {
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
-const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', price: 'Preço', priceD: 'Variação do preço do bitcoin em 1 dia, 7 dias, 30 dias e 1 ano', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
 const CX_NAV = [
   [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
-  [CX.gMining, [['network', '🌐'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
+  [CX.gMining, [['network', '🌐'], ['price', '💹'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
   [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings], ['donate', '❤️', CX.donate]]],
 ];
 const cxPage = () => {
@@ -1914,6 +1970,79 @@ function renderBitaxes(j) {
       '</div>' + bxCharts(b) + bxScoreboard(b) + (warn.length ? '<div class="bxwarn">⚠️ ' + warn.join(' · ') + '</div>' : '') + '</div>';
   }).join('');
 }
+// ---- aba Preço: variação do bitcoin (o servidor guarda as séries; pede ao abrir a aba e a cada 15 min)
+const PRT = { up: 'subiu', down: 'caiu', since: 'desde', src: 'fonte', updated: 'atualizado', nodata: 'Ainda sem dados de preço (o servidor busca a cada 15 min; precisa de internet).', r: { d1: '24 h', d7: '7 dias', d30: '30 dias', y1: '1 ano' } };
+let prData = null, prRange = 'd30', prAt = 0;
+const prSeries = (d, r) => {
+  if (!d) return [];
+  if (r === 'd7') { const cut = Date.now() - 7 * 86400e3; return (d.d30 || []).filter(([t]) => t >= cut); }
+  return d[r] || [];
+};
+const prPct = (arr) => (arr.length > 1 ? (arr[arr.length - 1][1] / arr[0][1] - 1) * 100 : null);
+const prFmtPct = (v) => (v == null ? '–' : (v > 0 ? '+' : '') + nf(v, Math.abs(v) < 10 ? 2 : 1) + '%');
+const prW = () => (window.innerWidth < 560 ? 380 : 720);
+function prChart(arr) {
+  const W = prW(), H = W < 500 ? 230 : 240, P = 26;
+  if (arr.length < 2) return '<p class="sub">' + PRT.nodata + '</p>';
+  const t0 = arr[0][0], t1 = arr[arr.length - 1][0];
+  const vs = arr.map((a) => a[1]), lo = Math.min(...vs), hi = Math.max(...vs), pad = (hi - lo) * 0.08 || hi * 0.01;
+  const X = (t) => 4 + (W - 8) * (t - t0) / Math.max(1, t1 - t0), Y = (v) => 24 + (H - P - 34) * (1 - (v - lo + pad) / (hi - lo + 2 * pad));
+  const up = arr[arr.length - 1][1] >= arr[0][1], col = up ? 'var(--ok)' : 'var(--warn)';
+  const d = arr.map((a, i) => (i ? 'L' : 'M') + X(a[0]).toFixed(1) + ' ' + Y(a[1]).toFixed(1)).join(' ');
+  const span = t1 - t0, lab = (t) => span <= 2 * 86400e3 ? hora(t) : new Date(t).toLocaleDateString(LOC, span > 120 * 86400e3 ? { month: 'short' } : { day: '2-digit', month: '2-digit' });
+  let g = '';
+  const nl = W < 500 ? 2 : 4;
+  for (let k = 0; k <= nl; k++) { const t = t0 + span * k / nl; g += '<text x="' + X(t).toFixed(1) + '" y="' + (H - 6) + '" font-size="13" fill="var(--dim)" text-anchor="' + (k === 0 ? 'start' : k === nl ? 'end' : 'middle') + '">' + lab(t) + '</text>'; }
+  const imax = vs.indexOf(hi), imin = vs.indexOf(lo);
+  const mark = (i, v, dy) => '<text x="' + Math.min(Math.max(X(arr[i][0]), 60), W - 60).toFixed(1) + '" y="' + (Y(v) + dy).toFixed(1) + '" font-size="13" fill="var(--txt)" text-anchor="middle">' + moneyCompact(v) + '</text>';
+  return '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img"><defs><linearGradient id="prg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="' + col + '" stop-opacity=".28"/><stop offset="1" stop-color="' + col + '" stop-opacity="0"/></linearGradient></defs>' +
+    '<path d="' + d + ' L' + X(t1).toFixed(1) + ' ' + (H - P) + ' L' + X(t0).toFixed(1) + ' ' + (H - P) + ' Z" fill="url(#prg)"/>' +
+    '<path d="' + d + '" fill="none" stroke="' + col + '" stroke-width="2.2" stroke-linejoin="round"/>' + mark(imax, hi, -8) + mark(imin, lo, 18) + g +
+    '<line id="prCur" x1="0" x2="0" y1="6" y2="' + (H - P) + '" stroke="var(--dim)" stroke-dasharray="3 3" visibility="hidden"/></svg><div class="pr-tip" id="prTip" hidden></div>';
+}
+function renderPrice() {
+  const d = prData;
+  if (!d) return;
+  const now = d.now || (d.d1 && d.d1.length ? d.d1[d.d1.length - 1][1] : null);
+  set('prNow', now ? money(now) : '–');
+  const ch = (r) => prPct(prSeries(d, r));
+  const c24 = ch('d1');
+  set('prSub', c24 == null ? '–' : (c24 >= 0 ? '▲ ' + PRT.up : '▼ ' + PRT.down) + ' ' + prFmtPct(c24) + ' (24 h)');
+  $('prChips').innerHTML = ['d1', 'd7', 'd30', 'y1'].map((r) => { const v = ch(r); return '<div><span>' + PRT.r[r] + '</span><b class="' + (v == null ? '' : v >= 0 ? 'up' : 'down') + '">' + prFmtPct(v) + '</b></div>'; }).join('');
+  const arr = prSeries(d, prRange);
+  prLastW = prW();
+  $('prChart').innerHTML = prChart(arr);
+  set('prSrc', d.okAt ? PRT.src + ': ' + (d.source === 'binance' ? 'Binance' : 'CoinGecko') + ' · ' + PRT.updated + ' ' + hora(d.okAt) : '');
+  set('prErr', d.okAt ? '' : (d.error || ''));
+  document.querySelectorAll('#prRanges button').forEach((b) => b.classList.toggle('on', b.dataset.r === prRange));
+  // valor do ponto sob o dedo / mouse
+  const svg = $('prChart').querySelector('svg');
+  if (!svg || arr.length < 2) return;
+  const t0 = arr[0][0], t1 = arr[arr.length - 1][0];
+  const move = (ev) => {
+    const r = svg.getBoundingClientRect(), x = ((ev.touches ? ev.touches[0].clientX : ev.clientX) - r.left) / r.width;
+    const W = prW(), t = t0 + (t1 - t0) * Math.min(1, Math.max(0, (x * W - 4) / (W - 8)));
+    let best = arr[0]; for (const a of arr) if (Math.abs(a[0] - t) < Math.abs(best[0] - t)) best = a;
+    const vx = 4 + (W - 8) * (best[0] - t0) / Math.max(1, t1 - t0);
+    const cur = $('prCur'); cur.setAttribute('x1', vx); cur.setAttribute('x2', vx); cur.setAttribute('visibility', 'visible');
+    const tip = $('prTip'); tip.hidden = false; tip.style.left = Math.min(Math.max(vx / W * 100, 22), 78) + '%';
+    tip.textContent = money(best[1]) + ' · ' + new Date(best[0]).toLocaleString(LOC, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+  };
+  const leave = () => { $('prCur').setAttribute('visibility', 'hidden'); $('prTip').hidden = true; };
+  svg.addEventListener('mousemove', move); svg.addEventListener('touchmove', move, { passive: true }); svg.addEventListener('mouseleave', leave); svg.addEventListener('touchend', leave);
+}
+async function loadPrice(force) {
+  if (!force && Date.now() - prAt < 5 * 60e3) return renderPrice();
+  try { const r = await fetch('/api/price'); if (r.ok) { prData = await r.json(); prAt = Date.now(); } } catch (_) { /* segue */ }
+  renderPrice();
+}
+let prLastW = 0; window.addEventListener('resize', () => { if (prData && prW() !== prLastW) renderPrice(); });
+$('prRanges').addEventListener('click', (e) => { const b = e.target.closest('button[data-r]'); if (b) { prRange = b.dataset.r; renderPrice(); } });
+const prVisible = () => { const sec = document.querySelector('.page[data-page="price"]'); return sec && sec.offsetParent !== null; };
+setInterval(() => { if (prVisible()) loadPrice(); }, 60e3);
+window.addEventListener('hashchange', () => { if (location.hash === '#price') loadPrice(); });
+if (location.hash === '#price' || kiosk) loadPrice(true);
+
 // Top 20 do scoreboard do AxeOS, recolhido; lembra quem estava aberto (a lista é redesenhada a cada atualização)
 const bxSbOpen = new Set();
 function bxScoreboard(b) {
@@ -2854,6 +2983,10 @@ function requestHandler(req, res) {
     });
     return;
   }
+  if (req.url === '/api/price') {
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    return res.end(JSON.stringify({ currency: CURRENCY, now: wallet[CURRENCY === 'BRL' ? 'brl' : 'usd'] || null, ...priceHist }));
+  }
   // app instalável no celular: manifesto, ícones e service worker
   if (require('./pwa').handle(req, res, { lang: pickLang(req, LANGUAGE), theme: THEME })) return;
   if (req.url === '/api/mining') {
@@ -2897,6 +3030,7 @@ function start(port = PORT, host = '0.0.0.0') {
       everyTimer(tickPool, POOL_MS);
       everyTimer(tickWallet, WALLET_MS);
       everyTimer(tickNetwork, NET_MS);
+      everyTimer(tickPrice, 15 * 60e3);
       everyTimer(tickDiffHist, 3600e3);
       everyTimer(tickLocal, 60e3);
       everyTimer(tickCkpools, 120e3);
