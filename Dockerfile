@@ -3,7 +3,7 @@
 FROM node:22-alpine
 
 # python3 + Pillow + DejaVu only for the GeekMagic cube; tzdata for local time (quiet hours, cube clock)
-RUN apk add --no-cache python3 py3-pillow font-dejavu tzdata \
+RUN apk add --no-cache python3 py3-pillow font-dejavu tzdata openssl \
  && mkdir -p /data && chown node:node /data
 
 WORKDIR /app
