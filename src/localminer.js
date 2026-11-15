@@ -41,12 +41,15 @@ function systemctl(args) {
   });
 }
 
+// Porta do proxy em que o minerador local entra (opção MINER_PORT; vazio ou inválido = 3333, public-pool)
+const portOf = (p) => { const n = Number(p); return Number.isInteger(n) && n > 0 && n < 65536 ? n : 3333; };
+
 // Aplica a opção ao subir o painel. Devolve o nome do worker local (ou null se não minera).
 async function sync({ enabled, address, worker, threads, appDir, port = 3333 }) {
   if (!available()) return null;
   if (enabled && address) {
     const w = workerOf(worker);
-    const env = `# gerado pelo painel (opção "Minerar também com este servidor")\nMINER_USER=${address}.${w}\nMINER_THREADS=${threadsOf(threads)}\nMINER_PORT=${Number(port) || 3333}\n`;
+    const env = `# gerado pelo painel (opção "Minerar também com este servidor")\nMINER_USER=${address}.${w}\nMINER_THREADS=${threadsOf(threads)}\nMINER_PORT=${portOf(port)}\n`;
     const file = path.join(appDir, 'minerador.env');
     let changed = true;
     try { changed = fs.readFileSync(file, 'utf8') !== env; } catch (_) { /* primeira vez */ }
@@ -63,4 +66,4 @@ async function sync({ enabled, address, worker, threads, appDir, port = 3333 }) 
   return null;
 }
 
-module.exports = { UNIT, available, cores, defaultThreads, threadsOf, workerOf, sync, minerdPath };
+module.exports = { UNIT, portOf, available, cores, defaultThreads, threadsOf, workerOf, sync, minerdPath };

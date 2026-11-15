@@ -3118,7 +3118,7 @@ function start(port = PORT, host = '0.0.0.0') {
       // minerador local opcional (imagens prontas): liga/desliga o serviço conforme a opção LOCAL_MINER
       require('./localminer').sync({
         enabled: process.env.LOCAL_MINER === '1', address: ADDRESS, worker: process.env.LOCAL_WORKER,
-        threads: process.env.MINER_THREADS, appDir: process.env.DATA_DIR || __dirname,
+        threads: process.env.MINER_THREADS, port: process.env.MINER_PORT, appDir: process.env.DATA_DIR || __dirname,
       }).then((w) => { if (w) LOCAL_WORKER = w; }).catch(() => {});
       // tela ligada na placa (opção KIOSK): instala o navegador na primeira vez e liga/desliga o serviço
       require('./kiosk').sync({ enabled: process.env.KIOSK === '1', dataDir: process.env.DATA_DIR || __dirname }).catch(() => {});

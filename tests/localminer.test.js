@@ -70,3 +70,14 @@ test('assistente: passo "minerar também" só onde dá para minerar', () => {
   assert.strictEqual(setup.validate({ ...base, LOCAL_MINER: '0' }, '', null, true).values.LOCAL_MINER, '0');
   assert.deepStrictEqual(setup.validate({ ...base, LOCAL_MINER: '1', MINER_THREADS: '0', LOCAL_WORKER: 'a b' }, '', null, true).errors, { MINER_THREADS: 'threads', LOCAL_WORKER: 'name' });
 });
+
+test('escolher a pool: MINER_PORT vai para o minerador.env e reinicia ao trocar', async (t) => {
+  const { dir, calls, lm } = sandbox(t);
+  await lm.sync({ enabled: true, address: ADDR, worker: 'odroid', threads: '1', port: '3333', appDir: dir });
+  await lm.sync({ enabled: true, address: ADDR, worker: 'odroid', threads: '1', port: '3340', appDir: dir });
+  assert.match(fs.readFileSync(path.join(dir, 'minerador.env'), 'utf8'), /MINER_PORT=3340\n/);
+  assert.strictEqual(calls().filter((c) => c.startsWith('restart')).length, 2);
+  assert.strictEqual(lm.portOf(''), 3333);
+  assert.strictEqual(lm.portOf('abc'), 3333);
+  assert.strictEqual(lm.portOf('70000'), 3333);
+});

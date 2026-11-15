@@ -13,6 +13,6 @@ FROM debian:trixie-slim
 RUN apt-get update && apt-get install -y --no-install-recommends libcurl4t64 ca-certificates && rm -rf /var/lib/apt/lists/*
 COPY --from=build /src/minerd /usr/local/bin/minerd
 USER nobody
-ENV MINER_URL=stratum+tcp://proxy:3333
+# MINER_PORT escolhe a pool (porta do proxy, padrão 3333); MINER_URL, se definido, manda em tudo
 # baixa prioridade: o proxy e o painel vêm primeiro
-CMD ["sh", "-c", "[ -n \"$BTC_ADDRESS\" ] || { echo 'BTC_ADDRESS vazio no mineracao.env / BTC_ADDRESS is empty'; exit 1; }; n=$(nproc); t=${MINER_THREADS:-$(( n > 1 ? n - 1 : 1 ))}; exec nice -n 19 minerd -a sha256d -o \"$MINER_URL\" -u \"$BTC_ADDRESS.${LOCAL_WORKER:-docker}\" -p x -t \"$t\""]
+CMD ["sh", "-c", "[ -n \"$BTC_ADDRESS\" ] || { echo 'BTC_ADDRESS vazio no mineracao.env / BTC_ADDRESS is empty'; exit 1; }; n=$(nproc); t=${MINER_THREADS:-$(( n > 1 ? n - 1 : 1 ))}; exec nice -n 19 minerd -a sha256d -o \"${MINER_URL:-stratum+tcp://proxy:${MINER_PORT:-3333}}\" -u \"$BTC_ADDRESS.${LOCAL_WORKER:-docker}\" -p x -t \"$t\""]
