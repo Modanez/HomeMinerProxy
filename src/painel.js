@@ -2669,7 +2669,8 @@ function wkChart(hours, val, color, logScale, fmt, stack) {
     if (i % 6 === 0 || i === n - 1) svg += '<text x="' + (i === 0 ? x : i === n - 1 ? x + bw : x + bw / 2).toFixed(1) + '" y="' + (H + 15) + '" text-anchor="' + (i === 0 ? 'start' : i === n - 1 ? 'end' : 'middle') + '" font-size="14" fill="var(--dim)">' + hora(h.t) + '</text>';
   });
   const top = hours.reduce((b, h) => (val(h) > val(b) ? h : b), hours[0]);
-  if (top && val(top) > 0) { const i = hours.indexOf(top), x = 4 + i * bw + bw / 2, y = H - (H - 14) * tr(val(top)) / max - 3; svg += '<text x="' + Math.min(Math.max(x, 30), W - 30).toFixed(1) + '" y="' + Math.max(y, 11).toFixed(1) + '" text-anchor="middle" font-size="14" fill="var(--txt)">' + esc(fmt(top)) + '</text>'; }
+  if (top && val(top) > 0) { const i = hours.indexOf(top), x = 4 + i * bw + bw / 2, y = H - (H - 14) * tr(val(top)) / max - 3; const anc = x < W * 0.2 ? 'start' : x > W * 0.8 ? 'end' : 'middle';   // perto da borda, o texto cresce para dentro (não corta)
+    svg += '<text x="' + (anc === 'start' ? Math.max(x - bw / 2, 2) : anc === 'end' ? Math.min(x + bw / 2, W - 2) : x).toFixed(1) + '" y="' + Math.max(y, 11).toFixed(1) + '" text-anchor="' + anc + '" font-size="14" fill="var(--txt)">' + esc(fmt(top)) + '</text>'; }
   return svg + '<line x1="0" y1="' + H + '" x2="' + W + '" y2="' + H + '" stroke="var(--line)"/></svg>';
 }
 // Ao vivo: com o modal aberto, busca de novo a cada 3 s (o proxy vê cada share na hora). Shares que chegaram desde a
