@@ -80,7 +80,7 @@ const EN = [
   ["return nf(d, d < 10 ? 1 : 0) + ' dias';", "return nf(d, d < 10 ? 1 : 0) + ' days';"],
   ["[[1e12, ' tri'], [1e9, ' bi'], [1e6, ' mi'], [1e3, ' mil']]", "[[1e12, ' T'], [1e9, ' B'], [1e6, ' M'], [1e3, ' k']]"],
   ["[[1, '1'], [1e3, 'mil'], [1e6, 'milhão'], [1e9, 'bilhão'], [1e12, 'trilhão'], [1e15, 'quatrilhão']]", "[[1, '1'], [1e3, 'thousand'], [1e6, 'million'], [1e9, 'billion'], [1e12, 'trillion'], [1e15, 'quadrillion']]"],
-  ["const medals = ['1º', '2º', '3º', '4º', '5º'];", "const medals = ['1st', '2nd', '3rd', '4th', '5th'];"],
+  ["const medals = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];", "const medals = ['1st', '2nd', '3rd', '4th', '5th', '6th', '7th', '8th', '9th', '10th'];"],
 
   // ---------- tela da fazenda
   ["'faltam ' + fmtBig(D / f.best) + ' de vezes'", "fmtBig(D / f.best) + ' times to go'"],

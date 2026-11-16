@@ -326,6 +326,25 @@ function dedupeRecords(list) {
   }
   return out.sort((a, b) => b.value - a.value);
 }
+// Hall da fama: os MAIORES shares da fazenda, de onde vierem — recordes gravados, os 10 maiores de cada worker que o
+// proxy guarda e o top 20 que cada Bitaxe guarda (scoreboard do AxeOS). Antes eram só os que tinham sido recorde no
+// dia em que saíram, então um 86 milhões depois do recorde de 339 milhões nunca aparecia.
+function hallOfFame(n = 10) {
+  const all = records.map((r) => ({ worker: r.worker, value: r.value, at: r.at }));
+  for (const t of proxy.topShares || []) all.push({ worker: t.worker, value: t.diff, at: new Date(t.at).toISOString() });
+  for (const [name, st] of bitaxeState) {
+    const b = BITAXES.find((x) => x.name === name) || {};
+    for (const e of st.scoreboard || []) all.push({ worker: (b.name ? bitaxeWorker(b) : null) || name, value: e.diff, at: e.at ? new Date(e.at).toISOString() : null });
+  }
+  const out = [];
+  for (const r of all.filter((r) => r.value > 0).sort((a, b) => b.value - a.value)) {
+    if (out.some((o) => sameShare(o.value, r.value) && (o.worker === r.worker || o.worker === '—' || r.worker === '—'))) continue;   // o mesmo share visto por dois caminhos
+    out.push(r);
+    if (out.length >= n) break;
+  }
+  return out;
+}
+
 // Recordes falsos já gravados (versões antigas registravam o melhor da sessão nova depois de reconectar): um
 // "recorde" menor que um recorde anterior do mesmo worker não é recorde e sai da lista.
 function dropRegressions(list) {
@@ -860,6 +879,7 @@ async function tickProxy() {
       events: Array.isArray(s.events) ? s.events.slice(0, 30) : [],
       process: s.process || null,
       hist: Array.isArray(s.hist) ? s.hist : null,
+      topShares: Array.isArray(s.topShares) ? s.topShares : [],
       // portas cuja pool principal está fora do ar (ou voltou há pouco e os mineradores ainda estão na reserva)
       failover: (s.routes || []).filter((r) => r.upstreams && (r.upstreams[0].down || r.onBackup > 0)).map((r) => ({
         listen: r.listen, primary: r.upstreams[0].label, since: r.upstreams[0].since, returning: !r.upstreams[0].down,
@@ -1099,7 +1119,7 @@ function snapshot(internal = false) {
         achievements: { unlocked: ach.unlockedCount, total: ach.totalCount, list: ach.list },
       };
     })(),
-    hall: [...records].sort((a, b) => b.value - a.value).slice(0, 5),
+    hall: hallOfFame(),
     recordSteps,
     recentRecords: [...records]
       .map((r) => ({ ...r, t: new Date(r.at).getTime() }))
@@ -2560,7 +2580,7 @@ function renderHistory(j) {
     fmtV: (p) => nf(p.v, 2) + (p.worker ? ' · ' + esc(p.worker) : ''), fmtT: (t) => diaMes(t) + ' ' + hora(t),
   });
 
-  const medals = ['1º', '2º', '3º', '4º', '5º'];
+  const medals = ['1º', '2º', '3º', '4º', '5º', '6º', '7º', '8º', '9º', '10º'];
   const hall = j.hall || [];
   $('hall').innerHTML = hall.length ? hall.map((r, i) =>
     '<li><span class="pos' + (i === 0 ? ' first' : '') + '">' + medals[i] + '</span><span class="val">' + (r.value > 0 && r.value < 0.01 ? nf(r.value, 4) : nf(r.value, 2)) +
