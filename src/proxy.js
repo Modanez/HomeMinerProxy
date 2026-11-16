@@ -184,6 +184,21 @@ function noteHour(w, at, ok, diff, target) {
     w.top24 = top.slice(0, TOP_N);
   }
 }
+// Os 10 maiores shares de todos os tempos de cada worker (para o hall da fama: os maiores, não só os que foram
+// recorde no dia). Ficam no arquivo de estatísticas.
+function noteTop(w, at, diff) {
+  if (!(diff > 0)) return;
+  const top = w.topAll || (w.topAll = []);
+  if (top.length >= 10 && diff <= top[top.length - 1][1]) return;
+  top.push([at, diff]);
+  top.sort((a, b) => b[1] - a[1]);
+  if (top.length > 10) top.length = 10;
+}
+function topShares(list, n = 10) {
+  const out = [];
+  for (const w of list) for (const [at, diff] of w.topAll || []) out.push({ worker: w.name, at, diff });
+  return out.sort((a, b) => b.diff - a.diff).slice(0, n);
+}
 function workerDay(w, now = Date.now()) {
   const cut = now - DAY_MS;
   const byT = new Map((w.hours || []).filter(([t]) => t + HOUR_MS > cut).map((h) => [h[0], h]));
@@ -460,6 +475,7 @@ function session(down, route) {
             w.window.push([p.at, p.target]);
             addBin(w, p.at, p.target);
             noteHour(w, p.at, true, p.diff, p.target);
+            noteTop(w, p.at, p.diff);
             if (p.diff > w.bestSession) w.bestSession = p.diff;
             if (p.diff > w.bestEver) w.bestEver = p.diff;
             if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
@@ -553,7 +569,7 @@ function startServers() {
     const list = Object.values(workers).map((w) => {
       const { window, subs, ...rest } = w;
       const hr = hashrate(w);   // poda a janela antes de contar
-      const { bins, hours, top24, ...slim } = rest;
+      const { bins, hours, top24, topAll, ...slim } = rest;
       return { ...slim, hashrate: hr, shares1h: w.window.length, hashrate15m: hashrateOver(w, 15 * 60e3), hashrate24h: hashrateOver(w, DAY_MS), stale: w.stale || 0, duplicate: w.duplicate || 0 };
     });
     res.writeHead(200, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
@@ -604,7 +620,7 @@ function startServers() {
       efficiency: efficiency(),
       hashrate: { m15: list.reduce((n, w) => n + w.hashrate15m, 0), h1: list.reduce((n, w) => n + w.hashrate, 0), h24: list.reduce((n, w) => n + w.hashrate24h, 0) },
     };
-    res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist, missing: missingList() }));
+    res.end(JSON.stringify({ at: Date.now(), routes, workers: list, recent, totals, events, process: processStats(), week, lastWeek, bestHash, dayBestHash: dayBest, hist, missing: missingList(), topShares: topShares(Object.values(workers)) }));
   }).listen(STATS_PORT, process.env.PROXY_STATS_HOST || '127.0.0.1', () => log(`estatísticas em http://${process.env.PROXY_STATS_HOST || '127.0.0.1'}:${STATS_PORT}/stats`));
   servers.push(statsServer);
   return servers;
@@ -628,6 +644,8 @@ module.exports = {
   rejectKind,
   addBin,
   noteHour,
+  noteTop,
+  topShares,
   workerDay,
   safeJson,
   saveStats,

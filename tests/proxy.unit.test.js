@@ -192,3 +192,15 @@ test('últimas 24 h do worker (modal): por hora, top 10 e o que passou de 24 h s
   assert.strictEqual(d.name, 'orangeone');
   assert.ok(d.hours[23].hashrate > 0);
 });
+
+test('os 10 maiores shares de cada worker (hall da fama), juntando todos os workers', () => {
+  const a = { name: 'orangeone' }, b = { name: 'odroid' };
+  for (const d of [339e6, 15e6, 86e6, 60.3e6, 27.7e6, 24.5e6, 16.6e6, 13.3e6, 7.9e6, 5.8e6, 3e6, 1]) proxy.noteTop(a, Date.now(), d);
+  proxy.noteTop(b, Date.now(), 1150.58);
+  assert.strictEqual(a.topAll.length, 10);
+  assert.deepStrictEqual(a.topAll.slice(0, 3).map(([, d]) => d), [339e6, 86e6, 60.3e6]);
+  assert.ok(!a.topAll.some(([, d]) => d === 1), 'os menores saem');
+  const top = proxy.topShares([a, b], 11);
+  assert.strictEqual(top[0].worker, 'orangeone');
+  assert.strictEqual(top[10].worker, 'odroid');
+});
