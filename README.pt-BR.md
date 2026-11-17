@@ -331,6 +331,20 @@ nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u SEU_ENDERECO.bt
 ```
 `chmod +x ~/.termux/boot/01-minerar.sh`. Na Android TV, libere o Termux e o Termux:Boot para rodar em segundo plano (economia de bateria → sem restrição).
 
+## Dificuldade local (minerador lento em pool de dificuldade alta)
+
+Pools como a ckpool solo (3334) fixam a dificuldade em 10.000. Um processador, TV Box ou celular de poucos MH/s leva dias para mandar um share ali, então o painel não mostra nada e a pool pode derrubar a conexão por inatividade. Com a **dificuldade local** ligada numa porta, o proxy dá ao minerador uma dificuldade do tamanho do hashrate dele (ajustada para cerca de um share a cada 15 s), responde esses shares ele mesmo e conta no painel (hashrate ao vivo, melhor share), e **manda para a pool só os shares que chegam na dificuldade da pool**. A chance de achar um bloco não muda: qualquer share bom para um bloco é bom para a pool e passa.
+
+Vem **desligada**. Ligue por porta no `.env` e reinicie o proxy (`sudo systemctl restart mineracao-proxy`, ou o contêiner):
+
+```bash
+PROXY_LOCAL_DIFF=3334            # portas, separadas por vírgula
+#PROXY_LOCAL_DIFF_START=1         # primeira dificuldade enviada ao minerador
+#PROXY_LOCAL_DIFF_TARGET_S=15     # segundos por share que o ajuste busca
+#PROXY_LOCAL_DIFF_MIN=0.0001      # piso
+```
+No `PROXY_ROUTES`, `"localDiff": true` numa rota faz o mesmo. Deixe desligada nas portas de Bitaxe e ASIC: eles já acham shares na dificuldade da pool, e as estatísticas da pool para eles ficam como antes.
+
 ## HTTPS na rede de casa
 
 O painel também abre em **https://homeminer.local** (porta 443), com cadeado. Sem domínio e sem abrir porta no roteador: a fazenda cria uma **autoridade certificadora própria** na primeira vez e assina o certificado do servidor (para `homeminer`, `homeminer.local` e os IPs da placa). Let's Encrypt não serve aqui, porque só emite para domínio público.

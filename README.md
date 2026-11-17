@@ -331,6 +331,20 @@ nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u YOUR_ADDRESS.bt
 ```
 `chmod +x ~/.termux/boot/01-mine.sh`. On Android TV, allow Termux and Termux:Boot to run in the background (battery optimization → unrestricted).
 
+## Local difficulty (slow miners on high-difficulty pools)
+
+Pools like ckpool solo (3334) fix the difficulty at 10,000. A CPU, TV box or phone at a few MH/s takes days per share there, so the dashboard shows nothing and the pool may drop it as idle. With **local difficulty** turned on for a port, the proxy gives the miner a difficulty that fits its hashrate (adjusted to about one share every 15 s), answers those shares itself and counts them on the dashboard (live hashrate, best share), and **sends to the pool only the shares that reach the pool's difficulty**. Your chance of finding a block doesn't change: any share good enough for a block is good enough for the pool and goes through.
+
+It's **off by default**. Turn it on per port in the `.env`, then restart the proxy (`sudo systemctl restart mineracao-proxy`, or the container):
+
+```bash
+PROXY_LOCAL_DIFF=3334            # ports, comma-separated
+#PROXY_LOCAL_DIFF_START=1         # first difficulty sent to the miner
+#PROXY_LOCAL_DIFF_TARGET_S=15     # seconds per share the adjustment aims for
+#PROXY_LOCAL_DIFF_MIN=0.0001      # floor
+```
+In `PROXY_ROUTES`, `"localDiff": true` on a route does the same. Leave it off on ports used by Bitaxe and ASICs: they already find shares at the pool's difficulty, and the pool's statistics for them stay exactly as before.
+
 ## HTTPS on the home network
 
 The dashboard also opens at **https://homeminer.local** (port 443), with a padlock. No domain and no router port forwarding: the farm creates **its own certificate authority** the first time and signs the server certificate (for `homeminer`, `homeminer.local` and the board's IPs). Let's Encrypt doesn't fit here, since it only issues for public domains.

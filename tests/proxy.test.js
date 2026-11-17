@@ -405,3 +405,83 @@ test('subscribe sem User-Agent (cpuminer): o proxy se apresenta como HomeMinerPr
   assert.match(seen[0][0], /^HomeMinerProxy\//);
   assert.deepStrictEqual(seen[1], ['bitaxe/BM1370/v2.15.4']);
 });
+
+test('dificuldade local (porta ligada): minerador recebe a dificuldade local e os shares abaixo da pool ficam no proxy', async (t) => {
+  const submits = [], diffs = [];
+  const pool = net.createServer((c) => lines(c, (l) => {
+    const m = JSON.parse(l);
+    const send = (o) => c.write(JSON.stringify(o) + '\n');
+    if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+    else if (m.method === 'mining.authorize') {
+      send({ id: m.id, result: true, error: null });
+      send({ id: null, method: 'mining.set_difficulty', params: [1e12] });
+      send({ id: null, method: 'mining.notify', params: ['j1', '00'.repeat(32), '01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff', 'ffffffff0100f2052a01000000434104', [], '20000000', '1d00ffff', '6553f100', true] });
+    } else if (m.method === 'mining.submit') { submits.push(m); send({ id: m.id, result: true, error: null }); }
+  }));
+  const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
+  const [listen, statsPort] = [await freePort(), await freePort()];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'ck' }]), PROXY_LOCAL_DIFF: String(listen), PROXY_LOCAL_DIFF_START: '1e-15', PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir }, stdio: 'ignore' });
+  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const s = net.connect(listen, '127.0.0.1');
+  const answers = {};
+  lines(s, (l) => { const m = JSON.parse(l); if (m.method === 'mining.set_difficulty') diffs.push(m.params[0]); if (m.id >= 10) answers[m.id] = m; });
+  await new Promise((r) => s.on('connect', r));
+  s.write('{"id":1,"method":"mining.subscribe","params":["cpuminer"]}\n{"id":2,"method":"mining.authorize","params":["bc1qteste.tvbox","x"]}\n');
+  await waitFor(() => diffs.length);
+  assert.ok(diffs[0] < 1e-6, 'minerador recebe a dificuldade local, não a da pool: ' + diffs[0]);
+  for (let i = 0; i < 3; i++) s.write(JSON.stringify({ id: 10 + i, method: 'mining.submit', params: ['bc1qteste.tvbox', 'j1', '0000000' + i, '6553f100', String(1000 + i).padStart(8, '0')] }) + '\n');
+  await waitFor(() => Object.keys(answers).length === 3);
+  assert.ok(Object.values(answers).every((a) => a.result === true), 'aceitos pelo proxy');
+  assert.strictEqual(submits.length, 0, 'nada abaixo da dificuldade da pool vai para a pool');
+  const st = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats`); const w = j.workers.find((x) => x.name === 'tvbox'); return w && w.accepted === 3 ? w : null; });
+  assert.strictEqual(st.accepted, 3);
+  s.destroy();
+});
+
+test('dificuldade local: share que bate a dificuldade da pool segue para a pool', async (t) => {
+  const submits = [], diffs = [];
+  const pool = net.createServer((c) => lines(c, (l) => {
+    const m = JSON.parse(l);
+    const send = (o) => c.write(JSON.stringify(o) + '\n');
+    if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+    else if (m.method === 'mining.authorize') {
+      send({ id: m.id, result: true, error: null });
+      send({ id: null, method: 'mining.set_difficulty', params: [1e-16] });
+      send({ id: null, method: 'mining.notify', params: ['j1', '00'.repeat(32), '01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff', 'ffffffff0100f2052a01000000434104', [], '20000000', '1d00ffff', '6553f100', true] });
+    } else if (m.method === 'mining.submit') { submits.push(m); send({ id: m.id, result: true, error: null }); }
+  }));
+  const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
+  const [listen, statsPort] = [await freePort(), await freePort()];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'ck' }]), PROXY_LOCAL_DIFF: String(listen), PROXY_LOCAL_DIFF_START: '1e-15', PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir }, stdio: 'ignore' });
+  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const s = net.connect(listen, '127.0.0.1');
+  const answers = {};
+  lines(s, (l) => { const m = JSON.parse(l); if (m.method === 'mining.set_difficulty') diffs.push(m.params[0]); if (m.id >= 10) answers[m.id] = m; });
+  await new Promise((r) => s.on('connect', r));
+  s.write('{"id":1,"method":"mining.subscribe","params":["cpuminer"]}\n{"id":2,"method":"mining.authorize","params":["bc1qteste.tvbox","x"]}\n');
+  await waitFor(() => diffs.length);
+  assert.strictEqual(diffs[0], 1e-16, 'local nunca acima da pool');
+  for (let i = 0; i < 3; i++) s.write(JSON.stringify({ id: 10 + i, method: 'mining.submit', params: ['bc1qteste.tvbox', 'j1', '0000000' + i, '6553f100', String(1000 + i).padStart(8, '0')] }) + '\n');
+  await waitFor(() => Object.keys(answers).length === 3);
+  assert.ok(Object.values(answers).every((a) => a.result === true), 'aceitos pela pool');
+  await waitFor(() => submits.length === 3);
+  const st = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats`); const w = j.workers.find((x) => x.name === 'tvbox'); return w && w.accepted === 3 ? w : null; });
+  assert.strictEqual(st.accepted, 3);
+  s.destroy();
+});
+
+test('dificuldade local: ajuste mira ~15 s por share, só com erro de 2× ou mais, nunca acima da pool', () => {
+  const { retarget, localDiffOn } = require('../src/proxy');
+  assert.strictEqual(retarget(1, 4, 60, 1e4), 1);              // 4 em 60 s = 1 a cada 15 s: fica
+  assert.strictEqual(retarget(1, 40, 60, 1e4), 8);             // 10× mais rápido: sobe (potência de 2)
+  assert.strictEqual(retarget(1, 0, 60, 1e4), 0.25);           // nenhum share: desce
+  assert.strictEqual(retarget(1, 1e6, 1, 1e4), 1e4);           // nunca acima da dificuldade da pool
+  assert.strictEqual(localDiffOn({ listen: 3334 }), false);    // desligada por padrão
+  assert.strictEqual(localDiffOn({ listen: 3334, localDiff: true }), true);
+});
