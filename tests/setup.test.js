@@ -101,6 +101,10 @@ test('versões e botão de atualizar', async (t) => {
   assert.ok(!update.newer('0.3.0', '0.3.0'));
   assert.ok(!update.newer('0.2.9', '0.3.0'));
   assert.strictEqual(update.canUpdate({ repo: null }, {}).ok, false);
+  const chgPt = update.changelog(path.join(__dirname, '../src'), 'pt');
+  const chgEn = update.changelog(path.join(__dirname, '../src'), 'en');
+  assert.ok(chgPt.length > 0 && chgEn.length > 0);
+  assert.notDeepStrictEqual(chgPt[0].items, chgEn[0].items);
 
   const port = await freePort();
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'upd-'));
@@ -111,6 +115,7 @@ test('versões e botão de atualizar', async (t) => {
   assert.strictEqual(v.version, require('../package.json').version);
   assert.strictEqual(v.canUpdate, true);
   assert.ok(!('repo' in v));   // a pasta do servidor não sai na API
+  assert.ok(Array.isArray(v.changelog) && v.changelog.length > 0);
   assert.strictEqual((await req(port, 'POST', '/api/config/update', { pin: '1' })).status, 403);
   assert.deepStrictEqual(JSON.parse((await req(port, 'POST', '/api/config/update', { pin: '424242' })).body), { ok: true, restart: true });
   await waitFor(() => fs.existsSync(flag), 5000);

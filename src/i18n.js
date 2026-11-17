@@ -28,6 +28,7 @@ const EN = [
   ['<title>Fazenda de Mineração</title>', '<title>Mining Farm</title>'],
   ['<h1>⛏️ Fazenda de <span>Mineração</span></h1>', '<h1>⛏️ Mining <span>Farm</span></h1>'],
   ['<div class="upd" id="upd">carregando…</div>', '<div class="upd" id="upd">loading…</div>'],
+  ['<a href="/config#backup" id="verFootLnk">Ver novidades (changelog) →</a>', '<a href="/config#backup" id="verFootLnk">What\'s new (changelog) →</a>'],
   ['title="Configurações"', 'title="Settings"'],
   ["const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaoffline: 'A tomada está offline na nuvem Tuya (sem Wi-Fi ou sem energia). Confira o app SmartLife', tuyaauth: 'A Tuya recusou o comando' };",
     "const PLUG_ERR = { selfplug: 'This plug powers the server itself: turn it off in the plug app', sonoffoffline: 'The Sonoff did not answer (check the IP and LAN/DIY mode)', sonofflan: 'The Sonoff LAN/DIY mode is off', tuyamissing: 'Tuya credentials are missing in /config', tuyaoffline: 'The plug is offline in the Tuya cloud (no Wi-Fi or no power). Check the SmartLife app', tuyaauth: 'Tuya rejected the command' };"],

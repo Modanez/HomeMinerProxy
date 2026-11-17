@@ -5,6 +5,7 @@ docs
 extras
 *.env
 *.md
+!CHANGELOG.md
 .venv
 .coverage
 htmlcov

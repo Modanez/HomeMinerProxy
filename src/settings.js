@@ -600,7 +600,8 @@ const T = {
     plugTypes: { tuya: 'SmartLife / Tuya (nuvem)', sonoff: 'Sonoff (rede local)' },
     tokenSet: (t) => `configurado (termina em ${t}). Deixe vazio para manter.`, tokenClear: 'Remover o valor salvo',
     backupHelp: 'Baixe ou restaure recordes, histórico, workers e configurações num único arquivo JSON (pede o PIN abaixo).',
-    verTitle: 'Versão e atualização', verInstalled: 'Instalada', verLatest: 'Mais recente no GitHub', verNew: 'nova versão disponível!', verOk: 'você está na versão mais recente',
+    verTitle: 'Versão e atualização', verInstalled: 'Instalada', verInstalledAt: 'instalada em', verLatest: 'Mais recente no GitHub', verNew: 'nova versão disponível!', verOk: 'você está na versão mais recente',
+    chgTitle: 'Novidades da versão (Changelog)', chgUnreleased: 'Em desenvolvimento (branch main / latest)', chgEmpty: 'Histórico de mudanças não disponível.',
     updSame: 'já estava na versão mais recente: reinstalado sem mudanças.', updFail: 'A atualização falhou:', updBtn: '⬆ Atualizar agora', updRunning: 'Atualizando: baixando a versão nova e reinstalando. O painel reinicia sozinho em 1 ou 2 minutos…', updDone: 'Atualizado!', updSlow: 'A atualização está demorando. Recarregue a página em alguns minutos.',
     updWhy: { docker: 'No Docker, atualize com: docker compose pull && docker compose up -d', norepo: 'A atualização pelo botão precisa da pasta do repositório (instalação pelo install.sh).', nosystemd: 'A atualização pelo botão precisa do serviço do systemd (instalação pelo install.sh).' },
     backupDown: '⬇ Baixar backup', backupUp: '⬆ Restaurar backup…',
@@ -713,7 +714,8 @@ const T = {
     plugTypes: { tuya: 'SmartLife / Tuya (cloud)', sonoff: 'Sonoff (local network)' },
     tokenSet: (t) => `set (ends in ${t}). Leave empty to keep it.`, tokenClear: 'Remove saved value',
     backupHelp: 'Download or restore records, history, workers and settings in a single JSON file (requires the PIN below).',
-    verTitle: 'Version and update', verInstalled: 'Installed', verLatest: 'Latest on GitHub', verNew: 'a new version is available!', verOk: 'you are on the latest version',
+    verTitle: 'Version and update', verInstalled: 'Installed', verInstalledAt: 'installed', verLatest: 'Latest on GitHub', verNew: 'a new version is available!', verOk: 'you are on the latest version',
+    chgTitle: 'What\'s new (Changelog)', chgUnreleased: 'Unreleased (main / latest)', chgEmpty: 'Changelog not available.',
     updSame: 'it was already the latest version: reinstalled with no changes.', updFail: 'The update failed:', updBtn: '⬆ Update now', updRunning: 'Updating: downloading the new version and reinstalling. The dashboard restarts by itself in 1 or 2 minutes…', updDone: 'Updated!', updSlow: 'The update is taking a while. Reload the page in a few minutes.',
     updWhy: { docker: 'With Docker, update with: docker compose pull && docker compose up -d', norepo: 'Updating from here needs the repository folder (install.sh install).', nosystemd: 'Updating from here needs the systemd service (install.sh install).' },
     backupDown: '⬇ Download backup', backupUp: '⬆ Restore backup…',
@@ -831,7 +833,8 @@ function page(lang, hasPin, theme) {
     `<button type="button" class="ghost" data-backup="restore">${htmlEsc(S.backupUp)}</button>` +
     `<input type="file" id="backup_file" accept=".json,application/json" hidden></div></div>` +
     `<div class="f"><label>${htmlEsc(S.verTitle)}</label><div class="hint" id="ver_info">…</div>` +
-    `<div class="bbar"><button type="button" class="ghost" id="update_btn" hidden>${htmlEsc(S.updBtn)}</button></div><div class="hint" id="ver_why"></div></div></fieldset>`;
+    `<div class="bbar"><button type="button" class="ghost" id="update_btn" hidden>${htmlEsc(S.updBtn)}</button></div><div class="hint" id="ver_why"></div></div>` +
+    `<div class="f"><label>${htmlEsc(S.chgTitle)}</label><div id="chg_list" class="pools"><div class="hint">…</div></div></div></fieldset>`;
   const msgs = {
     ks: S.kiosk,
     saved: S.saved, back2: S.back2, nothing: S.nothing, cubeOk: S.cubeOk, cubeFail: S.cubeFail,
@@ -844,7 +847,7 @@ function page(lang, hasPin, theme) {
     net: { ...N, wifiOn: N.wifiOn('%s', '%i') },
     pools: P,
     bx: B,
-    verInstalled: S.verInstalled, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updFail: S.updFail, updSlow: S.updSlow, updWhy: S.updWhy,
+    verInstalled: S.verInstalled, verInstalledAt: S.verInstalledAt, verLatest: S.verLatest, verNew: S.verNew, verOk: S.verOk, chgUnreleased: S.chgUnreleased, chgEmpty: S.chgEmpty, updRunning: S.updRunning, updDone: S.updDone, updSame: S.updSame, updFail: S.updFail, updSlow: S.updSlow, updWhy: S.updWhy,
   };
   return `<!doctype html>
 <html lang="${lang === 'pt' ? 'pt-br' : 'en'}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -954,6 +957,11 @@ function page(lang, hasPin, theme) {
   .how { display:grid; gap:4px; margin-top:8px; }
   .how b { font-size:13px; margin-top:6px; }
   .how code, #pools_hosts, #pools_user { word-break:break-all; }
+  details.chg-sec { padding:10px 12px; }
+  details.chg-sec summary { cursor:pointer; font-weight:600; font-size:13px; color:var(--txt); list-style-position:inside; }
+  details.chg-sec[open] summary { color:var(--gold); margin-bottom:8px; }
+  ul.chg-items { margin:0; padding-left:18px; display:grid; gap:6px; font-size:13px; line-height:1.45; color:var(--txt); }
+  ul.chg-items code { font-family:ui-monospace, Menlo, monospace; font-size:12px; background:rgba(128,128,128,.14); padding:1px 4px; border-radius:4px; }
   .pw { display:flex; gap:6px; } .pw input { flex:1; } .pw .eye { margin:0; padding:6px 10px; }
   .nopin { color:var(--warn); font-size:13px; line-height:1.5; }
   .pinmodal { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.55); display:flex; align-items:center; justify-content:center; padding:16px; }
@@ -1079,7 +1087,7 @@ for (const b of form.querySelectorAll('.tab[data-tab]')) {
   b.addEventListener('click', () => selectTab(b.dataset.tab));
 }
 if (typeof location !== 'undefined' && location.hash) selectTab(location.hash.slice(1));
-fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { const b = document.getElementById('tb_ver'); b.textContent = 'v' + v.version; b.hidden = false; } }).catch(() => {});
+fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { const b = document.getElementById('tb_ver'); b.textContent = 'v' + v.version + (v.commit ? ' (' + v.commit + ')' : ''); b.hidden = false; } }).catch(() => {});
 
 // °C ou °F: os limites de temperatura dos Bitaxe seguem a unidade; ao trocar, os números são convertidos
 let tempUnitNow = 'C';
@@ -1504,13 +1512,52 @@ function showErrors(errs) {
   if (firstErrPane) selectTab(firstErrPane);
 }
 // Versão instalada e botão de atualizar
+function fmtMd(el, txt) {
+  const bt = String.fromCharCode(96);
+  const parts = String(txt || '').split('**');
+  for (let i = 0; i < parts.length; i++) {
+    const sub = parts[i].split(bt);
+    for (let j = 0; j < sub.length; j++) {
+      if (!sub[j]) continue;
+      const tag = j % 2 === 1 ? 'code' : (i % 2 === 1 ? 'b' : null);
+      if (tag) { const n = document.createElement(tag); n.textContent = sub[j]; el.appendChild(n); }
+      else el.appendChild(document.createTextNode(sub[j]));
+    }
+  }
+}
+function renderChangelog(list) {
+  const box = document.getElementById('chg_list');
+  if (!box) return;
+  box.textContent = '';
+  if (!Array.isArray(list) || !list.length) {
+    const h = document.createElement('div'); h.className = 'hint'; h.textContent = M.chgEmpty; box.appendChild(h); return;
+  }
+  list.forEach((sec, idx) => {
+    const det = document.createElement('details'); det.className = 'pool chg-sec';
+    if (idx === 0) det.open = true;
+    const sum = document.createElement('summary');
+    sum.textContent = /^unreleased$/i.test(sec.version) ? M.chgUnreleased : sec.version;
+    det.appendChild(sum);
+    const ul = document.createElement('ul'); ul.className = 'chg-items';
+    for (const item of sec.items || []) {
+      const li = document.createElement('li'); fmtMd(li, item); ul.appendChild(li);
+    }
+    det.appendChild(ul);
+    box.appendChild(det);
+  });
+}
 const updBtn = document.getElementById('update_btn');
 let verNow = null;
 fetch('/api/config/version').then((r) => r.json()).then((v) => {
   verNow = v;
+  renderChangelog(v && v.changelog);
   const box = document.getElementById('ver_info');
   if (!v || !v.version) { box.textContent = '–'; return; }
   let t = M.verInstalled + ': v' + v.version + (v.commit ? ' (' + v.commit + ')' : '');
+  if (v.installedAt) {
+    const d = new Date(v.installedAt);
+    if (!Number.isNaN(d.getTime())) t += ' · ' + M.verInstalledAt + ' ' + d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  }
   if (v.latest) t += ' · ' + M.verLatest + ': v' + v.latest + ' · ' + (v.updateAvailable ? M.verNew : M.verOk);
   box.textContent = t;
   if (v.canUpdate) updBtn.hidden = false;
@@ -1947,10 +1994,12 @@ function handle(req, res, ctx) {
     return true;
   }
   if (url === '/api/config/version' && req.method === 'GET') {
-    require('./update').status(ctx.appDir || __dirname).then((st) => {
+    const upd = require('./update');
+    const appDir = ctx.appDir || __dirname;
+    upd.status(appDir).then((st) => {
       const { repo, ...pub } = st;   // a pasta do repositório não precisa sair do servidor
-      json(200, pub);
-    }).catch(() => json(200, { version: null }));
+      json(200, { ...pub, changelog: upd.changelog(appDir, ctx.lang) });
+    }).catch(() => json(200, { version: null, changelog: [] }));
     return true;
   }
   if (req.method !== 'POST' || !/^application\/json/.test(req.headers['content-type'] || '')) { json(405, { error: 'option' }); return true; }

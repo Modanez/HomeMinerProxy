@@ -7,7 +7,9 @@ RUN apk add --no-cache python3 py3-pillow font-dejavu tzdata openssl \
  && mkdir -p /data && chown node:node /data
 
 WORKDIR /app
-COPY src/ ./
+COPY src/ package.json CHANGELOG.md ./
+ARG COMMIT=""
+RUN node -e 'const fs = require("fs"), v = require("./package.json").version, c = (process.env.COMMIT || "").trim().slice(0, 7) || null; fs.writeFileSync("version.json", JSON.stringify({ version: v, commit: c, installedAt: new Date().toISOString() }) + "\n");'
 
 ENV DATA_DIR=/data NODE_ENV=production
 VOLUME /data
