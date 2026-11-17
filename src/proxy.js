@@ -213,6 +213,7 @@ function workerDay(w, now = Date.now()) {
   const top = (w.top24 || []).filter(([t]) => t > cut).map(([at, diff]) => ({ at, diff }));
   return {
     name: w.name, pool: w.pool || null, ip: w.ip || null, online: w.online > 0,
+    shareDiff: w.shareDiff || null, poolDiff: w.poolDiff || null,
     hours, top,
     accepted: hours.reduce((n, h) => n + h.accepted, 0),
     rejected: hours.reduce((n, h) => n + h.rejected, 0),
@@ -449,6 +450,7 @@ function session(down, route) {
         s.worker.ip = cleanIp(s.peer);
         s.worker.listen = route.listen;
         s.worker.shareDiff = s.shareDiff;
+        s.worker.poolDiff = s.local ? s.poolDiff : null;
         s.worker.extranonce1 = s.en1;
         delete awaiting[name];
         log(`[${route.label}] ${name} conectou de ${s.peer}`);
@@ -489,7 +491,7 @@ function session(down, route) {
           m.params = [s.localDiff];
           line = JSON.stringify(m);
           if (s.worker) s.worker.poolDiff = s.poolDiff;
-        }
+        } else if (s.worker) s.worker.poolDiff = null;
         s.shareDiff = s.local ? s.localDiff : Number(m.params[0]) || s.shareDiff;
         if (s.worker) s.worker.shareDiff = s.shareDiff;
       } else if (m.method === 'mining.set_extranonce' && m.params) {
@@ -660,6 +662,7 @@ function startServers() {
     const dayBest = dayBestHash && dayBestHash.date === dayKey() ? dayBestHash : null;
     const routes = ROUTES.map((r) => ({
       ...r,
+      localDiff: localDiffOn(r),   // dificuldade local ligada nesta porta (só informativo no painel)
       onBackup: [...sessions].filter((x) => x.route === r && x.upIndex > 0 && !x.closed).length,   // ainda na reserva (a principal pode já ter voltado)
       upstreams: upstreamsOf(r).map((u) => {
         const h = health[hkey(u)] || {};

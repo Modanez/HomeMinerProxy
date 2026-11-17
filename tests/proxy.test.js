@@ -438,6 +438,12 @@ test('dificuldade local (porta ligada): minerador recebe a dificuldade local e o
   assert.strictEqual(submits.length, 0, 'nada abaixo da dificuldade da pool vai para a pool');
   const st = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats`); const w = j.workers.find((x) => x.name === 'tvbox'); return w && w.accepted === 3 ? w : null; });
   assert.strictEqual(st.accepted, 3);
+  assert.strictEqual(st.poolDiff, 1e12, 'painel mostra a dificuldade da pool ao lado da local');
+  const j = await getJson(`http://127.0.0.1:${statsPort}/stats`);
+  assert.strictEqual(j.routes[0].localDiff, true, 'porta marcada para o guia Pools e portas');
+  const wd = await getJson(`http://127.0.0.1:${statsPort}/stats/worker?name=tvbox`);
+  assert.strictEqual(wd.poolDiff, 1e12);
+  assert.ok(wd.shareDiff < 1e-6);
   s.destroy();
 });
 
