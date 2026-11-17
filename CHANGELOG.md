@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Telemetry for miners without an API** (Termux TV boxes, phones, Raspberry Pi with cpuminer): `POST /api/worker/<name>/telemetry` with `tempC`, `cpuPct` and/or `watts`, from the home network only; the dashboard shows a badge next to the worker, like a Bitaxe, for 5 minutes. README gets an "Android TV box and phone (Termux)" section with the miner command, the telemetry loop and auto-start with Termux:Boot.
 - **CPU miners on Bitronics:** cpuminer/minerd send `mining.subscribe` with no User-Agent, and Bitronics drops them ("Empty useragent not allowed"). When a miner sends none, the proxy now introduces itself as `HomeMinerProxy/<version>`; miners that send one are left alone.
 - **Hall of fame shows the biggest shares, not just past records:** it listed only shares that were a record on the day they came in, so an 86 million share after the 339 million record never showed up. Now it's the farm's top 10 from every source: saved records, the 10 biggest shares of each worker the proxy now keeps (all time, in its stats file) and each Bitaxe's top 20 (AxeOS scoreboard), with the same share seen twice counted once.
 - Fixed: in the worker dialog, the label of the highest bar was cut off when that bar was at the edge of the chart ("60.3 millio…").
@@ -27,6 +28,7 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Telemetria de mineradores sem API** (TV Box e celular com Termux, Raspberry com cpuminer): `POST /api/worker/<nome>/telemetry` com `tempC`, `cpuPct` e/ou `watts`, só da rede de casa; o painel mostra uma etiqueta ao lado do worker, como no Bitaxe, por 5 minutos. O README ganha a seção "TV Box e celular Android (Termux)", com o comando do minerador, o laço de telemetria e o início automático com o Termux:Boot.
 - **Minerador de processador na Bitronics:** o cpuminer/minerd manda o `mining.subscribe` sem User-Agent, e a Bitronics derruba ("Empty useragent not allowed"). Quando o minerador não manda nenhum, o proxy agora se apresenta como `HomeMinerProxy/<versão>`; quem manda o próprio continua igual.
 - **Hall da fama mostra os maiores shares, não só os recordes:** ele listava só os shares que foram recorde no dia em que saíram, então um de 86 milhões depois do recorde de 339 milhões nunca aparecia. Agora é o top 10 da fazenda vindo de todos os lados: recordes gravados, os 10 maiores shares de cada worker que o proxy passa a guardar (de todos os tempos, no arquivo de estatísticas) e o top 20 de cada Bitaxe (scoreboard do AxeOS), sem contar duas vezes o mesmo share.
 - Corrigido: no modal do worker, o rótulo da barra mais alta saía cortado quando a barra ficava na ponta do gráfico ("60,3 milhõe…").

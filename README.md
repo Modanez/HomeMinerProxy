@@ -302,6 +302,35 @@ The antivirus may flag any miner as unwanted software. If it does, allow that fo
 
 **Check that it worked:** within a minute, `minerd` prints `accepted: 1/1 (100.00%)` and, on the dashboard, the worker appears with ⚡ (connected through the proxy). A CPU at a few MH/s needs some minutes per share at difficulty 1, so the first one can take a while.
 
+## Android TV box and phone (Termux)
+
+A TV box or an old phone with [Termux](https://f-droid.org/packages/com.termux/) mines with `cpuminer` (`pkg install cpuminer` or built from source). Point it at the proxy on a low-difficulty pool (3333 public-pool or 3340 bitronics):
+
+```bash
+minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u YOUR_ADDRESS.btv13 -p x -t 4
+```
+
+**Temperature on the dashboard:** the miner posts its temperature to the dashboard and it shows next to its name, like a Bitaxe (valid for 5 minutes; home network only):
+
+```bash
+while true; do
+  t=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+  curl -s -m 5 -H 'Content-Type: application/json' -d "{\"tempC\": $(awk "BEGIN {print $t/1000}")}" \
+    http://homeminer.local:3000/api/worker/btv13/telemetry >/dev/null
+  sleep 30
+done
+```
+It takes `tempC`, `cpuPct` and `watts`. The name in the URL is the worker name (what comes after the dot in the username).
+
+**Start on its own at power-on:** install the **Termux:Boot** app (also on F-Droid, same source as Termux), open it once and create `~/.termux/boot/01-mine.sh`:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u YOUR_ADDRESS.btv13 -p x -t 4 >/dev/null 2>&1 &
+```
+`chmod +x ~/.termux/boot/01-mine.sh`. On Android TV, allow Termux and Termux:Boot to run in the background (battery optimization → unrestricted).
+
 ## HTTPS on the home network
 
 The dashboard also opens at **https://homeminer.local** (port 443), with a padlock. No domain and no router port forwarding: the farm creates **its own certificate authority** the first time and signs the server certificate (for `homeminer`, `homeminer.local` and the board's IPs). Let's Encrypt doesn't fit here, since it only issues for public domains.

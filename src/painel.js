@@ -58,6 +58,8 @@ const bitaxe = require('./bitaxe');
 const BITAXES = bitaxe.parseList(process.env.BITAXES) || [];
 const BITAXE_MS = Number(process.env.BITAXE_MS || 30e3);
 const BITAXE_HIST_MS = Number(process.env.BITAXE_HIST_MS || 5 * 60e3);   // um ponto do gráfico de 24 h a cada 5 min
+const telemetry = new Map();   // nome do worker → { at, tempC, cpuPct, watts } enviado pelo próprio minerador (vale 5 min)
+const cleanPeer = (a) => String(a || '').replace(/^::ffff:/, '');
 const bitaxeState = new Map();   // nome → { ok, at, okAt, error, fails, data, hist, alerts }
 const numEnv = (k) => (process.env[k] != null && process.env[k] !== '' && Number.isFinite(Number(process.env[k])) ? Number(process.env[k]) : null);
 // °C ou °F na tela e no Telegram (TEMP_UNIT); internamente tudo é °C, e os limites digitados em °F são convertidos
@@ -472,7 +474,9 @@ function workersView() {
       device = { name: bx.name, host: bx.host, tempC: d.tempC, vrTempC: d.vrTempC, watts: d.watts, jth: d.jth, fanPct: d.fanPct, fanRpm: d.fanRpm,
         expected: d.expected, fallback: d.pool.fallback, paused: d.paused, model: d.model };
     }
-    return { ...k, name, hashRate, approx, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx, bitaxe: device };
+    const tl = telemetry.get(name);
+    const tele = tl && Date.now() - tl.at < 5 * 60e3 ? { tempC: tl.tempC, cpuPct: tl.cpuPct, watts: tl.watts } : null;
+    return { ...k, name, hashRate, approx, nominal, lastSeen, state, source, inactive, viaProxy, lastDiff, ...netx, bitaxe: device, tele };
   }).sort((a, b) => b.hashRate - a.hashRate);
 }
 
@@ -2183,6 +2187,10 @@ function renderFarm(j) {
     if (h.tempC != null && w.name === h.worker) {
       temp = ' <span class="temp ' + (h.tempC >= 75 ? 'hot' : h.tempC >= 60 ? 'warm' : '') + '">' + tmp(h.tempC) + '</span>';
     }
+    if (w.tele && !w.bitaxe) {   // temperatura enviada pelo próprio minerador (TV Box, celular…)
+      const tt = w.tele;
+      temp = ' <span class="temp ' + (tt.tempC >= 75 ? 'hot' : tt.tempC >= 60 ? 'warm' : '') + '">' + [tt.tempC != null ? tmp(tt.tempC) : null, tt.cpuPct != null ? 'CPU ' + nf(tt.cpuPct, 0) + '%' : null, tt.watts != null ? nf(tt.watts, 1) + ' W' : null].filter(Boolean).join(' · ') + '</span>';
+    }
     if (w.bitaxe) {
       const bx = w.bitaxe;
       temp = ' <span class="temp ' + bxTemp(bx.tempC) + '">' + [bx.tempC != null ? tmp(bx.tempC) : null, bx.watts != null ? nf(bx.watts, 1) + ' W' : null, bx.fallback ? BXT.backup : null, bx.paused ? BXT.paused : null].filter(Boolean).join(' · ') + '</span>';
@@ -3062,6 +3070,32 @@ function requestHandler(req, res) {
     const sent = '0123RPST'.includes(e) && alarm(e);
     res.writeHead(200, { 'Content-Type': 'application/json' });
     return res.end(JSON.stringify({ sent, port: ALARM_PORT, connected: alarmFd !== null, quiet: quietNow() }));
+  }
+  // Telemetria de mineradores sem API (TV Box/celular com Termux, Raspberry com cpuminer): POST com a temperatura
+  // e o uso de CPU, só da rede de casa. Ex.: curl -d '{"tempC":58.5}' -H 'Content-Type: application/json' http://homeminer.local:3000/api/worker/btv13/telemetry
+  {
+    const tm = /^\/api\/worker\/([^/?]{1,64})\/telemetry$/.exec(req.url.split('?')[0]);
+    if (tm) {
+      const json = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
+      if (req.method !== 'POST') return json(405, { ok: false, error: 'post' });
+      const peer = cleanPeer(req.socket.remoteAddress);
+      if (!bitaxe.isPrivateHost(peer) && peer !== '127.0.0.1' && peer !== '::1') return json(403, { ok: false, error: 'lan' });
+      let name; try { name = decodeURIComponent(tm[1]); } catch (_) { return json(400, { ok: false, error: 'name' }); }
+      if (!/^[\w.@-]{1,64}$/.test(name)) return json(400, { ok: false, error: 'name' });
+      let body = '', big = false;
+      req.on('data', (c) => { body += c; if (body.length > 2048) { big = true; req.destroy(); } });
+      req.on('end', () => {
+        if (big) return;
+        let j; try { j = JSON.parse(body || '{}'); } catch (_) { return json(400, { ok: false, error: 'json' }); }
+        const num = (v, lo, hi) => { const n = Number(v); return Number.isFinite(n) && n >= lo && n <= hi ? n : null; };
+        const t = { at: Date.now(), tempC: num(j.tempC, -40, 150), cpuPct: num(j.cpuPct, 0, 100), watts: num(j.watts, 0, 5000) };
+        if (t.tempC == null && t.cpuPct == null && t.watts == null) return json(400, { ok: false, error: 'empty' });
+        telemetry.set(name, t);
+        if (telemetry.size > 64) telemetry.delete(telemetry.keys().next().value);
+        json(200, { ok: true });
+      });
+      return;
+    }
   }
   if (req.url === '/api/plug' && req.method === 'POST') {
     const json = (code, obj) => {

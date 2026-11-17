@@ -82,3 +82,19 @@ test('conta de luz: moeda e preço do kWh configuráveis', async (t) => {
   assert.deepStrictEqual(await run({ CURRENCY: 'brl', POWER_PRICE_KWH: '1.05' }), { tarifa: 1.05, cur: 'BRL' });
   assert.deepStrictEqual(await run({ CURRENCY: 'USD', TARIFA_KWH: '0.22' }), { tarifa: 0.22, cur: 'USD' });   // nome antigo continua valendo
 });
+
+test('telemetria de minerador sem API (TV Box/Termux): POST da rede de casa aparece no worker', async (t) => {
+  const port = await freePort();
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-'));
+  fs.writeFileSync(path.join(dir, 'workers.json'), JSON.stringify({ btv13: { name: 'btv13', hashRate: 4e6, bestDifficulty: 12, lastSeen: new Date().toISOString(), pool: 'public-pool' } }));
+  const p = spawn(process.execPath, ['-r', OFFLINE, PAINEL], {
+    env: { ...process.env, BTC_ADDRESS: 'bc1qteste', PORT: String(port), DATA_DIR: dir, PROXY_URL: '', ALARM_PORT: path.join(dir, 'sem-sirene'), CKPOOL_URLS: '', OCEAN_API: '' }, stdio: 'ignore' });
+  t.after(() => { p.kill(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => get(`http://127.0.0.1:${port}/api/mining`));
+  const ok = await post(`http://127.0.0.1:${port}/api/worker/btv13/telemetry`, { tempC: 58.5, cpuPct: 75 });
+  assert.deepStrictEqual([ok.status, ok.body.ok], [200, true]);
+  assert.strictEqual((await post(`http://127.0.0.1:${port}/api/worker/btv13/telemetry`, { tempC: 'quente' })).status, 400);
+  assert.strictEqual((await post(`http://127.0.0.1:${port}/api/worker/nome%20ruim/telemetry`, { tempC: 50 })).status, 400);
+  const w = await waitFor(async () => { const r = JSON.parse((await get(`http://127.0.0.1:${port}/api/mining`)).body); const x = (((r.farm || {}).workers) || []).find((v) => v.name === 'btv13'); return x && x.tele ? x : null; });
+  assert.deepStrictEqual([w.tele.tempC, w.tele.cpuPct], [58.5, 75]);
+});
