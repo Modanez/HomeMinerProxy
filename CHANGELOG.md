@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **CPU miners on Bitronics:** cpuminer/minerd send `mining.subscribe` with no User-Agent, and Bitronics drops them ("Empty useragent not allowed"). When a miner sends none, the proxy now introduces itself as `HomeMinerProxy/<version>`; miners that send one are left alone.
 - **Hall of fame shows the biggest shares, not just past records:** it listed only shares that were a record on the day they came in, so an 86 million share after the 339 million record never showed up. Now it's the farm's top 10 from every source: saved records, the 10 biggest shares of each worker the proxy now keeps (all time, in its stats file) and each Bitaxe's top 20 (AxeOS scoreboard), with the same share seen twice counted once.
 - Fixed: in the worker dialog, the label of the highest bar was cut off when that bar was at the edge of the chart ("60.3 millio…").
 - HTTPS with `tailscale serve` on: Tailscale holds port 443 on its own IP, so the dashboard couldn't open 443 and fell back to 3443 (and the log wrongly showed both). Now it opens 443 just on the home-network IPs, so https://homeminer.local works without a port, and logs one line.
@@ -26,6 +27,7 @@
 - **Two new achievements:** 🌋 **Trillion hash** (a share with difficulty over 1 trillion) and the 🏆 **Golden prize: block found!**, unlocked when a share passes the network difficulty. The golden prize sits on its own full-width row, shows its trophy even while locked and lights up in gold when won.
 
 ### Português
+- **Minerador de processador na Bitronics:** o cpuminer/minerd manda o `mining.subscribe` sem User-Agent, e a Bitronics derruba ("Empty useragent not allowed"). Quando o minerador não manda nenhum, o proxy agora se apresenta como `HomeMinerProxy/<versão>`; quem manda o próprio continua igual.
 - **Hall da fama mostra os maiores shares, não só os recordes:** ele listava só os shares que foram recorde no dia em que saíram, então um de 86 milhões depois do recorde de 339 milhões nunca aparecia. Agora é o top 10 da fazenda vindo de todos os lados: recordes gravados, os 10 maiores shares de cada worker que o proxy passa a guardar (de todos os tempos, no arquivo de estatísticas) e o top 20 de cada Bitaxe (scoreboard do AxeOS), sem contar duas vezes o mesmo share.
 - Corrigido: no modal do worker, o rótulo da barra mais alta saía cortado quando a barra ficava na ponta do gráfico ("60,3 milhõe…").
 - HTTPS com o `tailscale serve` ligado: o Tailscale segura a porta 443 no IP dele, então o painel não conseguia abrir a 443 e caía na 3443 (e o log mostrava as duas, errado). Agora ele abre a 443 só nos IPs da rede de casa, então https://homeminer.local funciona sem porta, e o log tem uma linha só.

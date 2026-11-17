@@ -12,6 +12,7 @@
 // (padrão 10) aparece em "missing" nas estatísticas: o painel e o Telegram avisam.
 
 const net = require('net');
+const USER_AGENT = 'HomeMinerProxy/' + (() => { try { return require('../package.json').version; } catch (_) { try { return require('./package.json').version; } catch (__) { return '1'; } } })();
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -404,7 +405,15 @@ function session(down, route) {
   down.on('data', lineReader((line) => {
     let m; try { m = JSON.parse(line); } catch (_) { toUp(line); return; }
     try {
-      if (m.method === 'mining.subscribe') s.subscribeIds.add(m.id);
+      if (m.method === 'mining.subscribe') {
+        s.subscribeIds.add(m.id);
+        // cpuminer/minerd mandam o subscribe sem User-Agent ("params": []); algumas pools (Bitronics) recusam com
+        // "Empty useragent not allowed". Sem agente, o proxy se apresenta no lugar dele.
+        if (!Array.isArray(m.params) || !m.params.length || !m.params[0]) {
+          m.params = [USER_AGENT, ...(Array.isArray(m.params) ? m.params.slice(1) : [])];
+          line = JSON.stringify(m);
+        }
+      }
       else if (m.method === 'mining.configure') s.configureIds.add(m.id);
       else if (m.method === 'mining.authorize' && m.params) {
         const user = String(m.params[0] || '');

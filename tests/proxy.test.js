@@ -381,3 +381,27 @@ test('ping separado por pool em uso (reservas só testadas não entram)', async 
   for (const p of s.totals.pools) { assert.ok(p.pingMs >= 0, p.label); assert.ok(['great', 'good', 'poor'].includes(p.pingScore)); }
   assert.ok(!s.totals.pools.some((p) => p.label === 'ckpool'));   // reserva sem minerador não aparece
 });
+
+test('subscribe sem User-Agent (cpuminer): o proxy se apresenta como HomeMinerProxy; com agente, não mexe', async (t) => {
+  const seen = [];
+  const pool = net.createServer((c) => lines(c, (l) => {
+    const m = JSON.parse(l);
+    if (m.method === 'mining.subscribe') { seen.push(m.params); c.write(JSON.stringify({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null }) + '\n'); }
+  }));
+  const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
+  const [listen, statsPort] = [await freePort(), await freePort()];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'p' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir }, stdio: 'ignore' });
+  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  for (const params of [[], ['bitaxe/BM1370/v2.15.4']]) {
+    const s = net.connect(listen, '127.0.0.1');
+    await new Promise((r) => s.on('connect', r));
+    s.write(JSON.stringify({ id: 1, method: 'mining.subscribe', params }) + '\n');
+    await waitFor(() => seen.length === (params.length ? 2 : 1));
+    s.destroy();
+  }
+  assert.match(seen[0][0], /^HomeMinerProxy\//);
+  assert.deepStrictEqual(seen[1], ['bitaxe/BM1370/v2.15.4']);
+});
