@@ -462,7 +462,7 @@ function workersView() {
     const pw = proxy.workers[name];       // último share visto pelo proxy (fica mesmo depois de desconectar)
     const lastDiff = pw && pw.lastShareAt ? { diff: pw.lastShareDiff, at: pw.lastShareAt } : null;
     const pxw = proxied.get(name);
-    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0, group: pxw.group || null } : {};
+    const netx = pxw ? { ip: pxw.ip || null, shareDiff: pxw.shareDiff || null, poolDiff: pxw.poolDiff || null, extranonce1: pxw.extranonce1 || null, listen: pxw.listen || null, rejected: pxw.rejected || 0, stale: pxw.stale || 0, duplicate: pxw.duplicate || 0, hr15m: pxw.hashrate15m || 0, hr24h: pxw.hashrate24h || 0, group: pxw.group || null } : {};
     // Bitaxe com API: o hashrate medido pelo próprio aparelho (média de 10 min) vale mais que a estimativa por shares
     const bx = bitaxeOfWorker(name);
     let device = null;
@@ -896,7 +896,7 @@ async function tickProxy() {
         const up = r.upstreams || [];
         const main = up[0] || r;
         return { listen: r.listen, label: main.label || r.label, host: main.host || r.host, down: !!main.down, pingMs: main.pingMs ?? null,
-          backups: up.slice(1).map((u) => u.label), active: main.down ? (up.slice(1).find((u) => !u.down) || {}).label || null : null };
+          backups: up.slice(1).map((u) => u.label), localDiff: !!r.localDiff, active: main.down ? (up.slice(1).find((u) => !u.down) || {}).label || null : null };
       }),
       bestHash: s.bestHash || null,
       dayBestHash: s.dayBestHash || null,
@@ -2203,7 +2203,7 @@ function renderFarm(j) {
     }
     const seen = w.state === 'unknown' ? 'não listado' : ago(w.lastSeen);
     const pool = w.pool ? ' <span class="pool">' + (w.viaProxy ? '⚡ ' : '') + esc(w.pool) + (w.group ? ' #' + esc(w.group) : '') + '</span>' : '';
-    const det = [w.ip, w.shareDiff ? 'diff ' + nf(w.shareDiff, 0) : null].filter(Boolean).join(' · ');
+    const det = [w.ip, w.shareDiff ? diffPair(w.shareDiff, w.poolDiff) : null].filter(Boolean).join(' · ');
     const netInfo = det ? ' <span class="sub" title="extranonce1: ' + esc(w.extranonce1 || '–') + '">' + esc(det) + '</span>' : '';
     const rej = w.rejected > 0 ? ' <span class="sub" title="recusados pela pool: stale = job vencido, duplicado = share repetido">✗ ' + w.rejected + ' (stale ' + (w.stale || 0) + ' · duplicado ' + (w.duplicate || 0) + ')</span>' : '';
     const trophy = j.championship && j.championship.leader && j.championship.leader.name === w.name ? ' 🏆' : '';
@@ -2301,6 +2301,8 @@ function fmtShort(n) {
   return nf(n);
 }
 function diffTxt(d) { return d >= 1e3 ? fmtBig(d) : nf(d, d < 1 ? 5 : 2); }
+// dificuldade do minerador; com a dificuldade local ligada na porta, também a da pool ("diff 0,5 local · pool 10 mil")
+function diffPair(share, pool) { const t = (v) => (v >= 1e3 ? fmtBig(v) : v >= 1 ? nf(v, 0) : nf(Number(v.toPrecision(3)), 8)); return 'diff ' + t(share) + (pool ? ' local · pool ' + t(pool) : ''); }
 function renderNear(j) {
   const nb = j.nearBlock || {}, f = j.farm || {}, t = nb.tip;
   if (!t) return;
@@ -2721,7 +2723,7 @@ async function loadWorker(name, live) {
   wkSeenAt = Math.max(wkSeenAt, ...(d.recent || []).map((r) => r.at || 0));
   const isNew = (at) => live && prevSeen && at > prevSeen;
   set('wkMsg', '');
-  set('wkSub', [d.online ? '🟢 ' + WKT.online : '⚪ ' + WKT.offline, d.pool, d.ip, WKT.ever + ' ' + diffTxt(d.bestEver)].filter(Boolean).join(' · '));
+  set('wkSub', [d.online ? '🟢 ' + WKT.online : '⚪ ' + WKT.offline, d.pool, d.ip, d.poolDiff ? diffPair(d.shareDiff, d.poolDiff) : null, WKT.ever + ' ' + diffTxt(d.bestEver)].filter(Boolean).join(' · '));
   const card = (l, v) => '<div><span>' + l + '</span><strong>' + v + '</strong></div>';
   let html = '<div class="wk-sum">' + card(WKT.acc, nf(d.accepted)) + card(WKT.rej, nf(d.rejected)) + card(WKT.best, d.best > 0 ? diffTxt(d.best) : '–') + card(WKT.hr, fmtHash(d.hashrate24h)) + '</div>';
   if (!d.accepted && !d.rejected) html += '<p class="pm-hint">' + WKT.noShares + '</p>';
