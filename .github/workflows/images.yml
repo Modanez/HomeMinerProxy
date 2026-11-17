@@ -2,6 +2,7 @@ name: SD card images
 
 # Imagens prontas para gravar no cartão (Raspberry Pi 3/4/5, Orange Pi Zero 3, Odroid-C2).
 # - release publicada: monta as três e anexa na release
+# - manual com "tag" (ex.: v0.7.0): monta a versão da release e anexa nela (para refazer uma release que falhou)
 # - manual (Actions → SD card images → Run workflow) ou push na branch de desenvolvimento: deixa como artefato
 on:
   release:
@@ -11,6 +12,9 @@ on:
       boards:
         description: 'Placas, separadas por espaço / boards, space separated'
         default: 'rpi orangepizero3 odroidc2'
+      tag:
+        description: 'Release para anexar as imagens (ex.: v0.7.0); vazio = só artefato / release tag to attach to; empty = artifact only'
+        default: ''
   push:
     branches: [feat/sd-images]
     paths: ['image/**', 'install.sh', '.github/workflows/images.yml']
@@ -32,7 +36,8 @@ jobs:
 
   build:
     needs: plan
-    runs-on: ubuntu-latest
+    # 24.04 fixo: no ubuntu-latest (26.04) o pacote qemu-user-static não existe mais e o passo Tools falha
+    runs-on: ubuntu-24.04
     timeout-minutes: 120
     strategy:
       fail-fast: false
@@ -41,6 +46,7 @@ jobs:
     steps:
       - uses: actions/checkout@v5
         with:
+          ref: ${{ github.event.inputs.tag || '' }}   # manual com tag: monta a imagem da versão da release
           fetch-depth: 0          # o repositório vai inteiro para a imagem (botão "Atualizar")
           persist-credentials: false   # sem o token do Actions no .git/config que vai para a imagem
       - name: Tools
@@ -48,12 +54,12 @@ jobs:
       - name: Build
         run: sudo image/build.sh ${{ matrix.board }} "$GITHUB_WORKSPACE/homeminer-${{ matrix.board }}.img.xz"
       - name: Attach to the release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || github.event.inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" "homeminer-${{ matrix.board }}.img.xz" "homeminer-${{ matrix.board }}.img.xz.sha256" --clobber
+        run: gh release upload "${{ github.event.release.tag_name || github.event.inputs.tag }}" "homeminer-${{ matrix.board }}.img.xz" "homeminer-${{ matrix.board }}.img.xz.sha256" --clobber
       - name: Keep as artifact
-        if: github.event_name != 'release'
+        if: github.event_name != 'release' && github.event.inputs.tag == ''
         uses: actions/upload-artifact@v5
         with:
           name: homeminer-${{ matrix.board }}

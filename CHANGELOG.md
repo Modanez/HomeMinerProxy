@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### English
+- SD card images: the release build failed because GitHub's `ubuntu-latest` moved to 26.04, which no longer has `qemu-user-static`; the build now runs on Ubuntu 24.04. The workflow can also be run by hand with a `tag` (e.g. `v0.7.0`) to build that version and attach the images to its release.
+
+### Português
+- Imagens para cartão: o build da release falhou porque o `ubuntu-latest` do GitHub passou para o 26.04, que não tem mais o `qemu-user-static`; o build agora roda no Ubuntu 24.04. O workflow também pode ser rodado à mão com uma `tag` (ex.: `v0.7.0`) para montar aquela versão e anexar as imagens na release dela.
+
 ## v0.7.0 — 2026-11-17
 
 ### English
