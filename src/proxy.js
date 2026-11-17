@@ -328,6 +328,26 @@ async function healthCheck(now = Date.now()) {
 }
 setInterval(() => { healthCheck().catch(() => {}); }, HEALTH_MS).unref();
 
+// Dificuldade local (opcional, por porta; desligada por padrão): o proxy dá ao minerador uma dificuldade que ele
+// alcança (≈ 1 share a cada LOCAL_DIFF_TARGET_S) e só repassa à pool os shares que passam da dificuldade dela.
+// Os outros o proxy aceita sozinho: o minerador lento (processador, TV Box, ESP32) tem estatística ao vivo numa pool
+// de dificuldade alta (ckpool, atlaspool) e a chance de bloco é a mesma — um bloco passa de qualquer dificuldade.
+// Ligar: PROXY_LOCAL_DIFF="3334,3338" (portas) ou "localDiff": true na rota do PROXY_ROUTES.
+const LOCAL_DIFF_PORTS = new Set(String(process.env.PROXY_LOCAL_DIFF || '').split(/[,\s]+/).map(Number).filter((n) => n > 0));
+const LOCAL_DIFF_START = Number(process.env.PROXY_LOCAL_DIFF_START) || 1;
+const LOCAL_DIFF_MIN = Number(process.env.PROXY_LOCAL_DIFF_MIN) || 0.0001;
+const LOCAL_DIFF_TARGET_S = Number(process.env.PROXY_LOCAL_DIFF_TARGET_S) || 15;
+const localDiffOn = (route) => !!route.localDiff || LOCAL_DIFF_PORTS.has(Number(route.listen));
+// próxima dificuldade local: mira LOCAL_DIFF_TARGET_S por share; só muda quando erra por mais de 2×
+function retarget(cur, shares, seconds, poolDiff) {
+  if (!(seconds > 0)) return cur;
+  const want = shares > 0 ? cur * (shares * LOCAL_DIFF_TARGET_S) / seconds : cur / 4;
+  const ratio = want / cur;
+  if (ratio > 0.5 && ratio < 2) return cur;
+  const pow2 = 2 ** Math.round(Math.log2(Math.max(LOCAL_DIFF_MIN, want)));   // potências de 2: valores estáveis
+  return Math.min(poolDiff || Infinity, Math.max(LOCAL_DIFF_MIN, pow2));
+}
+
 // ---------------------------------------------------------------- sessão minerador <-> pool
 function lineReader(onLine) {
   let buf = '';
@@ -344,7 +364,8 @@ function lineReader(onLine) {
 
 function session(down, route) {
   const s = { en1: null, shareDiff: 1, versionMask: null, jobs: new Map(), pending: new Map(),
-    subscribeIds: new Set(), configureIds: new Set(), worker: null, peer: down.remoteAddress, route, upIndex: 0 };
+    subscribeIds: new Set(), configureIds: new Set(), worker: null, peer: down.remoteAddress, route, upIndex: 0,
+    local: localDiffOn(route), poolDiff: null, localDiff: LOCAL_DIFF_START, vd: { since: Date.now(), shares: 0 } };
   const ups = upstreamsOf(route);
   down.setKeepAlive(true, 30e3);
   const queue = [];   // tudo que o minerador mandou antes de a pool aceitar a conexão
@@ -435,7 +456,17 @@ function session(down, route) {
       } else if (m.method === 'mining.submit' && m.params) {
         const job = s.jobs.get(m.params[1]);
         const r = job && s.en1 ? shareDifficulty(job, s.en1, m.params, s.versionMask) : null;
-        s.pending.set(m.id, { diff: r ? r.diff : null, hash: r ? r.hash : null, target: s.shareDiff, at: Date.now() });
+        const p = { diff: r ? r.diff : null, hash: r ? r.hash : null, target: s.shareDiff, at: Date.now() };
+        if (s.local && r && s.poolDiff && r.diff < s.poolDiff) {
+          // abaixo da dificuldade da pool: o proxy decide sozinho e não repassa
+          const ok = r.diff >= s.localDiff * 0.999;
+          down.write(JSON.stringify({ id: m.id, result: ok, error: ok ? null : [23, 'Low difficulty share', null] }) + '\n');
+          settle(p, { result: ok, error: ok ? null : [23, 'Low difficulty share', null] });
+          if (ok) localVardiff();
+          return;
+        }
+        if (s.local && r) localVardiff();
+        s.pending.set(m.id, p);
       }
     } catch (e) { log('erro ao ler mensagem do minerador:', e.message); }
     toUp(line);
@@ -451,7 +482,15 @@ function session(down, route) {
         s.jobs.set(jobId, { prevhash, coinb1, coinb2, branches: branches || [], version, nbits });
         if (s.jobs.size > 32) s.jobs.delete(s.jobs.keys().next().value);
       } else if (m.method === 'mining.set_difficulty' && m.params) {
-        s.shareDiff = Number(m.params[0]) || s.shareDiff;
+        if (s.local) {
+          // guarda a da pool e manda ao minerador a local (nunca acima da da pool)
+          s.poolDiff = Number(m.params[0]) || s.poolDiff;
+          s.localDiff = Math.min(s.localDiff, s.poolDiff || Infinity);
+          m.params = [s.localDiff];
+          line = JSON.stringify(m);
+          if (s.worker) s.worker.poolDiff = s.poolDiff;
+        }
+        s.shareDiff = s.local ? s.localDiff : Number(m.params[0]) || s.shareDiff;
         if (s.worker) s.worker.shareDiff = s.shareDiff;
       } else if (m.method === 'mining.set_extranonce' && m.params) {
         s.en1 = m.params[0];
@@ -472,57 +511,90 @@ function session(down, route) {
           const w = s.worker; if (!w) return;
           w.pingMs = rtt;
           w.pingScore = pingScore(rtt).score;
-          const ok = m.result === true;
-          const entry = { at: p.at, worker: w.name, pool: label(), diff: p.diff, target: p.target, ok };
-          if (p.diff > 0) (w.subs || (w.subs = [])).push([p.at, p.diff, p.target || 0]);
-          if (ok) {
-            w.accepted++;
-            if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
-            today.accepted++;
-            w.lastShareAt = p.at;
-            w.lastShareDiff = p.diff;
-            w.window.push([p.at, p.target]);
-            addBin(w, p.at, p.target);
-            noteHour(w, p.at, true, p.diff, p.target);
-            noteTop(w, p.at, p.diff);
-            if (p.diff > w.bestSession) w.bestSession = p.diff;
-            if (p.diff > w.bestEver) w.bestEver = p.diff;
-            if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
-            // medidor de sorte e campeonato semanal
-            if (p.diff > 0 && p.target > 0) {
-              if (!w.luck) w.luck = { since: p.at, work: 0, best: 0 };
-              w.luck.work += p.target;
-              if (p.diff > w.luck.best) w.luck.best = p.diff;
-              rollWeek();
-              const ww = week.workers[w.name] || (week.workers[w.name] = { shares: 0, work: 0, best: 0, bestAt: null });
-              ww.shares++;
-              ww.work += p.target;
-              if (p.diff > ww.best) { ww.best = p.diff; ww.bestAt = p.at; }
-              const k = bucket(p.diff, p.target);
-              if (k >= 0) { hist[k]++; (w.hist || (w.hist = new Array(HIST_BUCKETS).fill(0)))[k]++; }
-            }
-            noteBestHash(w.name, p);
-          } else if (s.upIndex > 0 && rejectKind(m.error) === 'low' && p.diff > 0 && p.target > 0 && p.diff < p.target) {
-            // na reserva, shares abaixo do mínimo dela são esperados (o ESP32 segue com a dificuldade da pool dele);
-            // um share bom de verdade (um bloco) passa do mínimo e é aceito. Conta à parte, sem alerta.
-            w.belowMin = (w.belowMin || 0) + 1;
-            return;
-          } else {
-            w.rejected++;
-            noteHour(w, p.at, false);
-            const kind = rejectKind(m.error);
-            if (kind === 'stale' || kind === 'duplicate') w[kind] = (w[kind] || 0) + 1;
-            entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
-            w.lastReject = { at: p.at, error: entry.error };
-            addEvent('reject', `${w.name}: share rejected (${entry.error})`, { worker: w.name });
-          }
-          recent.unshift(entry);
-          if (recent.length > RECENT_MAX) recent.length = RECENT_MAX;
+          settle(p, m);
         }
       }
     } catch (e) { log('erro ao ler mensagem da pool:', e.message); }
     down.write(line + '\n');
   });
+
+
+  // dificuldade local: a cada minuto (ou 4 shares) confere o ritmo e ajusta, avisando o minerador
+  function localVardiff() {
+    s.vd.shares++;
+    const secs = (Date.now() - s.vd.since) / 1000;
+    if (secs < 60 && s.vd.shares < 4) return;
+    const next = retarget(s.localDiff, s.vd.shares, secs, s.poolDiff);
+    s.vd = { since: Date.now(), shares: 0 };
+    if (next === s.localDiff) return;
+    s.localDiff = s.shareDiff = next;
+    if (s.worker) s.worker.shareDiff = next;
+    down.write(JSON.stringify({ id: null, method: 'mining.set_difficulty', params: [next] }) + '\n');
+  }
+  // minerador parado (nenhum share): baixa a dificuldade de tempos em tempos
+  if (s.local) {
+    const t = setInterval(() => {
+      if (s.closed) return clearInterval(t);
+      const secs = (Date.now() - s.vd.since) / 1000;
+      if (secs >= 4 * LOCAL_DIFF_TARGET_S && s.vd.shares === 0 && s.localDiff > LOCAL_DIFF_MIN) {
+        const next = retarget(s.localDiff, 0, secs, s.poolDiff);
+        s.vd = { since: Date.now(), shares: 0 };
+        if (next !== s.localDiff) { s.localDiff = s.shareDiff = next; if (s.worker) s.worker.shareDiff = next; down.write(JSON.stringify({ id: null, method: 'mining.set_difficulty', params: [next] }) + '\n'); }
+      }
+    }, 15e3);
+    t.unref();
+  }
+
+  // Conta o resultado de um share (da pool ou, com a dificuldade local, decidido pelo próprio proxy)
+  function settle(p, m) {
+    const w = s.worker; if (!w) return;
+    const ok = m.result === true;
+    const entry = { at: p.at, worker: w.name, pool: label(), diff: p.diff, target: p.target, ok };
+    if (p.diff > 0) (w.subs || (w.subs = [])).push([p.at, p.diff, p.target || 0]);
+    if (ok) {
+      w.accepted++;
+      if (today.date !== dayKey()) today = { date: dayKey(), accepted: 0 };
+      today.accepted++;
+      w.lastShareAt = p.at;
+      w.lastShareDiff = p.diff;
+      w.window.push([p.at, p.target]);
+      addBin(w, p.at, p.target);
+      noteHour(w, p.at, true, p.diff, p.target);
+      noteTop(w, p.at, p.diff);
+      if (p.diff > w.bestSession) w.bestSession = p.diff;
+      if (p.diff > w.bestEver) w.bestEver = p.diff;
+      if (p.hash && (!w.bestHash || p.diff > w.bestHash.diff)) w.bestHash = { diff: p.diff, hash: p.hash, at: p.at };
+      // medidor de sorte e campeonato semanal
+      if (p.diff > 0 && p.target > 0) {
+        if (!w.luck) w.luck = { since: p.at, work: 0, best: 0 };
+        w.luck.work += p.target;
+        if (p.diff > w.luck.best) w.luck.best = p.diff;
+        rollWeek();
+        const ww = week.workers[w.name] || (week.workers[w.name] = { shares: 0, work: 0, best: 0, bestAt: null });
+        ww.shares++;
+        ww.work += p.target;
+        if (p.diff > ww.best) { ww.best = p.diff; ww.bestAt = p.at; }
+        const k = bucket(p.diff, p.target);
+        if (k >= 0) { hist[k]++; (w.hist || (w.hist = new Array(HIST_BUCKETS).fill(0)))[k]++; }
+      }
+      noteBestHash(w.name, p);
+    } else if (s.upIndex > 0 && rejectKind(m.error) === 'low' && p.diff > 0 && p.target > 0 && p.diff < p.target) {
+      // na reserva, shares abaixo do mínimo dela são esperados (o ESP32 segue com a dificuldade da pool dele);
+      // um share bom de verdade (um bloco) passa do mínimo e é aceito. Conta à parte, sem alerta.
+      w.belowMin = (w.belowMin || 0) + 1;
+      return;
+    } else {
+      w.rejected++;
+      noteHour(w, p.at, false);
+      const kind = rejectKind(m.error);
+      if (kind === 'stale' || kind === 'duplicate') w[kind] = (w[kind] || 0) + 1;
+      entry.error = Array.isArray(m.error) ? m.error[1] : (m.error && m.error.message) || String(m.error || 'recusado');
+      w.lastReject = { at: p.at, error: entry.error };
+      addEvent('reject', `${w.name}: share rejected (${entry.error})`, { worker: w.name });
+    }
+    recent.unshift(entry);
+    if (recent.length > RECENT_MAX) recent.length = RECENT_MAX;
+  }
 
   function close(why) {
     if (s.closed) return; s.closed = true;
@@ -655,6 +727,8 @@ module.exports = {
   noteHour,
   noteTop,
   topShares,
+  retarget,
+  localDiffOn,
   workerDay,
   safeJson,
   saveStats,
