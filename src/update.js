@@ -16,7 +16,9 @@ function versionInfo(appDir = __dirname) {
   let v = {};
   try { v = JSON.parse(fs.readFileSync(path.join(appDir, 'version.json'), 'utf8')) || {}; } catch (_) { /* rodando do repositório */ }
   if (!v.version) {
-    try { v.version = require(path.join(appDir, '..', 'package.json')).version; v.repo = v.repo || path.join(appDir, '..'); } catch (_) { /* sem package.json */ }
+    for (const p of [path.join(appDir, 'package.json'), path.join(appDir, '..', 'package.json')]) {
+      try { v.version = require(p).version; v.repo = v.repo || path.dirname(p); break; } catch (_) { /* sem package.json */ }
+    }
   }
   if (!v.commit && v.repo) {
     try { v.commit = execFileSync('git', ['-C', v.repo, 'rev-parse', '--short', 'HEAD'], { stdio: ['ignore', 'pipe', 'ignore'], timeout: 3000 }).toString().trim(); } catch (_) { /* sem git */ }
@@ -97,4 +99,50 @@ function runUpdate(appDir, env = process.env) {
   return { ok: true };
 }
 
-module.exports = { lastUpdate, versionInfo, newer, latestRelease, canUpdate, status, runUpdate };
+function parseChangelogItems(block) {
+  const items = [];
+  let cur = null;
+  for (const rawLine of block.split('\n')) {
+    const line = rawLine.trimEnd();
+    if (/^- /.test(line)) {
+      if (cur !== null) items.push(cur.replace(/\s+/g, ' ').trim());
+      cur = line.slice(2).trim();
+    } else if (cur !== null && /^\s+\S/.test(rawLine)) {
+      cur += ' ' + line.trim();
+    } else if (cur !== null && !line.trim()) {
+      items.push(cur.replace(/\s+/g, ' ').trim());
+      cur = null;
+    }
+  }
+  if (cur !== null) items.push(cur.replace(/\s+/g, ' ').trim());
+  return items.filter(Boolean);
+}
+
+function changelog(appDir = __dirname, lang = 'pt') {
+  let raw = '';
+  for (const p of [path.join(appDir, 'CHANGELOG.md'), path.join(appDir, '..', 'CHANGELOG.md')]) {
+    try { raw = fs.readFileSync(p, 'utf8'); break; } catch (_) { /* sem CHANGELOG.md */ }
+  }
+  if (!raw) return [];
+  const text = raw.replace(/\r\n/g, '\n');
+  const sections = text.split(/^## /m).slice(1);
+  const wantPt = String(lang || 'pt').toLowerCase().startsWith('pt');
+  const out = [];
+  for (const sec of sections) {
+    const nl = sec.indexOf('\n');
+    const version = (nl >= 0 ? sec.slice(0, nl) : sec).trim();
+    const body = nl >= 0 ? sec.slice(nl + 1) : '';
+    const langParts = body.split(/^### /m);
+    let targetBody = body;
+    if (langParts.length > 1) {
+      const wantHeading = wantPt ? /^Portugu[êe]s\b/i : /^English\b/i;
+      const found = langParts.slice(1).find((p) => wantHeading.test(p.split('\n')[0].trim()));
+      targetBody = found ? found.slice(found.indexOf('\n') + 1) : langParts[1].slice(langParts[1].indexOf('\n') + 1);
+    }
+    const items = parseChangelogItems(targetBody);
+    if (version && items.length) out.push({ version, items });
+  }
+  return out;
+}
+
+module.exports = { lastUpdate, versionInfo, newer, latestRelease, canUpdate, status, runUpdate, changelog };

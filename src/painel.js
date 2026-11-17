@@ -1492,10 +1492,14 @@ const PAGE = `<!doctype html>
     .card { padding:10px; }
     .pool { font-size:10px; margin-left:15px; }
   }
+  .ver-foot { margin-top:18px; padding-top:10px; border-top:1px solid var(--line); font-size:11px; color:var(--dim); display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; }
+  .ver-foot a { color:var(--dim); text-decoration:none; }
+  .ver-foot a:hover { color:var(--gold); text-decoration:underline; }
+  body.kiosk .ver-foot { display:none; }
 </style>
 </head>
 <body data-theme="obsidian">
-<div class="cx-top" id="cxTop"><a class="cx-brand" href="#overview"><span class="cx-logo">⛏</span><b>HomeMinerProxy</b></a><span class="cx-sep">/</span><span class="cx-crumb" id="cxCrumb"></span><span class="cx-grow"></span><span class="cx-pill" id="cxWorkers"></span><span class="cx-pill" id="cxPing" hidden></span><span class="cx-badge" id="cxVer" hidden></span><span id="cxLangSlot"></span><button type="button" class="cx-btn" id="cxSound" title="Som dos recordes">🔊</button><a class="cx-btn cx-gear" href="/config" id="cxGear">⚙️</a></div>
+<div class="cx-top" id="cxTop"><a class="cx-brand" href="#overview"><span class="cx-logo">⛏</span><b>HomeMinerProxy</b></a><span class="cx-sep">/</span><span class="cx-crumb" id="cxCrumb"></span><span class="cx-grow"></span><span class="cx-pill" id="cxWorkers"></span><span class="cx-pill" id="cxPing" hidden></span><a class="cx-badge" id="cxVer" href="/config#backup" style="text-decoration:none" hidden></a><span id="cxLangSlot"></span><button type="button" class="cx-btn" id="cxSound" title="Som dos recordes">🔊</button><a class="cx-btn cx-gear" href="/config" id="cxGear">⚙️</a></div>
 <div class="cx-shell"><aside class="cx-side"><nav id="cxNav"></nav></aside><div class="cx-main">
 <div class="cx-head"><div><h2 id="cxTitle"></h2><p id="cxDesc"></p></div><span class="cx-grow"></span><div class="cx-actions" id="cxActions"></div></div>
 <header>
@@ -1678,6 +1682,7 @@ const PAGE = `<!doctype html>
   </div>
 </section>
 
+<footer class="ver-foot" id="verFoot" hidden><span id="verFootTxt"></span><a href="/config#backup" id="verFootLnk">Ver novidades (changelog) →</a></footer>
 </main>
 </div></div>
 <div class="pinmodal" id="enPin" hidden role="dialog" aria-modal="true"><div class="pm-box"><b>Digite o PIN para continuar</b><p class="pm-hint">O mesmo PIN das Configurações.</p>
@@ -1819,7 +1824,14 @@ if (!kiosk) {
   $('cxActions').innerHTML = '<a class="cx-btn" href="?kiosk">📺 ' + CX.kiosk + '</a>';
   $('cxActions').appendChild($('ticketBtn'));
   $('cxGear').title = CX.settings;
-  fetch('/api/config/version').then((r) => r.json()).then((v) => { if (v && v.version) { set('cxVer', 'v' + v.version); $('cxVer').hidden = false; } }).catch(() => {});
+  fetch('/api/config/version').then((r) => r.json()).then((v) => {
+    if (!v || !v.version) return;
+    const tag = 'v' + v.version + (v.commit ? ' (' + v.commit + ')' : '');
+    set('cxVer', tag); $('cxVer').hidden = false;
+    const dt = v.installedAt ? ' · ' + diaMes(Date.parse(v.installedAt)) + ' ' + hora(Date.parse(v.installedAt)) : '';
+    set('verFootTxt', 'HomeMinerProxy ' + tag + dt);
+    $('verFoot').hidden = false;
+  }).catch(() => {});
   window.addEventListener('hashchange', () => cxShow(true));
   $('cxDonate').addEventListener('click', (e) => { e.preventDefault(); $('donateModal').hidden = false; });
   cxShow(false);
