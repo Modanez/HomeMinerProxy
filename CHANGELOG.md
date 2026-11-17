@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## v0.7.0 — 2026-11-17
 
 ### English
 - **Version in Docker, dashboard footer and Changelog in Settings:** the Docker image now packs `package.json`, `CHANGELOG.md` and `version.json` (with the short commit hash from CI), so the version badge works in Docker too; the dashboard gains a discreet footer with the running version, commit, install date and a link to **Settings → Backup**, which now shows the release notes (`CHANGELOG.md`) in the chosen language.
