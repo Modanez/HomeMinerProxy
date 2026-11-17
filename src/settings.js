@@ -524,7 +524,7 @@ const T = {
       fanAuto: 'Fan automático, alvo', fanFixed: 'Fan fixo em', apply: 'Aplicar', confirm: 'Confirmar e reiniciar', cancel: 'Cancelar', offline: 'sem resposta', paused: 'pausado',
       from: 'Hoje', to: 'Vai ficar', backupLbl: 'reserva', same: 'Já aponta para o proxy.', done: 'Feito.', pointDone: 'Pool gravada e conferida; o Bitaxe está reiniciando.', last: 'Última ação' },
     pools: { title: 'Pools e portas', help: 'Cada porta do proxy leva a uma pool. Aponte cada minerador para a porta que combina com ele; se a pool cair, o proxy passa para a reserva sozinho.',
-      factory: 'O proxy não respondeu: estas são as portas de fábrica.', backup: 'reserva', down: 'fora do ar · usando', ms: 'ms',
+      factory: 'O proxy não respondeu: estas são as portas de fábrica.', backup: 'reserva', local: 'dificuldade local', localHint: 'O proxy dá aos mineradores desta porta uma dificuldade do tamanho deles e manda para a pool só os shares que chegam na dificuldade dela (PROXY_LOCAL_DIFF no .env).', down: 'fora do ar · usando', ms: 'ms',
       use: { group: 'Bitaxe e ASICs (Bitronics): solo sem taxa com ENDEREÇO.worker, ou SOLO Group com ENDEREÇO.worker#grupo (taxa 1%, divide o bloco se o grupo achar)', nerd: 'NerdMiner e ESP32: aceita os shares minúsculos deles', pub: 'cpuminer (PC, celular, Raspberry): sem taxa, dificuldade mínima 1', atlas: 'Bitaxe e ASICs: servidor em São Paulo, menor ping no Brasil (taxa 1,5%; não serve para ESP32)',
         ck: 'Bitaxe e ASICs: a pool solo mais conhecida (taxa 2%)', ckeu: 'Bitaxe e ASICs na Europa (taxa 2%)', ocean: 'Não é solo: a recompensa é dividida entre todos (pagamentos pequenos e regulares)', other: 'Pool configurada no PROXY_ROUTES' },
       howTitle: 'Como apontar os mineradores', server: 'Servidor', user: 'Usuário', userHint: 'seu endereço + ponto + um nome para o minerador', pass: 'Senha',
@@ -637,7 +637,7 @@ const T = {
       fanAuto: 'Auto fan, target', fanFixed: 'Fixed fan at', apply: 'Apply', confirm: 'Confirm and restart', cancel: 'Cancel', offline: 'no answer', paused: 'paused',
       from: 'Now', to: 'Will be', backupLbl: 'backup', same: 'Already points at the proxy.', done: 'Done.', pointDone: 'Pool saved and checked; the Bitaxe is restarting.', last: 'Last action' },
     pools: { title: 'Pools and ports', help: 'Each proxy port leads to a pool. Point each miner at the port that suits it; if the pool goes down, the proxy switches to the backup on its own.',
-      factory: 'The proxy did not answer: these are the factory ports.', backup: 'backup', down: 'down · using', ms: 'ms',
+      factory: 'The proxy did not answer: these are the factory ports.', backup: 'backup', local: 'local difficulty', localHint: 'The proxy gives miners on this port a difficulty that fits them and sends to the pool only the shares that reach its difficulty (PROXY_LOCAL_DIFF in the .env).', down: 'down · using', ms: 'ms',
       use: { group: 'Bitaxe and ASICs (Bitronics): solo with no fee using ADDRESS.worker, or a SOLO Group with ADDRESS.worker#group (1% fee, splits the block if the group finds one)', nerd: 'NerdMiner and ESP32: accepts their tiny shares', pub: 'cpuminer (PC, phone, Raspberry): no fee, minimum difficulty 1', atlas: 'Bitaxe and ASICs: server in São Paulo, lowest ping in Brazil (1.5% fee; not for ESP32)',
         ck: 'Bitaxe and ASICs: the best-known solo pool (2% fee)', ckeu: 'Bitaxe and ASICs in Europe (2% fee)', ocean: 'Not solo: the reward is split among everyone (small, regular payouts)', other: 'Pool set in PROXY_ROUTES' },
       howTitle: 'How to point your miners', server: 'Server', user: 'User', userHint: 'your address + dot + a name for the miner', pass: 'Password',
@@ -949,6 +949,7 @@ function page(lang, hasPin, theme) {
   .pool .pname { font-weight:600; }
   .pool .pst { margin-left:auto; font-size:12px; }
   .pool .pst.bad { color:var(--warn); }
+  .pool .ldiff { font-size:12px; color:var(--gold); border:1px solid currentColor; border-radius:999px; padding:0 8px; cursor:help; }
   .pools .muted, .f .muted { color:var(--dim); font-size:12px; }
   .how { display:grid; gap:4px; margin-top:8px; }
   .how b { font-size:13px; margin-top:6px; }
@@ -1621,6 +1622,7 @@ if (updBtn) updBtn.addEventListener('click', async () => {
       const h = document.createElement('div'); h.className = 'ph';
       h.append(txt('span', 'port', String(r.listen)), txt('span', 'pname', r.label));
       if (r.backups && r.backups.length) h.append(txt('span', 'muted', P.backup + ': ' + r.backups.join(', ')));
+      if (r.localDiff) { const t = txt('span', 'ldiff', '◎ ' + P.local); t.title = P.localHint; h.append(t); }
       if (d.live) h.append(r.down ? txt('span', 'pst bad', '⚠️ ' + P.down + ' ' + (r.active || '–')) : txt('span', 'pst muted', '✓' + (r.pingMs != null ? ' ' + Math.round(r.pingMs) + ' ' + P.ms : '')));
       row.append(h, txt('div', 'hint', useOf(r)));
       list.appendChild(row);
