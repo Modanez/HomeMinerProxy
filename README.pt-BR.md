@@ -302,6 +302,35 @@ O antivírus pode marcar qualquer minerador como software indesejado. Se acontec
 
 **Como saber se funcionou:** o `minerd` mostra `accepted: 1/1 (100.00%)` e, no painel, o worker aparece com ⚡ (conectado pelo proxy). Uma CPU de poucos MH/s leva alguns minutos por share na dificuldade 1, então o primeiro pode demorar.
 
+## TV Box e celular Android (Termux)
+
+Uma TV Box ou um celular velho com o [Termux](https://f-droid.org/packages/com.termux/) minera com o `cpuminer` (`pkg install cpuminer` ou compilado). Aponte para o proxy numa pool de dificuldade baixa (3333 public-pool ou 3340 bitronics):
+
+```bash
+minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u SEU_ENDERECO.btv13 -p x -t 4
+```
+
+**Temperatura no painel:** o minerador manda a temperatura para o painel, e ela aparece ao lado do nome dele, como no Bitaxe (vale por 5 minutos; só da rede de casa):
+
+```bash
+while true; do
+  t=$(cat /sys/class/thermal/thermal_zone0/temp 2>/dev/null)
+  curl -s -m 5 -H 'Content-Type: application/json' -d "{\"tempC\": $(awk "BEGIN {print $t/1000}")}" \
+    http://homeminer.local:3000/api/worker/btv13/telemetry >/dev/null
+  sleep 30
+done
+```
+Aceita `tempC`, `cpuPct` e `watts`. O nome na URL é o mesmo do worker (o que vem depois do ponto no usuário).
+
+**Começar sozinho quando liga:** instale o app **Termux:Boot** (também no F-Droid, da mesma origem do Termux), abra uma vez e crie `~/.termux/boot/01-minerar.sh`:
+
+```bash
+#!/data/data/com.termux/files/usr/bin/sh
+termux-wake-lock
+nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u SEU_ENDERECO.btv13 -p x -t 4 >/dev/null 2>&1 &
+```
+`chmod +x ~/.termux/boot/01-minerar.sh`. Na Android TV, libere o Termux e o Termux:Boot para rodar em segundo plano (economia de bateria → sem restrição).
+
 ## HTTPS na rede de casa
 
 O painel também abre em **https://homeminer.local** (porta 443), com cadeado. Sem domínio e sem abrir porta no roteador: a fazenda cria uma **autoridade certificadora própria** na primeira vez e assina o certificado do servidor (para `homeminer`, `homeminer.local` e os IPs da placa). Let's Encrypt não serve aqui, porque só emite para domínio público.
