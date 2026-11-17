@@ -2,7 +2,7 @@ manifestVersion: 1
 id: modanez-homeminerproxy
 category: bitcoin
 name: HomeMinerProxy
-version: "0.6.0"
+version: "0.7.0"
 tagline: Stratum proxy and dashboard for home solo "lottery" mining
 icon: https://raw.githubusercontent.com/Modanez/HomeMinerProxy/main/umbrel/icon.svg
 description: >-
@@ -44,7 +44,9 @@ path: ""
 defaultUsername: ""
 defaultPassword: ""
 releaseNotes: >-
-  First Umbrel release. On first open, a short wizard asks for your Bitcoin address, language and a PIN
-  for the settings.
+  New Price and News pages, live worker dialog with the last 24 h, hall of fame with the 10 biggest shares,
+  Bitaxe top 20 from AxeOS, HTTPS on the home network, phone app (PWA), Black & Yellow theme, local difficulty
+  per port for slow miners on high-difficulty pools, telemetry for miners without an API, and the version
+  and changelog in Settings. Full list: https://github.com/Modanez/HomeMinerProxy/blob/main/CHANGELOG.md
 submitter: Paulo Modanez
 submission: https://github.com/Modanez/HomeMinerProxy
