@@ -3,9 +3,11 @@
 ## Unreleased
 
 ### English
+- **Kiosk on a TV (Fire TV Stick, TV browser):** at 960×540 and other small screens, cards overlapped (luck meter over the weekly championship, share distribution over achievements) and the bottom of some pages was cut off. Now a page that doesn't fit is zoomed out until it fits, and the kiosk shows only the achievements already earned.
 - SD card images: the release build failed because GitHub's `ubuntu-latest` moved to 26.04, which no longer has `qemu-user-static`; the build now runs on Ubuntu 24.04. The workflow can also be run by hand with a `tag` (e.g. `v0.7.0`) to build that version and attach the images to its release.
 
 ### Português
+- **Quiosque na TV (Fire TV Stick, navegador da TV):** em 960×540 e outras telas pequenas, os cards ficavam um por cima do outro (medidor de sorte sobre o campeonato da semana, distribuição dos shares sobre as conquistas) e o fim de algumas telas sumia. Agora a tela que não cabe é reduzida com zoom até caber, e o quiosque mostra só as conquistas já ganhas.
 - Imagens para cartão: o build da release falhou porque o `ubuntu-latest` do GitHub passou para o 26.04, que não tem mais o `qemu-user-static`; o build agora roda no Ubuntu 24.04. O workflow também pode ser rodado à mão com uma `tag` (ex.: `v0.7.0`) para montar aquela versão e anexar as imagens na release dela.
 
 ## v0.7.0 — 2026-11-17

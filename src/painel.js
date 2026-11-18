@@ -1250,14 +1250,15 @@ const PAGE = `<!doctype html>
   body.kiosk .page { position:absolute; inset:0; opacity:0; pointer-events:none; transition:opacity .5s; }
   body.kiosk .page.on { opacity:1; pointer-events:auto; }
   body.kiosk .page { display:flex; flex-direction:column; }
-  body.kiosk .duo { flex:1; }
+  body.kiosk .page > * { flex-shrink:0; }   /* nada encolhe por cima do vizinho: o que não cabe vira zoom (fitZoom) */
+  body.kiosk .duo { flex:1 0 auto; }
   body.kiosk .duo .card { display:flex; flex-direction:column; justify-content:center; }
   body.kiosk .duo .big { font-size:60px; }
   body.kiosk .duo .lead { font-size:17px; }
   body.kiosk .duo .card > .label { margin-bottom:auto; }
   body.kiosk .duo .card > :last-child { margin-bottom:auto; }
   body.kiosk .duo .sub { font-size:14px; }
-  body.kiosk .p3 { flex:1; min-height:0; grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto; }
+  body.kiosk .p3 { flex:1 0 auto; min-height:0; grid-template-rows:minmax(0,1fr) minmax(0,1fr) auto; }
   body.kiosk .duo { min-height:0; }
   body.kiosk .p3 .chart-card { display:flex; flex-direction:column; }
   body.kiosk .p3 .chart { flex:1; height:auto; min-height:90px; }
@@ -1376,15 +1377,16 @@ const PAGE = `<!doctype html>
   .ach.golden.on .ach-t { color:#f2a900; font-size:15px; }
   .ach-d { font-size:11px; color:var(--dim); line-height:1.3; margin-top:2px; }
   .hist-card .chart { height:240px; }
-  body.kiosk .luck-duo { flex:1; min-height:0; }
+  body.kiosk .luck-duo { flex:1 0 auto; min-height:0; }
   body.kiosk .hist-card { display:flex; flex-direction:column; }
+  body.kiosk .ach:not(.on):not(.golden) { display:none; }   /* na TV, só as conquistas já ganhas (e o prêmio de ouro) */
   body.kiosk .hist-card .chart { flex:1; height:auto; min-height:0; }
   .hexrow { margin-bottom:6px; }
   .hex { font-family:ui-monospace, "DejaVu Sans Mono", Menlo, monospace; font-size:15px; letter-spacing:.02em; color:var(--dim); word-break:break-all; line-height:1.35; }
   .hex .z, .z { color:var(--gold); font-weight:700; }
   .ruler { height:120px; }
   .ruler svg { width:100%; height:100%; overflow:visible; }
-  body.kiosk .ruler-card { flex:1; min-height:0; display:flex; flex-direction:column; }
+  body.kiosk .ruler-card { flex:1 0 auto; min-height:0; display:flex; flex-direction:column; }
   body.kiosk .ruler { flex:1; min-height:0; }
   .duo .card { padding:18px 20px; }
   .duo .big { font-size:46px; margin-top:6px; }
@@ -1776,8 +1778,21 @@ function show(i) {
   page = (i + ps.length) % ps.length;
   ps.forEach((p, k) => p.classList.toggle('on', k === page));
   Array.from($('dots').children).forEach((d, k) => d.classList.toggle('on', k === page));
+  fitCurrent();
 }
 function schedule() { clearInterval(rotT); rotT = setInterval(() => show(page + 1), rotS * 1000); }
+// Tela pequena (TV pelo Fire Stick, navegador da TV em 960×540, telinha de 7"): a página que não cabe é reduzida
+// com zoom até caber, em vez de um card passar por cima do outro ou sumir embaixo da tela
+function fitZoom(p) {
+  if (!kiosk || !p) return;
+  p.style.zoom = '';
+  const need = p.scrollHeight, have = p.clientHeight;
+  if (!(need > have + 1) || !have) return;
+  let z = Math.max(0.5, have / need);
+  p.style.zoom = z;
+  for (let k = 0; k < 3 && p.scrollHeight > p.clientHeight + 1 && z > 0.5; k++) { z = Math.max(0.5, z * p.clientHeight / p.scrollHeight - 0.005); p.style.zoom = z; }
+}
+const fitCurrent = () => fitZoom(pages()[page]);
 function fitPages() {
   if (!kiosk) return;
   const top = $('pages').getBoundingClientRect().top;
@@ -1786,6 +1801,8 @@ function fitPages() {
 if (kiosk) {
   $('dots').innerHTML = pages().map(() => '<i></i>').join('');
   show(0); schedule(); fitPages();
+  setInterval(fitCurrent, 3000);   // os dados chegam depois e mudam a altura (mais workers, conquistas, manchetes)
+  window.addEventListener('resize', () => { fitPages(); fitCurrent(); });
   document.addEventListener('click', () => { show(page + 1); schedule(); });
 }
 
