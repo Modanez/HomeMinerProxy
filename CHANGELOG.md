@@ -3,10 +3,14 @@
 ## Unreleased
 
 ### English
+- **TV app (Fire TV Stick / Android TV):** `homeminer-tv.apk`, attached to each release, opens the dashboard in kiosk mode full screen, with the screen always on, the page drawn at 1920 × 1080 instead of 960 × 540, and the remote in control (◀ ▶ change pages, OK pauses, ☰ settings, optional start when the TV turns on). Built by the new **Fire TV app** workflow from `android/`.
+- Kiosk: `?vw=1920` draws the page at that width (TV browsers), and ◀ ▶ / OK on a remote or keyboard change pages and pause the rotation.
 - **Kiosk on a TV (Fire TV Stick, TV browser):** at 960×540 and other small screens, cards overlapped (luck meter over the weekly championship, share distribution over achievements) and the bottom of some pages was cut off. Now a page that doesn't fit is zoomed out until it fits, and the kiosk shows only the achievements already earned.
 - SD card images: the release build failed because GitHub's `ubuntu-latest` moved to 26.04, which no longer has `qemu-user-static`; the build now runs on Ubuntu 24.04. The workflow can also be run by hand with a `tag` (e.g. `v0.7.0`) to build that version and attach the images to its release.
 
 ### Português
+- **App para TV (Fire TV Stick / Android TV):** o `homeminer-tv.apk`, anexado em cada release, abre o painel em modo quiosque em tela cheia, com a tela sempre ligada, a página desenhada em 1920 × 1080 em vez de 960 × 540, e o controle remoto no comando (◀ ▶ trocam de tela, OK pausa, ☰ configuração, abrir ao ligar a TV opcional). Gerado pelo novo workflow **Fire TV app** a partir de `android/`.
+- Quiosque: `?vw=1920` desenha a página nessa largura (navegadores de TV), e ◀ ▶ / OK no controle ou teclado trocam de tela e pausam a troca.
 - **Quiosque na TV (Fire TV Stick, navegador da TV):** em 960×540 e outras telas pequenas, os cards ficavam um por cima do outro (medidor de sorte sobre o campeonato da semana, distribuição dos shares sobre as conquistas) e o fim de algumas telas sumia. Agora a tela que não cabe é reduzida com zoom até caber, e o quiosque mostra só as conquistas já ganhas.
 - Imagens para cartão: o build da release falhou porque o `ubuntu-latest` do GitHub passou para o 26.04, que não tem mais o `qemu-user-static`; o build agora roda no Ubuntu 24.04. O workflow também pode ser rodado à mão com uma `tag` (ex.: `v0.7.0`) para montar aquela versão e anexar as imagens na release dela.
 

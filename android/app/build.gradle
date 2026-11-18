@@ -1,0 +1,42 @@
+plugins { id 'com.android.application' version '8.5.2' }
+
+// Versão vem do package.json pelo CI (-PappVersion=0.7.0 -PappCode=123)
+def appVersion = project.findProperty('appVersion') ?: '0.0.0-dev'
+def appCode = (project.findProperty('appCode') ?: '1') as Integer
+
+// Assinatura: com os secrets ANDROID_KEYSTORE_* no GitHub, o APK sai sempre com a mesma chave e o Fire Stick aceita
+// atualizar por cima. Sem eles, sai com a chave de debug do CI (instala, mas para atualizar é preciso desinstalar antes).
+def ks = System.getenv('ANDROID_KEYSTORE_FILE')
+
+android {
+    namespace 'io.github.modanez.homeminer'
+    compileSdk 34
+    defaultConfig {
+        applicationId 'io.github.modanez.homeminer'
+        minSdk 22          // Fire OS 5 (Fire TV Stick 1ª/2ª geração) em diante
+        targetSdk 34
+        versionCode appCode
+        versionName appVersion
+    }
+    signingConfigs {
+        release {
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv('ANDROID_KEYSTORE_PASSWORD')
+                keyAlias System.getenv('ANDROID_KEY_ALIAS')
+                keyPassword System.getenv('ANDROID_KEY_PASSWORD') ?: System.getenv('ANDROID_KEYSTORE_PASSWORD')
+            }
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig ks ? signingConfigs.release : signingConfigs.debug
+        }
+    }
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+    lint { abortOnError false; checkReleaseBuilds false }
+}
