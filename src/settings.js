@@ -514,7 +514,7 @@ const T = {
     dsc: { help: 'Varre a rede de casa atrás de Bitaxe e NerdQaxe (AxeOS), ASICs com a API do cgminer (porta 4028, como Avalon Nano e Antminer) e placas ESP32 (NerdMiner). Leva até meio minuto.',
       run: 'Procurar na rede', running: 'Procurando na rede (até meio minuto)…', none: 'Nenhum minerador encontrado. Confira se estão na mesma rede (Wi-Fi ou cabo) que este servidor.',
       docker: 'Rodando em Docker: sem network_mode: host, a busca só enxerga a rede interna do Docker.', count: '%s aparelho(s) encontrado(s).',
-      kinds: { axeos: 'AxeOS', cgminer: 'API cgminer', esp32: 'ESP32', proxy: 'aparelho conectado ao proxy' },
+      kinds: { axeos: 'AxeOS', nmminer: 'NMMiner', cgminer: 'API cgminer', esp32: 'ESP32', proxy: 'aparelho conectado ao proxy' },
       via: { proxy: 'minerando pelo proxy', direct: 'minerando direto em %s', unknown: 'não aparece no proxy' }, worker: 'worker',
       esp: 'Provavelmente um NerdMiner, ou outro aparelho com ESP32 (uma tomada Sonoff, por exemplo).', espHint: 'Se for um NerdMiner, aponte para a porta do NerdMiner do proxy (veja Pools e portas na aba Mineradores).',
       cgHint: 'Para minerar pelo proxy, troque a pool na página deste ASIC (veja Pools e portas na aba Mineradores).', axeHint: 'Adicione ao painel, salve e use "Apontar para o proxy" em Ações nos Bitaxe.',
@@ -628,7 +628,7 @@ const T = {
     dsc: { help: 'Scans the home network for Bitaxe and NerdQaxe (AxeOS), ASICs with the cgminer API (port 4028, such as Avalon Nano and Antminer) and ESP32 boards (NerdMiner). Takes up to half a minute.',
       run: 'Scan the network', running: 'Scanning the network (up to half a minute)…', none: 'No miner found. Check that they are on the same network (Wi-Fi or cable) as this server.',
       docker: 'Running in Docker: without network_mode: host, the scan only sees the Docker internal network.', count: '%s device(s) found.',
-      kinds: { axeos: 'AxeOS', cgminer: 'cgminer API', esp32: 'ESP32', proxy: 'device connected to the proxy' },
+      kinds: { axeos: 'AxeOS', nmminer: 'NMMiner', cgminer: 'cgminer API', esp32: 'ESP32', proxy: 'device connected to the proxy' },
       via: { proxy: 'mining through the proxy', direct: 'mining directly on %s', unknown: 'not seen on the proxy' }, worker: 'worker',
       esp: 'Probably a NerdMiner, or another ESP32 device (a Sonoff plug, for example).', espHint: 'If it is a NerdMiner, point it at the proxy NerdMiner port (see Pools and ports in the Miners tab).',
       cgHint: 'To mine through the proxy, change the pool on this ASIC page (see Pools and ports in the Miners tab).', axeHint: 'Add it to the dashboard, save and use "Point at the proxy" in Bitaxe actions.',
@@ -1608,44 +1608,50 @@ if (updBtn) updBtn.addEventListener('click', async () => {
     box.textContent = '';
     if (!list.length) { box.appendChild(mk('div', 'hint', B.none)); return; }
     for (const b of list) {
+      const nm = b.kind === 'nmminer';
       const row = mk('div', 'pool');
       const h = mk('div', 'ph');
-      h.append(mk('span', 'pname', b.name), mk('span', 'muted', b.host));
+      h.append(mk('span', 'pname', b.name), mk('span', 'muted', (b.model ? b.model + ' · ' : '') + b.host));
       h.append(mk('span', 'pst' + (b.fresh ? ' muted' : ' bad'), b.fresh ? (b.paused ? B.paused : '✓') : '⚠️ ' + B.offline));
       row.appendChild(h);
       const bar = mk('div', 'bbar');
-      bar.append(
-        btn(B.restart, async () => { if (await act(b.name, 'restart')) say(B.done, true); }),
-        btn(B.identify, async () => { if (await act(b.name, 'identify')) say(B.done, true); }),
-        btn(b.paused ? B.resume : B.pause, async () => { if (await act(b.name, b.paused ? 'resume' : 'pause')) { say(B.done, true); setTimeout(load, 1500); } }),
-        btn(B.point, async () => {
-          const r = await act(b.name, 'point-preview');
-          if (!r) return;
-          if (r.same) { say(B.same, true); return; }
-          const pv = mk('div', 'hint');
-          pv.textContent = B.from + ': ' + (r.current.url || '–') + ':' + (r.current.port || '–') + (r.current.fallback ? ' (' + B.backupLbl + ')' : '') + '  →  ' + B.to + ': ' + r.next.url + ':' + r.next.port + ' · ' + r.next.user + ' · ' + B.backupLbl + ' ' + r.backup.url + ':' + r.backup.port;
-          const yes = btn(B.confirm, async () => { if (await act(b.name, 'point')) { say(B.pointDone, true); pv.remove(); yes.remove(); no.remove(); } });
-          const no = btn(B.cancel, async () => { pv.remove(); yes.remove(); no.remove(); });
-          row.append(pv, yes, no);
-        }));
+      const pointBtn = btn(B.point, async () => {
+        const r = await act(b.name, 'point-preview');
+        if (!r) return;
+        if (r.same) { say(B.same, true); return; }
+        const pv = mk('div', 'hint');
+        pv.textContent = B.from + ': ' + (r.current.url || '–') + ':' + (r.current.port || '–') + (r.current.fallback ? ' (' + B.backupLbl + ')' : '') + '  →  ' + B.to + ': ' + r.next.url + ':' + r.next.port + ' · ' + r.next.user + ' · ' + B.backupLbl + ' ' + r.backup.url + ':' + r.backup.port;
+        const yes = btn(B.confirm, async () => { if (await act(b.name, 'point')) { say(B.pointDone, true); pv.remove(); yes.remove(); no.remove(); } });
+        const no = btn(B.cancel, async () => { pv.remove(); yes.remove(); no.remove(); });
+        row.append(pv, yes, no);
+      });
+      bar.append(btn(B.restart, async () => { if (await act(b.name, 'restart')) say(B.done, true); }));
+      if (!nm) {
+        bar.append(
+          btn(B.identify, async () => { if (await act(b.name, 'identify')) say(B.done, true); }),
+          btn(b.paused ? B.resume : B.pause, async () => { if (await act(b.name, b.paused ? 'resume' : 'pause')) { say(B.done, true); setTimeout(load, 1500); } }));
+      }
+      bar.append(pointBtn);
       row.appendChild(bar);
-      // fan: automático com alvo ou fixo
-      const fan = mk('div', 'bbar');
-      const mode = mk('select'); mode.style.maxWidth = '210px';
-      for (const [v, t] of [['auto', B.fanAuto], ['fixed', B.fanFixed]]) { const o = mk('option', null, t); o.value = v; mode.appendChild(o); }
-      mode.value = b.autoFan === false ? 'fixed' : 'auto';
-      const val = mk('input'); val.inputMode = 'numeric'; val.maxLength = 3; val.style.maxWidth = '90px';
-      const unit = mk('span', 'muted');
-      // o AxeOS guarda o alvo em °C; a tela mostra na unidade escolhida e converte ao gravar
-      const F = () => tempUnitNow === 'F', toU = (c) => (F() ? Math.round(c * 9 / 5 + 32) : c), toC = (v) => (F() ? Math.round((v - 32) * 5 / 9) : v);
-      const sync = () => { const auto = mode.value === 'auto'; unit.textContent = auto ? (F() ? '°F' : '°C') : '%'; val.placeholder = auto ? String(toU(60)) : '70'; };
-      val.value = b.autoFan === false ? (b.fanPct ?? '') : (b.tempTarget != null ? toU(b.tempTarget) : ''); sync();
-      mode.addEventListener('change', () => { val.value = ''; sync(); });
-      fan.append(mode, val, unit, btn(B.apply, async () => {
-        const n = Number(val.value || val.placeholder);
-        if (await act(b.name, 'fan', mode.value === 'auto' ? { auto: true, temptarget: toC(n) } : { auto: false, fanspeed: n })) say(B.done, true);
-      }));
-      row.appendChild(fan);
+      if (!nm) {
+        // fan: automático com alvo ou fixo
+        const fan = mk('div', 'bbar');
+        const mode = mk('select'); mode.style.maxWidth = '210px';
+        for (const [v, t] of [['auto', B.fanAuto], ['fixed', B.fanFixed]]) { const o = mk('option', null, t); o.value = v; mode.appendChild(o); }
+        mode.value = b.autoFan === false ? 'fixed' : 'auto';
+        const val = mk('input'); val.inputMode = 'numeric'; val.maxLength = 3; val.style.maxWidth = '90px';
+        const unit = mk('span', 'muted');
+        // o AxeOS guarda o alvo em °C; a tela mostra na unidade escolhida e converte ao gravar
+        const F = () => tempUnitNow === 'F', toU = (c) => (F() ? Math.round(c * 9 / 5 + 32) : c), toC = (v) => (F() ? Math.round((v - 32) * 5 / 9) : v);
+        const sync = () => { const auto = mode.value === 'auto'; unit.textContent = auto ? (F() ? '°F' : '°C') : '%'; val.placeholder = auto ? String(toU(60)) : '70'; };
+        val.value = b.autoFan === false ? (b.fanPct ?? '') : (b.tempTarget != null ? toU(b.tempTarget) : ''); sync();
+        mode.addEventListener('change', () => { val.value = ''; sync(); });
+        fan.append(mode, val, unit, btn(B.apply, async () => {
+          const n = Number(val.value || val.placeholder);
+          if (await act(b.name, 'fan', mode.value === 'auto' ? { auto: true, temptarget: toC(n) } : { auto: false, fanspeed: n })) say(B.done, true);
+        }));
+        row.appendChild(fan);
+      }
       if (b.lastAction) row.appendChild(mk('div', 'hint', B.last + ': ' + b.lastAction.action + ' · ' + new Date(b.lastAction.at).toLocaleTimeString() + (b.lastAction.ok ? '' : ' · ' + (M.err[b.lastAction.error] || b.lastAction.error))));
       box.appendChild(row);
     }
@@ -1864,10 +1870,11 @@ function dscRender(list, docker) {
     if (d.mac) info.push(d.mac);
     const hints = [];
     if (d.kind === 'esp32') hints.push(D.esp);
-    if (d.via !== 'proxy') hints.push(d.kind === 'esp32' ? D.espHint : d.kind === 'cgminer' ? D.cgHint : d.kind === 'axeos' && !d.registered ? D.axeHint : '');
+    const canPanel = d.kind === 'axeos' || d.kind === 'nmminer';
+    if (d.via !== 'proxy') hints.push(d.kind === 'esp32' ? D.espHint : d.kind === 'cgminer' ? D.cgHint : canPanel && !d.registered ? D.axeHint : '');
     let axeTip = null;
     for (const t of [info.join(' · '), ...hints].filter(Boolean)) { const x = document.createElement('div'); x.className = 'hint'; x.textContent = t; row.appendChild(x); if (t === D.axeHint) axeTip = x; }
-    if (d.kind === 'axeos' && !d.registered) {
+    if (canPanel && !d.registered) {
       const b = document.createElement('button'); b.type = 'button'; b.className = 'ghost'; b.textContent = D.add; b.style.marginTop = '6px';
       b.addEventListener('click', () => {
         const cur = String(el('BITAXES').value || '').trim();

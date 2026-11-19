@@ -65,16 +65,18 @@ test('varredura: reconhece cada tipo e diz se minera pelo proxy', async () => {
     '192.168.0.10 0x1 0x2 aa:bb:cc:00:00:10 * eth0\n192.168.0.20 0x1 0x2 24:0a:c4:00:00:20 * eth0\n' +
     '192.168.0.21 0x1 0x2 24:0a:c4:00:00:21 * eth0\n192.168.0.30 0x1 0x2 11:22:33:00:00:30 * eth0\n');
   const axe = async (ip) => ip === '192.168.0.10' ? { ok: true, data: { model: 'Gamma', hostname: 'bitaxe', worker: 'bitaxe1', hashRate: 1.2e12, pool: { url: '192.168.0.134', port: 3335 } } }
-    : ip === '192.168.0.11' ? { ok: true, data: { model: 'Gamma', hostname: 'bitaxe2', worker: 'bitaxe2', hashRate: 1.1e12, pool: { url: 'solo.ckpool.org', port: 3333 } } } : { ok: false };
+    : ip === '192.168.0.11' ? { ok: true, data: { model: 'Gamma', hostname: 'bitaxe2', worker: 'bitaxe2', hashRate: 1.1e12, pool: { url: 'solo.ckpool.org', port: 3333 } } }
+    : ip === '192.168.0.12' ? { ok: true, data: { kind: 'nmminer', model: 'NMMiner', hostname: 'NMTV154_47d2cb', worker: 'nmminer', hashRate: 1.04e6, pool: { url: '192.168.0.134', port: 3335 } } } : { ok: false };
   const cg = async (ip) => ip === '192.168.0.40' ? { ok: true, data: { model: 'Avalon Nano3', hashRate: 4e12, pool: { url: 'pool.example', port: 3333, user: 'x.avalon' } } } : { ok: false };
   const out = await d.scan(['192.168.0.134'], {
-    hosts: ['192.168.0.10', '192.168.0.11', '192.168.0.20', '192.168.0.21', '192.168.0.30', '192.168.0.40'], arpFile: arp, probeAxe: axe, probeCg: cg,
+    hosts: ['192.168.0.10', '192.168.0.11', '192.168.0.12', '192.168.0.20', '192.168.0.21', '192.168.0.30', '192.168.0.40'], arpFile: arp, probeAxe: axe, probeCg: cg,
     known: { ourHosts: ['192.168.0.134', 'homeminer.local'], workers: { '192.168.0.21': 'nerdminer', '192.168.0.30': 'macbook' }, bitaxes: [{ name: 'bitaxe1', host: '192.168.0.10' }] },
   });
   const by = Object.fromEntries(out.map((x) => [x.ip, x]));
-  assert.deepStrictEqual(out.map((x) => x.ip), ['192.168.0.10', '192.168.0.11', '192.168.0.20', '192.168.0.21', '192.168.0.30', '192.168.0.40']);
+  assert.deepStrictEqual(out.map((x) => x.ip), ['192.168.0.10', '192.168.0.11', '192.168.0.12', '192.168.0.20', '192.168.0.21', '192.168.0.30', '192.168.0.40']);
   assert.strictEqual(by['192.168.0.10'].via, 'proxy'); assert.strictEqual(by['192.168.0.10'].registered, 'bitaxe1');
   assert.strictEqual(by['192.168.0.11'].via, 'direct'); assert.strictEqual(by['192.168.0.11'].registered, null);
+  assert.strictEqual(by['192.168.0.12'].kind, 'nmminer'); assert.strictEqual(by['192.168.0.12'].model, 'NMMiner'); assert.strictEqual(by['192.168.0.12'].via, 'proxy'); assert.strictEqual(by['192.168.0.12'].worker, 'nmminer');
   assert.strictEqual(by['192.168.0.20'].kind, 'esp32'); assert.strictEqual(by['192.168.0.20'].via, 'unknown');
   assert.strictEqual(by['192.168.0.21'].kind, 'esp32'); assert.strictEqual(by['192.168.0.21'].via, 'proxy'); assert.strictEqual(by['192.168.0.21'].proxyWorker, 'nerdminer');
   assert.strictEqual(by['192.168.0.30'].kind, 'proxy'); assert.strictEqual(by['192.168.0.30'].proxyWorker, 'macbook');

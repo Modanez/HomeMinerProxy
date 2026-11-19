@@ -82,11 +82,20 @@ async function tickBitaxe() {
     bitaxeState.set(b.name, st);
     const r = await bitaxe.info(b.host);
     st.at = Date.now();
+    if (r.ok && r.data.kind === 'nmminer') {
+      // NMMiner /api/system/info não informa se está na secundária: confere /api/setting/mining a cada 5 min
+      if (!st.msAt || st.at - st.msAt >= BITAXE_HIST_MS) {
+        st.msAt = st.at;
+        const ms = await bitaxe.miningSettings(b.host).catch(() => ({ ok: false }));
+        if (ms.ok) st.miningSettings = ms;
+      }
+      if (st.miningSettings) r.data.pool.fallback = bitaxe.nmminerFallback(r.data.pool, st.miningSettings);
+    }
     st.alerts = bitaxe.evaluate(st.alerts, r, BITAXE_LIMITS, st.at);
     if (!r.ok) { st.ok = false; st.error = r.error; st.fails++; continue; }
     Object.assign(st, { ok: true, okAt: st.at, error: null, fails: 0, data: r.data });
     // scoreboard do AxeOS (top 20 do próprio Bitaxe): a cada 5 min basta; firmware sem a rota → para de pedir por 6 h
-    if (!st.sbAt || st.at - st.sbAt >= (st.sbMissing ? 6 * 3600e3 : BITAXE_HIST_MS)) {
+    if (r.data.kind !== 'nmminer' && (!st.sbAt || st.at - st.sbAt >= (st.sbMissing ? 6 * 3600e3 : BITAXE_HIST_MS))) {
       st.sbAt = st.at;
       const sb = await bitaxe.scoreboard(b.host).catch(() => ({ ok: false }));
       if (sb.ok) { st.scoreboard = sb.list; st.sbMissing = false; } else if (['http404', 'noscoreboard', 'json'].includes(sb.error)) st.sbMissing = true;
@@ -99,17 +108,24 @@ async function tickBitaxe() {
     }
   }
 }
-// ---------------------------------------------------------------- ações no Bitaxe (fase 3), sempre atrás do PIN ou do chat autorizado
-// Para onde apontar um Bitaxe: este servidor, a porta ASIC do proxy (atlaspool, senão ckpool), endereço.nome, reserva no ckpool
-function bitaxePointTarget(b) {
+// ---------------------------------------------------------------- ações no Bitaxe / NMMiner (fase 3), sempre atrás do PIN ou do chat autorizado
+// Para onde apontar um aparelho: este servidor, a porta do proxy que combina com ele e a reserva
+function bitaxePointTarget(b, kind = 'axeos') {
   if (!ADDRESS) return { ok: false, error: 'noaddress' };
-  // só IP da rede de casa (nunca o do Tailscale, 100.x, que o Bitaxe não alcança); BITAXE_SERVER_IP força um
+  // só IP da rede de casa (nunca o do Tailscale, 100.x, que o aparelho não alcança); BITAXE_SERVER_IP força um
   const forced = (process.env.BITAXE_SERVER_IP || '').trim();
   const ip = forced && bitaxe.isPrivateHost(forced) ? forced : require('./setup').lanAddresses().find((a) => bitaxe.isPrivateHost(a) && /^\d+\.\d+\.\d+\.\d+$/.test(a));
   if (!ip) return { ok: false, error: 'nohost' };
   const routes = proxy.routes || [];
-  const port = (routes.find((r) => /atlaspool/.test(r.host || '')) || routes.find((r) => /ckpool/.test(r.host || '') && !/eusolo/.test(r.host || '')) || {}).listen || 3338;
   const user = `${ADDRESS}.${b.name}`;
+  if (kind === 'nmminer') {
+    const mainR = routes.find((r) => /nerdminers/.test(r.host || '')) || routes.find((r) => /bitronics/.test(r.host || '') && !/asic|group/i.test(r.label || '')) || {};
+    const port = mainR.listen || 3335;
+    const altR = routes.find((r) => (/bitronics|nerdminers/.test(r.host || '')) && !/asic|group/i.test(r.label || '') && r.listen !== port);
+    const backup = altR ? { url: ip, port: altR.listen, user } : { url: 'pool.nerdminers.org', port: 3333, user };
+    return { ok: true, main: { url: ip, port, user }, backup };
+  }
+  const port = (routes.find((r) => /atlaspool/.test(r.host || '')) || routes.find((r) => /ckpool/.test(r.host || '') && !/eusolo/.test(r.host || '')) || {}).listen || 3338;
   return { ok: true, main: { url: ip, port, user }, backup: { url: 'solo.ckpool.org', port: 3333, user } };
 }
 async function bitaxeAction(name, action, params = {}, via = 'painel') {
@@ -117,8 +133,11 @@ async function bitaxeAction(name, action, params = {}, via = 'painel') {
   if (!b) return { ok: false, error: 'nobitaxe' };
   if (!bitaxeState.has(b.name)) bitaxeState.set(b.name, { ok: false, at: 0, okAt: 0, error: null, fails: 0, data: null, hist: [] });
   const st = bitaxeState.get(b.name);
+  const knownKind = st.data && st.data.kind;
   let r;
-  if (['restart', 'identify', 'pause', 'resume'].includes(action)) {
+  if (knownKind === 'nmminer' && ['identify', 'pause', 'resume', 'fan'].includes(action)) {
+    r = { ok: false, error: 'unsupported' };
+  } else if (['restart', 'identify', 'pause', 'resume'].includes(action)) {
     if (action === 'restart') st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
     r = await bitaxe.simpleAction(b.host, action);
   } else if (action === 'fan') {
@@ -132,21 +151,39 @@ async function bitaxeAction(name, action, params = {}, via = 'painel') {
       if (!applied) r = { ok: false, error: 'notapplied' };
     }
   } else if (action === 'point-preview' || action === 'point') {
-    const target = bitaxePointTarget(b);
-    if (!target.ok) return target;
     const cur = await bitaxe.info(b.host);
     if (!cur.ok) return cur;
+    const curKind = (cur.data && cur.data.kind) || knownKind || 'axeos';
+    const target = bitaxePointTarget(b, curKind);
+    if (!target.ok) return target;
     const current = { url: cur.data.pool.url, port: cur.data.pool.port, worker: cur.data.worker, fallback: cur.data.pool.fallback };
-    if (action === 'point-preview') return { ok: true, current, next: target.main, backup: target.backup, same: bitaxe.poolMatches(cur.raw, target.main) };
-    r = await bitaxe.patch(b.host, bitaxe.poolPatch(cur.raw, target.main, target.backup));
-    if (r.ok) {
-      const chk = await bitaxe.info(b.host);
-      if (!chk.ok || !bitaxe.poolMatches(chk.raw, target.main)) r = { ok: false, error: 'notapplied' };
-      else {
-        // a pool nova só vale depois de reiniciar
-        st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
-        await bitaxe.simpleAction(b.host, 'restart');
-        r = { ok: true, next: target.main };
+    if (curKind === 'nmminer') {
+      const ms = await bitaxe.miningSettings(b.host);
+      if (!ms.ok) return ms;
+      if (action === 'point-preview') return { ok: true, current, next: target.main, backup: target.backup, same: bitaxe.poolMatches(ms.raw, target.main) };
+      r = await bitaxe.request(b.host, 'POST', '/api/setting/mining', bitaxe.poolPatch(ms.raw, target.main, target.backup));
+      if (r.ok) {
+        const chk = await bitaxe.miningSettings(b.host);
+        if (!chk.ok || !bitaxe.poolMatches(chk.raw, target.main)) r = { ok: false, error: 'notapplied' };
+        else {
+          st.miningSettings = chk;
+          st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
+          await bitaxe.simpleAction(b.host, 'restart');
+          r = { ok: true, next: target.main };
+        }
+      }
+    } else {
+      if (action === 'point-preview') return { ok: true, current, next: target.main, backup: target.backup, same: bitaxe.poolMatches(cur.raw, target.main) };
+      r = await bitaxe.patch(b.host, bitaxe.poolPatch(cur.raw, target.main, target.backup));
+      if (r.ok) {
+        const chk = await bitaxe.info(b.host);
+        if (!chk.ok || !bitaxe.poolMatches(chk.raw, target.main)) r = { ok: false, error: 'notapplied' };
+        else {
+          // a pool nova só vale depois de reiniciar
+          st.alerts = { ...(st.alerts || {}), expectRebootUntil: Date.now() + 5 * 60e3 };
+          await bitaxe.simpleAction(b.host, 'restart');
+          r = { ok: true, next: target.main };
+        }
       }
     }
   } else return { ok: false, error: 'action' };
@@ -1298,14 +1335,16 @@ const PAGE = `<!doctype html>
   .bx { border:1px solid var(--line); border-radius:10px; padding:10px 12px; }
   .bx .bxh { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:baseline; }
   .bx .bxh b { font-size:15px; }
-  .bx .bxh a { margin-left:auto; font-size:12px; color:var(--dim); }
+  .bx .bxh .bx-tools { margin-left:auto; display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+  .bx .bxh a { font-size:12px; color:var(--dim); }
   .bx .bxh a.axeos { font-size:13px; color:var(--ok); border:1px solid var(--line); border-radius:8px; padding:3px 9px; text-decoration:none; }
   .bx .bxh a.axeos span { color:var(--dim); }
-  .bx .bxh a.axeos + a { margin-left:12px; }   /* só o primeiro link empurra para a direita; dois "auto" centralizavam quando quebrava a linha */
+  .bx .bxh button.bxr { background:none; border:1px solid var(--line); color:var(--dim); border-radius:8px; padding:3px 9px; font:inherit; font-size:12px; cursor:pointer; }
+  .bx .bxh button.bxr:hover { border-color:var(--gold); color:var(--gold); }
+  body.kiosk .bx .bxh .bx-tools { display:none; }
   @media (max-width:560px) {
     .bx .bxh .sub { flex-basis:100%; }
-    .bx .bxh a.axeos { margin-left:0; }
-    .bx .bxh a.axeos + a { margin-left:auto; }
+    .bx .bxh .bx-tools { margin-left:0; width:100%; justify-content:space-between; }
   }
   .nw-src { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:10px; }
   .nw-src button { background:none; border:1px solid var(--line); color:var(--dim); border-radius:999px; padding:3px 11px; font:inherit; font-size:12px; cursor:pointer; }
@@ -1987,7 +2026,7 @@ function renderProxyExtras(p) {
   ul.innerHTML = (p.events || []).map((e) => '<li>' + (icon[e.type] || '•') + ' ' + hora(e.at) + ' — ' + esc(e.msg) + '</li>').join('') || '<li>nenhum evento ainda</li>';
 }
 
-const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: '🌐 AxeOS', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras', sb: '🏆 Top 20 do Bitaxe', sbBest: 'melhor', sbHint: 'os melhores shares guardados no próprio Bitaxe (scoreboard do AxeOS)' };
+const BXT = { noAnswer: 'sem resposta', hash: 'Hashrate (10 min)', of: 'de', expected: 'esperado', chip: 'Chip', vr: 'Regulador', power: 'Consumo', fan: 'Fan', freq: 'Frequência', pool: 'Pool', backup: 'reserva', best: 'Melhor da sessão', up: 'Ligado há', wifi: 'Wi-Fi', paused: 'pausado', overheat: 'superaquecido: o AxeOS baixou a frequência', powerFault: 'falha de energia (confira a fonte)', hwFault: 'falha de hardware', open: '🌐 AxeOS', last: 'última leitura', hot: 'chip quente', vrhot: 'regulador quente', lowhash: 'hashrate baixo', onBackup: 'na pool reserva', reboots: 'reinícios', lastAct: 'Última ação', acts: { restart: 'reiniciar', identify: 'identificar', pause: 'pausar', resume: 'retomar', fan: 'fan', point: 'apontar para o proxy' }, actFail: 'falhou', actions: 'ações ⚙️', restartBtn: '↻ Reiniciar', chHash: 'Hashrate · 24 h', chTemp: 'Chip · 24 h', chWait: 'o gráfico aparece depois de 10 min de leituras', sb: '🏆 Top 20 do Bitaxe', sbBest: 'melhor', sbHint: 'os melhores shares guardados no próprio Bitaxe (scoreboard do AxeOS)' };
 // Gráficos de 24 h do Bitaxe: dois pequenos lado a lado (hashrate e chip), cada um com o seu eixo, nunca dois eixos no mesmo
 const BXCH = {};   // id do gráfico → pontos, para o tooltip
 function bxChart(id, title, pts, fmt) {
@@ -2042,10 +2081,12 @@ function renderBitaxes(j) {
   const st = (label, val) => '<div><span>' + label + '</span>' + val + '</div>';
   $('bxlist').innerHTML = list.map((b) => {
     const d = b.data;
+    const nm = d && d.kind === 'nmminer';
     const addr = (d && d.ip) || b.host;   // IP primeiro: nome .local não abre em todo celular
-    const link = /^[0-9A-Za-z_.:-]+$/.test(addr) ? '<a class="axeos" href="http://' + esc(addr) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + ' <span>' + esc(addr) + '</span> ↗</a>' : '';
+    const link = !nm && /^[0-9A-Za-z_.:-]+$/.test(addr) ? '<a class="axeos" href="http://' + esc(addr) + '/" target="_blank" rel="noopener noreferrer">' + BXT.open + ' <span>' + esc(addr) + '</span> ↗</a>' : '';
+    const tools = '<span class="bx-tools">' + link + '<button type="button" class="bxr" data-bxr="' + esc(b.name) + '">' + BXT.restartBtn + '</button><a href="/config#miners">' + BXT.actions + '</a></span>';
     const head = '<div class="bxh"><b>' + esc(b.name) + '</b><span class="sub">' + esc([d && d.model, d && d.version, b.host].filter(Boolean).join(' · ')) + '</span>' +
-      (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + link + '<a href="/config#miners">' + BXT.actions + '</a></div>';
+      (!b.fresh ? '<span class="temp hot">' + BXT.noAnswer + (b.okAt ? ' · ' + BXT.last + ' ' + agoTxt(b.okAt) : '') + '</span>' : '') + tools + '</div>';
     if (!d) return '<div class="bx">' + head + '</div>';
     const hr = d.hashRate10m || d.hashRate;
     const al = b.alerts || {};
@@ -2053,11 +2094,11 @@ function renderBitaxes(j) {
       d.paused && BXT.paused, d.overheat && BXT.overheat, d.powerFault && BXT.powerFault, d.hardwareFault && BXT.hwFault].filter(Boolean);
     return '<div class="bx">' + head + '<div class="bxg">' +
       st(BXT.hash, fmtHash(hr) + (d.expected ? ' <span>' + BXT.of + ' ' + fmtHash(d.expected) + ' ' + BXT.expected + '</span>' : '')) +
-      st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + tmp(d.tempC, 1) + '</b>' : '–') +
+      (d.tempC != null || !nm ? st(BXT.chip, d.tempC != null ? '<b class="' + bxTemp(d.tempC) + '">' + tmp(d.tempC, 1) + '</b>' : '–') : '') +
       (d.vrTempC != null ? st(BXT.vr, tmp(d.vrTempC, 1)) : '') +
-      st(BXT.power, (d.watts != null ? nf(d.watts, 1) + ' W' : '–') + (d.jth ? ' · ' + nf(d.jth, 1) + ' J/TH' : '')) +
-      st(BXT.fan, (d.fanPct != null ? nf(d.fanPct) + '%' : '–') + (d.fanRpm ? ' · ' + nf(d.fanRpm) + ' RPM' : '')) +
-      st(BXT.freq, (d.freqMhz != null ? nf(d.freqMhz) + ' MHz' : '–') + (d.coreMv ? ' · ' + nf(d.coreMv) + ' mV' : '')) +
+      (d.watts != null || d.jth || !nm ? st(BXT.power, (d.watts != null ? nf(d.watts, 1) + ' W' : '–') + (d.jth ? ' · ' + nf(d.jth, 1) + ' J/TH' : '')) : '') +
+      (d.fanPct != null || d.fanRpm || !nm ? st(BXT.fan, (d.fanPct != null ? nf(d.fanPct) + '%' : '–') + (d.fanRpm ? ' · ' + nf(d.fanRpm) + ' RPM' : '')) : '') +
+      (d.freqMhz != null || d.coreMv || !nm ? st(BXT.freq, (d.freqMhz != null ? nf(d.freqMhz) + ' MHz' : '–') + (d.coreMv ? ' · ' + nf(d.coreMv) + ' mV' : '')) : '') +
       st(BXT.pool, esc((d.pool.url || '–') + (d.pool.port ? ':' + d.pool.port : '')) + (d.pool.fallback ? ' <b class="warm">(' + BXT.backup + ')</b>' : '')) +
       st(BXT.best, d.bestSessionDiff != null ? nf(d.bestSessionDiff, 0) : '–') +
       st(BXT.up, d.uptimeS != null ? dur(d.uptimeS * 1000) : '–') +
@@ -2674,37 +2715,48 @@ function renderHistory(j) {
   }
 }
 
-let savedPin = '', pendingPlug = null;
+let savedPin = '', pendingPin = null;
 const PLUG_ERR = { selfplug: 'Essa tomada alimenta o próprio servidor: desligue pelo app da tomada', sonoffoffline: 'O Sonoff não respondeu (confira o IP e o modo LAN/DIY)', sonofflan: 'O modo LAN/DIY do Sonoff está desligado', tuyamissing: 'Faltam as credenciais da Tuya em /config', tuyaoffline: 'A tomada está offline na nuvem Tuya (sem Wi-Fi ou sem energia). Confira o app SmartLife', tuyaauth: 'A Tuya recusou o comando' };
-function askPlugAction(deviceId, action) {
-  pendingPlug = { deviceId, action };
+const BX_ERR = { nobitaxe: 'Aparelho não cadastrado', unsupported: 'Este firmware não tem essa ação', offline: 'O aparelho não respondeu', timeout: 'O aparelho não respondeu a tempo' };
+const PIN_ERR = { wrong: 'PIN errado', nopin: 'SETTINGS_PIN não definido', locked: 'Muitas tentativas erradas. Espere 15 minutos.' };
+function openPinModal(task) {
+  pendingPin = task;
   set('enPinMsg', '');
-  if (savedPin) return execPlugAction(savedPin);
+  if (savedPin) return execPinAction(savedPin);
   $('enPinInp').value = '';
   $('enPin').hidden = false;
   setTimeout(() => $('enPinInp').focus(), 0);
 }
-async function execPlugAction(pinVal) {
-  if (!pendingPlug) return;
-  const { deviceId, action } = pendingPlug;
+const askPlugAction = (deviceId, action) => openPinModal({ kind: 'plug', deviceId, action });
+const askBxAction = (name, action) => openPinModal({ kind: 'bitaxe', name, action });
+async function execPinAction(pinVal) {
+  if (!pendingPin) return;
+  const task = pendingPin, isBx = task.kind === 'bitaxe';
+  const url = isBx ? '/api/config/bitaxe-action' : '/api/plug';
+  const body = isBx ? { pin: pinVal, name: task.name, action: task.action, params: {} } : { pin: pinVal, deviceId: task.deviceId, action: task.action };
+  const errs = isBx ? BX_ERR : PLUG_ERR;
   try {
-    const r = await fetch('/api/plug', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ pin: pinVal, deviceId, action }) }).then((x) => x.json());
+    const r = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).then((x) => x.json());
     if (!r.ok) {
       savedPin = '';
       $('enPin').hidden = false;
-      set('enPinMsg', r.error === 'wrong' ? 'PIN errado' : (PLUG_ERR[r.error] || r.error || 'erro'));
-      if (PLUG_ERR[r.error]) savedPin = pinVal;   // o PIN estava certo; o problema foi a tomada
+      set('enPinMsg', errs[r.error] || PIN_ERR[r.error] || r.error || 'erro');
+      if (errs[r.error]) savedPin = pinVal;   // o PIN estava certo; o problema foi o aparelho
       return;
     }
     savedPin = pinVal;
-    pendingPlug = null;
+    pendingPin = null;
     $('enPin').hidden = true;
     $('enPinInp').value = '';
     set('enPinMsg', '');
     load();
   } catch (_) { set('enPinMsg', 'erro'); }
 }
-$('enPinOk').addEventListener('click', () => execPlugAction($('enPinInp').value.trim()));
+$('enPinOk').addEventListener('click', () => execPinAction($('enPinInp').value.trim()));
+$('bxlist').addEventListener('click', (e) => {
+  const btn = e.target.closest('button[data-bxr]');
+  if (btn && !document.body.classList.contains('kiosk')) askBxAction(btn.dataset.bxr, 'restart');
+});
 // doação: copiar funciona mesmo sem HTTPS (o painel abre por http na rede de casa)
 const DN = { copied: 'Endereço copiado. Obrigado! 🧡', select: 'Selecionado: use Ctrl+C / Copiar.' };
 $('dnCopy').addEventListener('click', async () => {
@@ -2775,11 +2827,11 @@ const closeDonate = () => { $('donateModal').hidden = true; set('dnOk', ''); };
 $('dnClose').addEventListener('click', closeDonate);
 $('donateModal').addEventListener('click', (e) => { if (e.target === $('donateModal')) closeDonate(); });
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('donateModal').hidden) closeDonate(); });
-const closePin = () => { pendingPlug = null; $('enPin').hidden = true; set('enPinMsg', ''); };
+const closePin = () => { pendingPin = null; $('enPin').hidden = true; set('enPinMsg', ''); };
 $('enPinCancel').addEventListener('click', closePin);
 $('enPin').addEventListener('click', (e) => { if (e.target === $('enPin')) closePin(); });   // toque fora da caixa fecha
 document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('enPin').hidden) closePin(); });
-$('enPinInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); execPlugAction($('enPinInp').value.trim()); } });
+$('enPinInp').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); execPinAction($('enPinInp').value.trim()); } });
 
 // ------------------------------------------------ narrador sarcástico
 const RAIO_ANO = 1.2e6;   // chance aproximada de uma pessoa ser atingida por um raio em um ano
@@ -3074,8 +3126,8 @@ function requestHandler(req, res) {
     telegramApi: process.env.TELEGRAM_API,
     tuyaApi: process.env.TUYA_API,
     bitaxeAction: (name, action, params) => bitaxeAction(name, action, params, 'config'),
-    bitaxeList: () => bitaxesView().map((b) => ({ name: b.name, host: b.host, fresh: b.fresh, paused: !!(b.data && b.data.paused), autoFan: b.data ? b.data.autoFan : null,
-      tempTarget: b.data ? b.data.tempTarget : null, fanPct: b.data ? b.data.fanPct : null, lastAction: b.lastAction })),
+    bitaxeList: () => bitaxesView().map((b) => ({ name: b.name, host: b.host, fresh: b.fresh, kind: b.data ? b.data.kind : null, model: b.data ? b.data.model : null,
+      paused: !!(b.data && b.data.paused), autoFan: b.data ? b.data.autoFan : null, tempTarget: b.data ? b.data.tempTarget : null, fanPct: b.data ? b.data.fanPct : null, lastAction: b.lastAction })),
     // descoberta na rede: IP de cada worker conectado ao proxy (o aparelho que já minera por aqui)
     discoverKnown: () => ({ workers: Object.fromEntries(Object.entries(proxy.workers || {}).filter(([, w]) => w && w.ip).map(([n, w]) => [String(w.ip).replace(/^::ffff:/, ''), n])) }),
     pools: () => ({ routes: proxy.routes && proxy.routes.length ? proxy.routes : null, hosts: [os.hostname().split('.')[0] + '.local', ...require('./setup').lanAddresses()], address: ADDRESS || null }),
@@ -3351,6 +3403,9 @@ module.exports = {
   tickOcean,
   tickProxy,
   tickTuya,
+  tickBitaxe,
+  bitaxeAction,
+  bitaxePointTarget,
   getJson,
   getJsonRetry,
   initTuya,

@@ -104,7 +104,8 @@ async function scan(addresses, { known = {}, timeoutMs = 1200, concurrency = 48,
       const [axe, cg] = await Promise.all([probeAxe(ip, timeoutMs).catch(() => ({ ok: false })), probeCg(ip, timeoutMs).catch(() => ({ ok: false }))]);
       if (axe && axe.ok) {
         const d = axe.data;
-        found.set(ip, { ip, kind: 'axeos', model: d.model || 'AxeOS', name: d.hostname || null, worker: d.worker || null, hashRate: d.hashRate ?? null,
+        const kind = d.kind === 'nmminer' ? 'nmminer' : 'axeos';
+        found.set(ip, { ip, kind, model: d.model || (kind === 'nmminer' ? 'NMMiner' : 'AxeOS'), name: d.hostname || null, worker: d.worker || null, hashRate: d.hashRate ?? null,
           pool: d.pool && d.pool.url ? { url: d.pool.url, port: d.pool.port ?? null, user: d.pool.user || null } : null });
       } else if (cg && cg.ok) {
         found.set(ip, { ip, kind: 'cgminer', model: cg.data.model, name: null, worker: cg.data.pool && cg.data.pool.user ? String(cg.data.pool.user).split('.').slice(1).join('.') || null : null,
