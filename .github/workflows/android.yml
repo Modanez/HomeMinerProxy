@@ -1,0 +1,75 @@
+name: Fire TV app
+
+# App do Fire TV / Android TV (android/): abre o painel em modo quiosque em tela cheia.
+# - release publicada: gera o APK e anexa na release (homeminer-tv.apk)
+# - manual com "tag" (ex.: v0.7.0): gera o APK daquela versão e anexa na release
+# - pull request / push na main mexendo em android/: só confere que compila (artefato por 14 dias)
+# Assinatura fixa (para atualizar por cima no Fire Stick): secrets ANDROID_KEYSTORE_BASE64, ANDROID_KEYSTORE_PASSWORD
+# e ANDROID_KEY_ALIAS (ANDROID_KEY_PASSWORD se for diferente). Sem eles, sai com a chave de debug.
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release para anexar o APK (ex.: v0.7.0); vazio = só artefato'
+        default: ''
+  pull_request:
+    paths: ['android/**', '.github/workflows/android.yml']
+  push:
+    branches: [main]
+    paths: ['android/**', '.github/workflows/android.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  apk:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.inputs.tag || '' }}
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Keystore
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/release.jks"
+            echo "ANDROID_KEYSTORE_FILE=$RUNNER_TEMP/release.jks" >> "$GITHUB_ENV"
+          else
+            echo "::notice::sem ANDROID_KEYSTORE_BASE64: APK assinado com a chave de debug (para atualizar, desinstale antes)"
+          fi
+      - name: Build
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          ver=$(node -p "require('./package.json').version")
+          gradle -p android assembleRelease -PappVersion="$ver" -PappCode=${{ github.run_number }} --no-daemon
+          cp android/app/build/outputs/apk/release/app-release.apk homeminer-tv.apk
+          sha256sum homeminer-tv.apk > homeminer-tv.apk.sha256
+          ls -la homeminer-tv.apk
+      - name: Attach to the release
+        if: github.event_name == 'release' || github.event.inputs.tag != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name || github.event.inputs.tag }}" homeminer-tv.apk homeminer-tv.apk.sha256 --clobber
+      - name: Keep as artifact
+        if: github.event_name != 'release' && github.event.inputs.tag == ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: homeminer-tv
+          path: |
+            homeminer-tv.apk
+            homeminer-tv.apk.sha256
+          retention-days: 14

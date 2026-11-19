@@ -1143,6 +1143,7 @@ const PAGE = `<!doctype html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<script>/* ?vw=1920: página desenhada com 1920 px de largura (app de TV e navegador do Fire Stick, que usariam 960) */(function(){var v=Number(new URLSearchParams(location.search).get("vw"));if(v>=320&&v<=3840)document.querySelector("meta[name=viewport]").setAttribute("content","width="+v);})();</script>
 <title>Fazenda de Mineração</title>
 <!--PWA-->
 <style>
@@ -1243,6 +1244,7 @@ const PAGE = `<!doctype html>
   body.kiosk .dots { display:flex; }
   .dots i { width:8px; height:8px; border-radius:50%; background:var(--line); }
   .dots i.on { background:var(--gold); }
+  .dots.paused::after { content:'⏸'; font-size:11px; color:var(--gold); line-height:8px; }
   h2.sect { font-size:13px; color:var(--dim); text-transform:uppercase; letter-spacing:.08em; margin:22px 0 10px; }
   .page:first-child h2.sect { margin-top:0; }
   body.kiosk h2.sect { display:none; }
@@ -1771,7 +1773,7 @@ function odds(hashrate, D) {
 }
 
 // ------------------------------------------------ rotação das telas (só no kiosk)
-let page = 0, rotT = null, rotS = 20;
+let page = 0, rotT = null, rotS = 20, paused = false;
 const pages = () => Array.from(document.querySelectorAll('.page')).filter((p) => !p.hidden);
 function show(i) {
   const ps = pages();
@@ -1804,6 +1806,15 @@ if (kiosk) {
   setInterval(fitCurrent, 3000);   // os dados chegam depois e mudam a altura (mais workers, conquistas, manchetes)
   window.addEventListener('resize', () => { fitPages(); fitCurrent(); });
   document.addEventListener('click', () => { show(page + 1); schedule(); });
+  // controle remoto da TV (app do Fire TV, navegador da TV) ou teclado: ◀ ▶ trocam de tela, OK/espaço pausa a troca
+  document.addEventListener('keydown', (e) => {
+    const k = e.key;
+    if (k === 'ArrowRight' || k === 'ArrowDown' || k === 'MediaTrackNext') { show(page + 1); if (!paused) schedule(); }
+    else if (k === 'ArrowLeft' || k === 'ArrowUp' || k === 'MediaTrackPrevious') { show(page - 1); if (!paused) schedule(); }
+    else if (k === 'Enter' || k === ' ' || k === 'MediaPlayPause') { paused = !paused; if (paused) clearInterval(rotT); else schedule(); $('dots').classList.toggle('paused', paused); }
+    else return;
+    e.preventDefault();
+  });
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
@@ -2981,7 +2992,7 @@ async function load() {
     if (j.theme) document.body.dataset.theme = j.theme;
     lastData = j;
     lastOcean = j.ocean;
-    if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; schedule(); }
+    if (kiosk && j.rotateS && j.rotateS !== rotS) { rotS = j.rotateS; if (!paused) schedule(); }
     const stale = !j.okAt || Date.now() - j.okAt > (j.staleWarnMs || 600000);
     const px = j.proxy && j.proxy.up;
     set('fo', [...((j.proxy && j.proxy.failover) || []).map((f) => f.returning

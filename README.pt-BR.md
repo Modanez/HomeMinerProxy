@@ -331,6 +331,20 @@ nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u SEU_ENDERECO.bt
 ```
 `chmod +x ~/.termux/boot/01-minerar.sh`. Na Android TV, libere o Termux e o Termux:Boot para rodar em segundo plano (economia de bateria → sem restrição).
 
+## App para TV (Fire TV Stick / Android TV)
+
+O `homeminer-tv.apk`, anexado em cada release, abre o painel em modo quiosque, em tela cheia, na TV. Em relação ao navegador da TV: a tela nunca apaga, a página é desenhada em 1920 × 1080 (o navegador do Fire Stick usa 960 × 540, com letras enormes e pouca coisa por tela), e o controle remoto comanda: ◀ ▶ trocam de tela, OK pausa a troca automática, ☰ (menu) abre a configuração do app.
+
+Instalando no Fire TV Stick:
+1. Configurações → Meu Fire TV → Opções do desenvolvedor: ligue **Apps de fontes desconhecidas** (nos modelos novos, **Instalar apps desconhecidos** → Downloader). Se não aparecer Opções do desenvolvedor: Configurações → Meu Fire TV → Sobre, clique 7 vezes no nome do aparelho.
+2. Instale o **Downloader** (da AFTVnews) pela loja da Amazon.
+3. No Downloader, digite o link do APK da release (`https://github.com/Modanez/HomeMinerProxy/releases/latest/download/homeminer-tv.apk`) e instale.
+4. Na primeira vez que abrir, digite o endereço do painel. No Fire OS o `homeminer.local` muitas vezes não resolve; use o IP da placa (ex.: `http://192.168.0.134`). Marque **Abrir quando a TV ligar** se quiser que ele suba sozinho.
+
+Sem o app, o navegador da TV também ganha a página maior com `http://<ip-da-placa>/?kiosk&vw=1920`.
+
+O APK sai assinado com a chave de debug, a não ser que o repositório tenha os secrets `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD` e `ANDROID_KEY_ALIAS`; com a chave de debug, desinstale a versão antiga antes de instalar uma nova.
+
 ## Dificuldade local (minerador lento em pool de dificuldade alta)
 
 Pools como a ckpool solo (3334) fixam a dificuldade em 10.000. Um processador, TV Box ou celular de poucos MH/s leva dias para mandar um share ali, então o painel não mostra nada e a pool pode derrubar a conexão por inatividade. Com a **dificuldade local** ligada numa porta, o proxy dá ao minerador uma dificuldade do tamanho do hashrate dele (ajustada para cerca de um share a cada 15 s), responde esses shares ele mesmo e conta no painel (hashrate ao vivo, melhor share), e **manda para a pool só os shares que chegam na dificuldade da pool**. A chance de achar um bloco não muda: qualquer share bom para um bloco é bom para a pool e passa.

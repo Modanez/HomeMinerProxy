@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HomeMiner</string>
+    <string name="setup_title">Painel do HomeMinerProxy</string>
+    <string name="setup_url">Endereço do painel (use o IP, ex.: http://192.168.0.134, se o homeminer.local não abrir)</string>
+    <string name="setup_size">Tamanho da página</string>
+    <string name="size_1920">Full HD (1920 × 1080): cabe mais em cada tela</string>
+    <string name="size_1280">Grande (1280 × 720): letras maiores</string>
+    <string name="size_device">Padrão do aparelho</string>
+    <string name="setup_boot">Abrir quando a TV / Fire Stick ligar</string>
+    <string name="setup_hint">No controle: ◀ ▶ trocam de tela · OK pausa · ☰ (menu) abre esta tela</string>
+    <string name="save">Abrir o painel</string>
+    <string name="cancel">Cancelar</string>
+    <string name="err_title">Não consegui abrir o painel</string>
+    <string name="err_retry">Tento de novo em 15 s. Aperte ☰ (menu) no controle para trocar o endereço.</string>
+</resources>

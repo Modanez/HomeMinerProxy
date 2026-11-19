@@ -331,6 +331,20 @@ nohup minerd -a sha256d -o stratum+tcp://homeminer.local:3333 -u YOUR_ADDRESS.bt
 ```
 `chmod +x ~/.termux/boot/01-mine.sh`. On Android TV, allow Termux and Termux:Boot to run in the background (battery optimization → unrestricted).
 
+## TV app (Fire TV Stick / Android TV)
+
+`homeminer-tv.apk`, attached to each release, opens the dashboard in kiosk mode, full screen, on the TV. Compared with the TV's own browser: the screen never sleeps, the page is drawn at 1920 × 1080 (the Fire Stick browser uses 960 × 540, with huge text and little on each screen), and the remote controls it: ◀ ▶ change pages, OK pauses the rotation, ☰ (menu) opens the app settings.
+
+Installing on a Fire TV Stick:
+1. Settings → My Fire TV → Developer options: turn on **Apps from unknown sources** (on newer models, **Install unknown apps** → Downloader). If Developer options isn't there: Settings → My Fire TV → About, click the device name 7 times.
+2. Install **Downloader** (by AFTVnews) from the Amazon store.
+3. In Downloader, type the APK link from the release (`https://github.com/Modanez/HomeMinerProxy/releases/latest/download/homeminer-tv.apk`) and install.
+4. The first time it opens, type the dashboard address. On Fire OS, `homeminer.local` often doesn't resolve; use the board's IP (e.g. `http://192.168.0.134`). Tick **Open when the TV turns on** if you want it to come up by itself.
+
+Without the app, the TV browser also gets the bigger page with `http://<board-ip>/?kiosk&vw=1920`.
+
+The APK is signed with the debug key unless the repository has the `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD` and `ANDROID_KEY_ALIAS` secrets; with the debug key, uninstall the old version before installing a new one.
+
 ## Local difficulty (slow miners on high-difficulty pools)
 
 Pools like ckpool solo (3334) fix the difficulty at 10,000. A CPU, TV box or phone at a few MH/s takes days per share there, so the dashboard shows nothing and the pool may drop it as idle. With **local difficulty** turned on for a port, the proxy gives the miner a difficulty that fits its hashrate (adjusted to about one share every 15 s), answers those shares itself and counts them on the dashboard (live hashrate, best share), and **sends to the pool only the shares that reach the pool's difficulty**. Your chance of finding a block doesn't change: any share good enough for a block is good enough for the pool and goes through.
