@@ -57,7 +57,7 @@ function getJson(host, path, timeoutMs = 5000) {
   });
 }
 
-const num = (v) => { const n = Number(v); return Number.isFinite(n) ? n : null; };
+const num = (v) => { if (v == null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
 // bestDiff vem como número ou como texto com sufixo ("4.29G") conforme a versão
 function parseDiff(v) {
   if (typeof v === 'number') return Number.isFinite(v) ? v : null;
@@ -67,6 +67,24 @@ function parseDiff(v) {
   return Number(m[1]) * mult;
 }
 const ghs = (v) => { const n = num(v); return n != null ? n * 1e9 : null; };
+
+// Separa "[proto://]host[:porta]" de pools do NMMiner ("192.168.0.10:3335", "stratum+tcp://...", ou "N/A:0" no boot)
+function splitPoolUrl(u) {
+  const s = String(u || '').trim();
+  if (!s || /^n\/a(?::0)?$/i.test(s)) return { url: null, port: null };
+  const m = /^(?:[a-z+]+:\/\/)?\[?([^\]\s/:]+)\]?(?::(\d+))?/i.exec(s);
+  if (!m || /^n\/a$/i.test(m[1])) return { url: null, port: null };
+  const port = m[2] ? Number(m[2]) : null;
+  return { url: m[1], port: port > 0 ? port : null };
+}
+// o nome do worker é o que vem depois do ponto no usuário (endereço.bitaxe1)
+// "endereço.worker#grupo" (SOLO Group): o grupo não faz parte do nome do worker
+function workerOf(user) {
+  const u = String(user || '').split('#')[0];
+  return u.includes('.') ? u.slice(u.lastIndexOf('.') + 1) || null : null;
+}
+
+const isNMMiner = (j) => !!(j && typeof j === 'object' && j.identity && typeof j.identity === 'object' && j.miner && typeof j.miner === 'object');
 
 // Pool em uso: campos da 2.14 (stratumURL/stratumUser/isUsingFallbackStratum) ou lista "pools" da 2.15
 function poolOf(j) {
@@ -81,14 +99,63 @@ function poolOf(j) {
     : { url: j.stratumURL || null, port: num(j.stratumPort), user: j.stratumUser || null, fallback };
 }
 
+function normalizeNMMiner(j) {
+  const id = j.identity || {};
+  const m = j.miner || {};
+  const st = j.stratum || {};
+  const temps = j.temps || {};
+  const sp = splitPoolUrl(st.url);
+  return {
+    kind: 'nmminer',
+    model: id.hwModel || 'NMMiner',
+    board: id.boardVersion || null,
+    version: id.fwVersion || null,
+    hostname: id.hostName || null,
+    ip: [id.ipv4, id.ip].find((v) => typeof v === 'string' && /^\d{1,3}(\.\d{1,3}){3}$/.test(v)) || null,
+    hashRate: ghs(m.hashRate),
+    hashRate1m: null,
+    hashRate10m: null,
+    hashRate1h: null,
+    expected: null,
+    tempC: num(temps.asic),
+    vrTempC: num(temps.vcore) || null,
+    watts: null,
+    volts: null,
+    amps: null,
+    jth: null,
+    freqMhz: null,
+    coreMv: null,
+    fanPct: null,
+    fanRpm: null,
+    autoFan: null,
+    tempTarget: null,
+    sharesAccepted: num(m.sAccepted),
+    sharesRejected: num(m.sRejected),
+    bestDiff: parseDiff(m.bestDiffEver),
+    bestSessionDiff: parseDiff(m.bestDiffSession),
+    uptimeS: num(m.uptimeSeconds),
+    resetReason: null,
+    rssi: num(id.rssi),
+    pool: { url: sp.url, port: sp.port, fallback: false },
+    worker: workerOf(st.user),
+    responseMs: null,
+    paused: false,
+    overheat: false,
+    powerFault: false,
+    hardwareFault: false,
+    blockFound: false,
+  };
+}
+
 // /api/system/info → unidades fixas (H/s, °C, W, V, A, MHz, %) e nomes nossos
 function normalize(j) {
   if (!j || typeof j !== 'object') return null;
+  if (isNMMiner(j)) return normalizeNMMiner(j);
   const pool = poolOf(j);
-  const user = String(pool.user || '');
   const hashRate = ghs(j.hashRate);
   const power = num(j.power);
   return {
+    kind: 'axeos',
     model: j.ASICModel || null,
     board: j.boardVersion || null,
     version: j.version || null,
@@ -122,7 +189,7 @@ function normalize(j) {
     pool: { url: pool.url, port: pool.port, fallback: pool.fallback },
     // o nome do worker é o que vem depois do ponto no usuário (endereço.bitaxe1)
     // "endereço.worker#grupo" (SOLO Group): o grupo não faz parte do nome do worker
-    worker: (() => { const u = user.split('#')[0]; return u.includes('.') ? u.slice(u.lastIndexOf('.') + 1) || null : null; })(),
+    worker: workerOf(pool.user),
     responseMs: num(j.responseTime),
     paused: !!j.miningPaused,
     overheat: !!Number(j.overheat_mode),
@@ -154,6 +221,24 @@ async function scoreboard(host, timeoutMs) {
   if (!r.ok) return r;
   const list = normalizeScoreboard(Array.isArray(r.json) ? r.json : r.json && (r.json.scoreboard || r.json.entries));
   return list ? { ok: true, list } : { ok: false, error: 'noscoreboard' };
+}
+
+// Configuração de pools do NMMiner (/api/setting/mining) para detectar fallback e apontar para o proxy
+async function miningSettings(host, timeoutMs) {
+  const r = await getJson(host, '/api/setting/mining', timeoutMs);
+  if (!r.ok) return r;
+  const j = r.json;
+  if (!j || typeof j !== 'object' || (!('PrimaryPool' in j) && !('SecondaryPool' in j))) return { ok: false, error: 'nomining' };
+  const primary = { ...splitPoolUrl(j.PrimaryPool), user: j.PrimaryAddress || null };
+  const secondary = { ...splitPoolUrl(j.SecondaryPool), user: j.SecondaryAddress || null };
+  return { ok: true, primary, secondary, raw: j };
+}
+
+// NMMiner fica preso na pool secundária até reiniciar: detecta comparando a pool ativa com /api/setting/mining
+function nmminerFallback(pool, mining) {
+  if (!pool || !pool.url || !mining || !mining.secondary || !mining.secondary.url) return false;
+  const sameEndpoint = (a, b) => a && b && a.url === b.url && (!a.port || !b.port || Number(a.port) === Number(b.port));
+  return sameEndpoint(pool, mining.secondary) && !sameEndpoint(pool, mining.primary);
 }
 
 // ---------------------------------------------------------------- ações (fase 3)
@@ -188,8 +273,14 @@ function fanPatch(p) {
   return Number.isInteger(f) && f >= 20 && f <= 100 ? { autofanspeed: 0, fanspeed: f } : null;
 }
 
-// Pool principal e reserva, no formato da versão: campos stratum* (2.14) ou a lista "pools" (2.15)
+// Pool principal e reserva, no formato do aparelho: NMMiner (PrimaryPool/SecondaryPool), 2.15 ("pools") ou 2.14 (stratum*)
+const stratumUrl = (v) => `stratum+tcp://${v.url}${v.port ? ':' + v.port : ''}`;
 function poolPatch(raw, main, backup) {
+  if (raw && ('PrimaryPool' in raw || 'SecondaryPool' in raw || isNMMiner(raw))) {
+    const out = { PrimaryPool: stratumUrl(main), PrimaryAddress: main.user, PrimaryPassword: 'x' };
+    if (backup) Object.assign(out, { SecondaryPool: stratumUrl(backup), SecondaryAddress: backup.user, SecondaryPassword: 'x' });
+    return out;
+  }
   if (Array.isArray(raw && raw.pools) && raw.pools.length) {
     const pools = raw.pools.map((p) => ({ ...p }));
     const pi = num(raw.primaryPoolIndex) ?? 0, si = num(raw.secondaryPoolIndex) ?? (pi === 0 ? 1 : 0);
@@ -204,6 +295,10 @@ function poolPatch(raw, main, backup) {
 // Confere na releitura se a pool principal ficou como pedimos (o AxeOS ignora chave errada em silêncio)
 function poolMatches(raw, main) {
   if (!raw) return false;
+  if ('PrimaryPool' in raw || 'SecondaryPool' in raw) {
+    const sp = splitPoolUrl(raw.PrimaryPool);
+    return sp.url === main.url && Number(sp.port) === Number(main.port) && raw.PrimaryAddress === main.user;
+  }
   if (Array.isArray(raw.pools) && raw.pools.length) {
     const p = raw.pools[num(raw.primaryPoolIndex) ?? 0] || {};
     return (p.url || p.stratumURL) === main.url && Number(p.port ?? p.stratumPort) === main.port && (p.user || p.stratumUser) === main.user;
@@ -226,7 +321,7 @@ async function discover(addresses, { timeoutMs = 1200, concurrency = 32, probe =
     while (next < hosts.length) {
       const host = hosts[next++];
       const r = await probe(host, timeoutMs);
-      if (r.ok) found.push({ host, model: r.data.model, hostname: r.data.hostname, worker: r.data.worker, hashRate: r.data.hashRate });
+      if (r.ok) found.push({ host, kind: r.data.kind || 'axeos', model: r.data.model, hostname: r.data.hostname, worker: r.data.worker, hashRate: r.data.hashRate });
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, hosts.length) }, worker));
@@ -273,4 +368,4 @@ function evaluate(prev, reading, limits = {}, now = Date.now()) {
   return { ...s, active };
 }
 
-module.exports = { simpleAction, fanPatch, poolPatch, poolMatches, patch, request, LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, normalize, info, discover, getJson, scoreboard, normalizeScoreboard };
+module.exports = { simpleAction, fanPatch, poolPatch, poolMatches, patch, request, LIMITS, ALERT_KINDS, evaluate, isPrivateHost, parseList, parseDiff, splitPoolUrl, isNMMiner, miningSettings, nmminerFallback, normalize, info, discover, getJson, scoreboard, normalizeScoreboard };

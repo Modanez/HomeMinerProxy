@@ -791,3 +791,84 @@ test('recordes falsos já gravados (menores que um recorde anterior do mesmo wor
   ]);
   assert.deepStrictEqual(out.map((r) => [r.worker, r.value]), [['macbook', 2787.03], ['odroid', 1150.58], ['odroid', 1150.5799], ['odroid', 535.66], ['—', 10]]);
 });
+
+test('NMMiner: tickBitaxe detecta fallback, bitaxePointTarget escolhe rota NerdMiner e /api/config/bitaxe-action reinicia com PIN', async (t) => {
+  const nmm = JSON.parse(JSON.stringify(require('./fixtures/nmminer-2.0.04.json')));
+  nmm.stratum.url = '192.168.68.88:3340';   // na secundária
+  const mining = {
+    PrimaryPool: 'stratum+tcp://192.168.68.88:3335',
+    PrimaryAddress: 'bc1q4c83udktg8jpaq6ew5z73fltzkfasf4wzwv0wm.nmminer',
+    SecondaryPool: 'stratum+tcp://192.168.68.88:3340',
+    SecondaryAddress: 'bc1q4c83udktg8jpaq6ew5z73fltzkfasf4wzwv0wm.nmminer',
+  };
+  let restarted = 0;
+  const server = http.createServer((req, res) => {
+    if (req.url === '/api/system/info') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(nmm)); }
+    if (req.url === '/api/setting/mining' && req.method === 'GET') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(mining)); }
+    if (req.url === '/api/system/restart' && req.method === 'POST') { restarted++; res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end('{"status":"ok"}'); }
+    res.writeHead(404); res.end();
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+
+  const painelPath = require.resolve('../src/painel');
+  const prevCache = require.cache[painelPath];
+  const oldEnv = { BITAXES: process.env.BITAXES, BITAXE_ALLOW_LOOPBACK: process.env.BITAXE_ALLOW_LOOPBACK, SETTINGS_PIN: process.env.SETTINGS_PIN, BITAXE_SERVER_IP: process.env.BITAXE_SERVER_IP };
+  delete require.cache[painelPath];
+  process.env.BITAXES = `nmminer=127.0.0.1:${server.address().port}`;
+  process.env.BITAXE_ALLOW_LOOPBACK = '1';
+  process.env.SETTINGS_PIN = '1234';
+  process.env.BITAXE_SERVER_IP = '192.168.68.88';
+  t.after(() => {
+    for (const [k, v] of Object.entries(oldEnv)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    if (prevCache) require.cache[painelPath] = prevCache;
+    else delete require.cache[painelPath];
+  });
+
+  const p2 = require('../src/painel');
+  p2._state().proxy.routes = [
+    { listen: 3335, host: 'pool.nerdminers.org', label: 'nerdminers' },
+    { listen: 3340, host: 'pool.bitronics.store', label: 'bitronics' },
+    { listen: 3338, host: 'solo.atlaspool.io', label: 'atlaspool' },
+  ];
+  await p2.tickBitaxe();
+  const snap = p2.snapshot();
+  assert.strictEqual(snap.bitaxes[0].fresh, true);
+  assert.strictEqual(snap.bitaxes[0].data.kind, 'nmminer');
+  assert.strictEqual(snap.bitaxes[0].data.pool.fallback, true);
+  assert.deepStrictEqual(snap.bitaxes[0].alerts.fallback, { url: '192.168.68.88', port: 3340 });
+
+  const tgt = p2.bitaxePointTarget({ name: 'nmminer' }, 'nmminer');
+  assert.strictEqual(tgt.ok, true);
+  assert.strictEqual(tgt.main.port, 3335);
+  assert.strictEqual(tgt.backup.port, 3340);
+
+  // ação não suportada em NMMiner volta 'unsupported'
+  const unsup = await p2.bitaxeAction('nmminer', 'pause', {}, 'painel');
+  assert.deepStrictEqual(unsup, { ok: false, error: 'unsupported' });
+
+  // HTTP /api/config/bitaxes + /api/config/bitaxe-action (como o botão da tela envia)
+  const settings = require('../src/settings');
+  const reqRes = (method, url, payload) => new Promise((resolve) => {
+    const req = new (require('stream').Readable)({ read() {} });
+    req.method = method; req.url = url;
+    req.headers = { 'content-type': 'application/json', 'accept-language': 'pt-BR' };
+    const res = {
+      writeHead(code) { this.code = code; },
+      end(body) { resolve({ code: this.code, json: JSON.parse(body) }); },
+    };
+    settings.handle(req, res, {
+      lang: 'pt',
+      bitaxeAction: (name, action, params) => p2.bitaxeAction(name, action, params, 'painel'),
+      bitaxeList: () => snap.bitaxes.map((b) => ({ name: b.name, host: b.host, fresh: b.fresh, kind: b.data.kind, model: b.data.model })),
+    });
+    if (payload) req.push(JSON.stringify(payload));
+    req.push(null);
+  });
+
+  const listRes = await reqRes('GET', '/api/config/bitaxes');
+  assert.strictEqual(listRes.json.list[0].kind, 'nmminer');
+  const actRes = await reqRes('POST', '/api/config/bitaxe-action', { pin: '1234', name: 'nmminer', action: 'restart', params: {} });
+  assert.deepStrictEqual(actRes, { code: 200, json: { ok: true } });
+  assert.strictEqual(restarted, 1);
+});

@@ -1,0 +1,36 @@
+{
+  "identity": {
+    "hwModel": "NMMiner",
+    "hostName": "NMTV154_47d2cb",
+    "fwVersion": "v2.0.04",
+    "rssi": -65
+  },
+  "miner": {
+    "hashRate": 0.001044231,
+    "sAccepted": 27543,
+    "sRejected": 64,
+    "uptimeSeconds": 146530,
+    "uptimeEver": 572168,
+    "networkDiff": "134.8T",
+    "poolDiff": "0.0010 ",
+    "lastDiff": "0.0538 ",
+    "bestDiffSession": "53.754 ",
+    "bestDiffEver": "14.104K",
+    "blkhits": 0,
+    "freeHeap": 50956,
+    "minFreeHeap": 26412
+  },
+  "stratum": {
+    "url": "192.168.68.88:3335",
+    "user": "bc1q4c83udktg8jpaq6ew5z73fltzkfasf4wzwv0wm.nmminer"
+  },
+  "temps": {
+    "vcore": null,
+    "asic": null
+  },
+  "storage": {
+    "fsTotal": 344064,
+    "fsUsed": 8192
+  }
+}
+

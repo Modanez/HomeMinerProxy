@@ -295,3 +295,117 @@ test('scoreboard do AxeOS: top 20 em ordem, "since" vira horário, texto com suf
   assert.strictEqual(bx.normalizeScoreboard({ nope: 1 }), null);
   assert.strictEqual(bx.normalizeScoreboard(Array.from({ length: 30 }, (_, i) => ({ difficulty: i + 1, since: 1 }))).length, 20);
 });
+
+test('NMMiner: normaliza /api/system/info, detecta N/A no boot, configurações de pool e fallback', () => {
+  const nmm = JSON.parse(JSON.stringify(require('./fixtures/nmminer-2.0.04.json')));
+  const d = bx.normalize(nmm);
+  assert.strictEqual(d.kind, 'nmminer');
+  assert.strictEqual(d.model, 'NMMiner');
+  assert.strictEqual(d.version, 'v2.0.04');
+  assert.strictEqual(d.hostname, 'NMTV154_47d2cb');
+  assert.ok(Math.abs(d.hashRate - 1044231) < 1e-6);
+  assert.strictEqual(d.tempC, null);
+  assert.strictEqual(d.vrTempC, null);
+  assert.strictEqual(d.watts, null);
+  assert.strictEqual(d.bestDiff, 14104);
+  assert.strictEqual(d.bestSessionDiff, 53.754);
+  assert.strictEqual(d.uptimeS, 146530);
+  assert.strictEqual(d.rssi, -65);
+  assert.deepStrictEqual(d.pool, { url: '192.168.68.88', port: 3335, fallback: false });
+  assert.strictEqual(d.worker, 'nmminer');
+
+  // no boot antes de conectar: "N/A:0"
+  nmm.stratum.url = 'N/A:0';
+  assert.deepStrictEqual(bx.normalize(nmm).pool, { url: null, port: null, fallback: false });
+
+  // detecção de pool reserva via /api/setting/mining
+  const mining = {
+    primary: { url: '192.168.68.88', port: 3335, user: 'bc1q.nmminer' },
+    secondary: { url: '192.168.68.88', port: 3340, user: 'bc1q.nmminer' },
+  };
+  assert.strictEqual(bx.nmminerFallback({ url: '192.168.68.88', port: 3335 }, mining), false);
+  assert.strictEqual(bx.nmminerFallback({ url: '192.168.68.88', port: 3340 }, mining), true);
+  assert.strictEqual(bx.nmminerFallback({ url: '192.168.68.88', port: 3335 }, { primary: { url: '192.168.68.88', port: 3335 }, secondary: { url: '192.168.68.88', port: 3335 } }), false);
+});
+
+test('NMMiner: info, miningSettings, restart HTTP, poolPatch/poolMatches e alertas sem falso positivo', async (t) => {
+  process.env.BITAXE_ALLOW_LOOPBACK = '1';
+  t.after(() => { delete process.env.BITAXE_ALLOW_LOOPBACK; });
+  const nmm = JSON.parse(JSON.stringify(require('./fixtures/nmminer-2.0.04.json')));
+  let miningCfg = {
+    PrimaryPool: 'stratum+tcp://192.168.68.88:3335',
+    PrimaryAddress: 'bc1q4c83udktg8jpaq6ew5z73fltzkfasf4wzwv0wm.nmminer',
+    PrimaryPassword: 'x',
+    SecondaryPool: 'stratum+tcp://192.168.68.88:3340',
+    SecondaryAddress: 'bc1q4c83udktg8jpaq6ew5z73fltzkfasf4wzwv0wm.nmminer',
+    SecondaryPassword: 'x',
+  };
+  const calls = [];
+  const server = http.createServer((req, res) => {
+    let b = '';
+    req.on('data', (c) => { b += c; });
+    req.on('end', () => {
+      calls.push([req.method, req.url, b]);
+      if (req.url === '/api/system/info' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(nmm));
+      }
+      if (req.url === '/api/setting/mining' && req.method === 'GET') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(miningCfg));
+      }
+      if (req.url === '/api/setting/mining' && req.method === 'POST') {
+        miningCfg = { ...miningCfg, ...JSON.parse(b) };
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end('{"status":"ok"}');
+      }
+      if (req.url === '/api/system/restart' && req.method === 'POST') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end('{"status":"ok"}');
+      }
+      res.writeHead(404);
+      res.end();
+    });
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  t.after(() => server.close());
+  const host = `127.0.0.1:${server.address().port}`;
+
+  const infoRes = await bx.info(host);
+  assert.strictEqual(infoRes.ok, true);
+  assert.strictEqual(infoRes.data.kind, 'nmminer');
+  assert.strictEqual(infoRes.data.worker, 'nmminer');
+
+  const ms = await bx.miningSettings(host);
+  assert.strictEqual(ms.ok, true);
+  assert.strictEqual(ms.secondary.port, 3340);
+
+  // poolPatch & poolMatches no formato NMMiner
+  const main = { url: '192.168.68.88', port: 3335, user: 'bc1qnew.nmminer' };
+  const backup = { url: '192.168.68.88', port: 3340, user: 'bc1qnew.nmminer' };
+  const patchBody = bx.poolPatch(ms.raw, main, backup);
+  assert.deepStrictEqual(patchBody, {
+    PrimaryPool: 'stratum+tcp://192.168.68.88:3335',
+    PrimaryAddress: 'bc1qnew.nmminer',
+    PrimaryPassword: 'x',
+    SecondaryPool: 'stratum+tcp://192.168.68.88:3340',
+    SecondaryAddress: 'bc1qnew.nmminer',
+    SecondaryPassword: 'x',
+  });
+  assert.strictEqual(bx.poolMatches({ ...ms.raw, ...patchBody }, main), true);
+  assert.strictEqual(bx.poolMatches(ms.raw, main), false);
+
+  // ações HTTP: restart funciona; identify/pause retornam unsupported (404)
+  assert.deepStrictEqual(await bx.simpleAction(host, 'restart'), { ok: true });
+  assert.deepStrictEqual(await bx.simpleAction(host, 'identify'), { ok: false, error: 'unsupported' });
+
+  // avaliação de alertas não gera hot/vrhot/lowhash/fault falsos para NMMiner
+  let evState = bx.evaluate(null, infoRes, {}, 0);
+  evState = bx.evaluate(evState, infoRes, {}, 20 * 60e3);
+  assert.deepStrictEqual(evState.active, {});
+
+  // Telegram /status lista o NMMiner sem quebrar por campos nulos
+  const tg = require('../src/telegram');
+  const status = tg.statusText({ farm: { hasData: true, hashrate: 1.04e6, workers: [], shares: { today: 5 } }, bitaxes: [{ name: 'nmminer', fresh: true, data: infoRes.data }] }, { lang: 'pt' });
+  assert.match(status, /🟧 <b>nmminer<\/b> · 1,04 MH\/s/);
+});
