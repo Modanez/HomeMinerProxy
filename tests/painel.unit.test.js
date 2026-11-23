@@ -872,3 +872,31 @@ test('NMMiner: tickBitaxe detecta fallback, bitaxePointTarget escolhe rota NerdM
   assert.deepStrictEqual(actRes, { code: 200, json: { ok: true } });
   assert.strictEqual(restarted, 1);
 });
+
+test('workersView: worker parado com hashRate 0 vira stale em 2 h e inactive após 24 h', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'painel-zero-'));
+  const oldDataDir = process.env.DATA_DIR;
+  process.env.DATA_DIR = dir;
+  const now = Date.now();
+  try {
+    painel.rememberWorkers([
+      { name: 'wZero30m', hashRate: 0, bestDifficulty: 0.3, lastSeen: new Date(now - 30 * 60e3).toISOString() },
+      { name: 'wZero3h', hashRate: 0, bestDifficulty: 0.3, lastSeen: new Date(now - 3 * 3600e3).toISOString() },
+      { name: 'wZero30h', hashRate: 0, bestDifficulty: 0.3, lastSeen: new Date(now - 30 * 3600e3).toISOString() },
+      { name: 'wSlow5h', hashRate: 350000, bestDifficulty: 1, lastSeen: new Date(now - 5 * 3600e3).toISOString() },
+    ], 'nerdminers');
+
+    const byName = Object.fromEntries(painel.workersView().map((w) => [w.name, w]));
+    assert.strictEqual(byName.wZero30m.state, 'quiet');
+    assert.strictEqual(byName.wZero30m.inactive, false);
+    assert.strictEqual(byName.wZero3h.state, 'stale');
+    assert.strictEqual(byName.wZero3h.inactive, false);
+    assert.strictEqual(byName.wZero30h.state, 'stale');
+    assert.strictEqual(byName.wZero30h.inactive, true);
+    assert.strictEqual(byName.wSlow5h.state, 'quiet');
+    assert.strictEqual(byName.wSlow5h.inactive, false);
+  } finally {
+    process.env.DATA_DIR = oldDataDir;
+    fs.rmSync(dir, { recursive: true, force: true });
+  }
+});
