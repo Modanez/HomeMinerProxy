@@ -490,7 +490,8 @@ function workersView() {
       state = 'unknown';
     } else {
       const mins = (now - new Date(lastSeen).getTime()) / 60000;
-      const limit = Math.max(QUIET_MIN, QUIET_SHARES * SHARE_HASHES / Math.max(hashRate, 1) / 60);
+      // sem hashrate medido (0 H/s), usa o mínimo (QUIET_MIN) em vez de dividir por 1 H/s (~544 anos)
+      const limit = hashRate > 0 ? Math.max(QUIET_MIN, QUIET_SHARES * SHARE_HASHES / hashRate / 60) : QUIET_MIN;
       state = mins < limit ? 'quiet' : 'stale';
     }
     // inativo = parado há mais de HIDE_STALE_H horas; a tela esconde por padrão (o arquivo guarda tudo)
