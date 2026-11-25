@@ -53,6 +53,8 @@ function addEvent(type, msg, extra) {
   events.unshift({ at: Date.now(), type, msg, ...extra });
   if (events.length > EVENTS_MAX) events.length = EVENTS_MAX;
 }
+const RACE = require('./race');
+let race = RACE.create();   // aba Corrida: mineradores escolhidos competindo share a share (race.js)
 const cleanIp = (a) => (a ? String(a).replace(/^::ffff:/, '') : null);
 
 // ---------------------------------------------------------------- estatísticas
@@ -110,6 +112,7 @@ try {
   bestHash = saved.bestHash || null;
   dayBestHash = saved.dayBestHash || null;
   if (Array.isArray(saved.hist) && saved.hist.length === HIST_BUCKETS) hist = saved.hist;
+  race = RACE.restore(saved.race);
   // quem estava conectado quando o proxy parou deve voltar sozinho: se não voltar, avisa
   for (const w of Object.values(workers)) if (w.online > 0) awaiting[w.name] = { name: w.name, ip: w.ip || null, since: Date.now(), why: 'restart' };
   for (const w of Object.values(workers)) { w.online = 0; w.window = []; w.subs = []; w.bestSession = 0; }
@@ -130,7 +133,7 @@ function worker(name, pool) {
 function saveStats() {
   const out = {};
   for (const [k, w] of Object.entries(workers)) { const { window, subs, ...rest } = w; out[k] = rest; }
-  try { require('./store').writeJson(STATS_FILE, { savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist }); } catch (_) { /* segue */ }
+  try { require('./store').writeJson(STATS_FILE, { savedAt: Date.now(), workers: out, recent, events, today, week, lastWeek, bestHash, dayBestHash, hist, race }); } catch (_) { /* segue */ }
 }
 setInterval(saveStats, 60e3).unref();
 
@@ -580,6 +583,10 @@ function session(down, route) {
         if (k >= 0) { hist[k]++; (w.hist || (w.hist = new Array(HIST_BUCKETS).fill(0)))[k]++; }
       }
       noteBestHash(w.name, p);
+      if (p.diff > 0 && p.target > 0 && RACE.note(race, w.name, p.at, p.diff, p.target)) {
+        const rc = race.race;
+        addEvent('race', rc.winner ? `🏁 race: ${rc.winner} won (${rc.goal} shares)` : '🏁 race finished', { winner: rc.winner });
+      }
     } else if (s.upIndex > 0 && rejectKind(m.error) === 'low' && p.diff > 0 && p.target > 0 && p.diff < p.target) {
       // na reserva, shares abaixo do mínimo dela são esperados (o ESP32 segue com a dificuldade da pool dele);
       // um share bom de verdade (um bloco) passa do mínimo e é aceito. Conta à parte, sem alerta.
@@ -643,6 +650,29 @@ function startServers() {
 
   const statsServer = http.createServer((req, res) => {
     if (!req.url.startsWith('/stats')) { res.writeHead(404); return res.end(); }
+    if (req.url.split('?')[0] === '/stats/race') {
+      // GET: estado da corrida e as últimas; POST {workers, goal, mode, maxHours}: começa; DELETE: cancela
+      const send = (code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
+      if (req.method === 'DELETE') { const ok = RACE.cancel(race); if (ok) saveStats(); return send(200, { ok, ...RACE.snapshot(race) }); }
+      if (req.method === 'POST') {
+        let body = '', big = false;
+        req.on('data', (c) => { body += c; if (body.length > 8192) { big = true; req.destroy(); } });
+        req.on('end', () => {
+          if (big) return;
+          let j; try { j = JSON.parse(body || '{}'); } catch (_) { return send(400, { ok: false, error: 'json' }); }
+          const r = RACE.start(race, j);
+          if (r.ok) { saveStats(); addEvent('race', `🏁 race started: ${Object.keys(race.race.racers).join(' × ')} · ${race.race.goal} shares`); }
+          send(r.ok ? 200 : 400, r.ok ? { ok: true, ...RACE.snapshot(race) } : r);
+        });
+        return;
+      }
+      // candidatos: quem está conectado, com os shares da última hora (o painel estima quanto tempo a corrida leva)
+      const now = Date.now();
+      const candidates = Object.values(workers).filter((w) => w.online > 0)
+        .map((w) => ({ name: w.name, shares1h: (w.window || []).filter(([t]) => now - t <= 3600e3).length, hashrate: hashrate(w) }))
+        .sort((a, b) => b.hashrate - a.hashrate || a.name.localeCompare(b.name));
+      return send(200, { ...RACE.snapshot(race, now), candidates });
+    }
     if (req.url.startsWith('/stats/worker')) {
       const name = new URL(req.url, 'http://x').searchParams.get('name') || '';
       const w = Object.prototype.hasOwnProperty.call(workers, name) ? workers[name] : null;
