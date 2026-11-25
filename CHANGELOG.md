@@ -3,6 +3,7 @@
 ## Unreleased
 
 ### English
+- **Race page:** pick two or more miners and a goal of accepted shares, and watch them compete share by share (progress bar per miner, latest shares, live ranking). Three ways to decide: **Speed** (first to N shares, fair between identical machines like two Bitaxe), **Average luck** (each mines N shares, best geometric mean of difficulty ÷ requested, fair between different machines) and **Biggest share**. Optional time limit, last 10 races kept, winner in the events, and the race shows up in the kiosk rotation while it runs (and for an hour after). Starting or cancelling only from the home network.
 - Fixed: a stopped worker whose hashrate dropped to 0 H/s stayed stuck as "quiet" (orange dot) forever instead of becoming "stale" and hiding after 24 h, because the expected share interval divided by 1 H/s (~544 years).
 - **TV app (Fire TV Stick / Android TV):** `homeminer-tv.apk`, attached to each release, opens the dashboard in kiosk mode full screen, with the screen always on, the page drawn at 1920 × 1080 instead of 960 × 540, and the remote in control (◀ ▶ change pages, OK pauses, ☰ settings, optional start when the TV turns on). Built by the new **Fire TV app** workflow from `android/`.
 - Kiosk: `?vw=1920` draws the page at that width (TV browsers), and ◀ ▶ / OK on a remote or keyboard change pages and pause the rotation.
@@ -10,6 +11,7 @@
 - SD card images: the release build failed because GitHub's `ubuntu-latest` moved to 26.04, which no longer has `qemu-user-static`; the build now runs on Ubuntu 24.04. The workflow can also be run by hand with a `tag` (e.g. `v0.7.0`) to build that version and attach the images to its release.
 
 ### Português
+- **Aba Corrida:** escolha dois ou mais mineradores e uma meta de shares aceitos, e veja os dois competindo share a share (barra de progresso por minerador, últimos shares, classificação ao vivo). Três jeitos de decidir: **Velocidade** (o primeiro a chegar em N shares, justo entre máquinas iguais como dois Bitaxe), **Média de sorte** (cada um minera N shares, vence a maior média geométrica de dificuldade ÷ pedida, justo entre máquinas diferentes) e **Maior share**. Tempo limite opcional, as últimas 10 corridas guardadas, o vencedor nos eventos, e a corrida entra no rodízio do quiosque enquanto acontece (e por 1 h depois). Largar ou cancelar só da rede de casa.
 - Corrigido: um worker parado cujo hashrate caía para 0 H/s ficava travado para sempre como "sem share recente" (bolinha laranja) em vez de virar "parado" e ser ocultado após 24 h, porque o cálculo dividia por 1 H/s (~544 anos).
 - **App para TV (Fire TV Stick / Android TV):** o `homeminer-tv.apk`, anexado em cada release, abre o painel em modo quiosque em tela cheia, com a tela sempre ligada, a página desenhada em 1920 × 1080 em vez de 960 × 540, e o controle remoto no comando (◀ ▶ trocam de tela, OK pausa, ☰ configuração, abrir ao ligar a TV opcional). Gerado pelo novo workflow **Fire TV app** a partir de `android/`.
 - Quiosque: `?vw=1920` desenha a página nessa largura (navegadores de TV), e ◀ ▶ / OK no controle ou teclado trocam de tela e pausam a troca.

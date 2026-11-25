@@ -1325,6 +1325,46 @@ const PAGE = `<!doctype html>
   .ticket { position:fixed; inset:0; z-index:30; display:none; flex-direction:column; align-items:center; justify-content:center; gap:12px; background:var(--backdrop); padding:16px; }
   .ticket.on { display:flex; }
   .ticket img { max-width:min(92vw, 540px); max-height:78vh; border-radius:10px; box-shadow:0 10px 40px rgba(0,0,0,.5); }
+  /* corrida */
+  #rcBox { display:grid; gap:14px; }
+  .rc-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:6px 14px; margin-bottom:10px; }
+  .rc-head .big { font-size:22px; }
+  .rc-lane { display:grid; grid-template-columns:34px minmax(90px, 160px) 1fr; gap:4px 12px; align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+  .rc-lane:first-of-type { border-top:0; }
+  .rc-place { font-size:20px; text-align:center; }
+  .rc-name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .rc-track { position:relative; height:26px; background:var(--gold-soft); border:1px solid var(--line); border-radius:999px; overflow:visible; }
+  .rc-track > i { position:absolute; left:0; top:0; bottom:0; background:var(--gold); opacity:.35; border-radius:999px; transition:width .6s ease; }
+  .rc-track > b { position:absolute; top:50%; transform:translate(-50%, -50%); font-size:18px; transition:left .6s ease; }
+  .rc-track > s { position:absolute; right:6px; top:50%; transform:translateY(-50%); text-decoration:none; font-size:14px; }
+  .rc-lane.done .rc-track > i { opacity:.7; }
+  .rc-stats { grid-column:3; display:flex; flex-wrap:wrap; gap:2px 14px; font-size:13px; color:var(--dim); }
+  .rc-stats .key { color:var(--gold); font-weight:700; }
+  .rc-dots { grid-column:3; display:flex; gap:3px; flex-wrap:wrap; }
+  .rc-dots i { width:10px; height:10px; border-radius:3px; background:var(--line); }
+  .rc-dots i.g { background:var(--ok); } .rc-dots i.y { background:var(--gold); } .rc-dots i.new { outline:2px solid var(--txt); }
+  .rc-win { font-size:20px; font-weight:700; color:var(--gold); margin:4px 0 8px; }
+  .rc-form { display:grid; gap:12px; }
+  .rc-form .rc-ws { display:flex; flex-wrap:wrap; gap:8px; }
+  .rc-form label.chip { display:flex; align-items:center; gap:6px; border:1px solid var(--line); border-radius:999px; padding:4px 12px; cursor:pointer; }
+  .rc-form label.chip:has(input:checked) { border-color:var(--gold); color:var(--gold); }
+  .rc-form .rc-modes { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:8px; }
+  .rc-form label.mode { border:1px solid var(--line); border-radius:var(--radius); padding:10px 12px; cursor:pointer; font-size:13px; color:var(--dim); }
+  .rc-form label.mode b { display:block; color:var(--txt); font-size:14px; margin-bottom:2px; }
+  .rc-form label.mode:has(input:checked) { border-color:var(--gold); }
+  .rc-form label.mode input { margin-right:6px; }
+  .rc-form input[type=number] { font:inherit; width:110px; padding:6px 8px; border-radius:8px; border:1px solid var(--line); background:var(--bg); color:var(--txt); }
+  .rc-form .row { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
+  .rc-btn { font:inherit; font-size:14px; padding:8px 16px; border-radius:8px; border:1px solid var(--gold); background:var(--card); color:var(--txt); cursor:pointer; }
+  .rc-btn.main { background:var(--gold); color:var(--on-gold); font-weight:700; }
+  .rc-btn.sm { font-size:12px; padding:3px 10px; }
+  .rc-err { color:var(--warn); font-size:13px; }
+  table.rc-hist { width:100%; border-collapse:collapse; font-size:13px; }
+  table.rc-hist td, table.rc-hist th { text-align:left; padding:6px 8px; border-top:1px solid var(--line); }
+  table.rc-hist th { color:var(--dim); font-weight:500; border-top:0; }
+  body.kiosk .rc-form, body.kiosk .rc-btn, body.kiosk .rc-histcard { display:none; }
+  body.kiosk .rc-lane { padding:16px 0; grid-template-columns:48px minmax(120px, 220px) 1fr; } body.kiosk .rc-name { font-size:24px; } body.kiosk .rc-place { font-size:30px; }
+  body.kiosk .rc-track { height:38px; } body.kiosk .rc-track > b { font-size:26px; } body.kiosk .rc-stats { font-size:17px; } body.kiosk .rc-dots i { width:14px; height:14px; }
   .ticket .btns { display:flex; gap:10px; }
   .ticket button { font:inherit; font-size:14px; padding:8px 16px; border-radius:8px; border:1px solid var(--gold); background:var(--card); color:var(--txt); cursor:pointer; }
   .ticket button.main { background:var(--gold); color:var(--on-gold); font-weight:700; }
@@ -1726,6 +1766,12 @@ const PAGE = `<!doctype html>
   </div>
 </section>
 
+<!-- Tela: corrida (mineradores escolhidos, share a share) -->
+<section class="page" data-page="race" hidden>
+  <h2 class="sect">Corrida</h2>
+  <div id="rcBox"></div>
+</section>
+
 <footer class="ver-foot" id="verFoot" hidden><span id="verFootTxt"></span><a href="/config#backup" id="verFootLnk">Ver novidades (changelog) →</a></footer>
 </main>
 </div></div>
@@ -1858,10 +1904,10 @@ if (kiosk) {
 }
 
 // ------------------------------------------------ console (fora do quiosque): menu lateral, uma tela por vez
-const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', price: 'Preço', priceD: 'Variação do preço do bitcoin em 1 dia, 7 dias, 30 dias e 1 ano', news: 'Notícias', newsD: 'Manchetes de bitcoin de sites que publicam RSS', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
+const CX = { overview: 'Visão geral', overviewD: 'Recorde, hashrate, workers e carteira da fazenda', bitaxe: 'Bitaxe', bitaxeD: 'Temperatura, consumo, pool e ações de cada Bitaxe', network: 'Rede Bitcoin', networkD: 'Dificuldade, próximo ajuste, mempool e taxas', price: 'Preço', priceD: 'Variação do preço do bitcoin em 1 dia, 7 dias, 30 dias e 1 ano', news: 'Notícias', newsD: 'Manchetes de bitcoin de sites que publicam RSS', near: 'Quase bloco', nearD: 'O quanto cada share chegou perto de um bloco', luck: 'Sorte', luckD: 'Chance de achar um bloco e o campeonato dos workers', race: 'Corrida', raceD: 'Mineradores escolhidos competindo share a share', history: 'Histórico', historyD: 'Gráficos, hall da fama, saúde do servidor e energia', gFarm: 'Fazenda', gMining: 'Mineração', gOps: 'Operação', pools: 'Pools e portas', discover: 'Descobrir na rede', donate: 'Apoiar o projeto', settings: 'Configurações', kiosk: 'Modo quiosque', workers: 'workers ativos', proxyDown: 'proxy fora do ar', ping: 'ping' };
 const CX_NAV = [
   [CX.gFarm, [['overview', '🏠'], ['bitaxe', '🔥']]],
-  [CX.gMining, [['network', '🌐'], ['price', '💹'], ['news', '📰'], ['near', '🎯'], ['luck', '🍀'], ['history', '📈']]],
+  [CX.gMining, [['network', '🌐'], ['price', '💹'], ['news', '📰'], ['near', '🎯'], ['luck', '🍀'], ['race', '🏁'], ['history', '📈']]],
   [CX.gOps, [['/config#miners', '🔌', CX.pools], ['/config#discover', '🔍', CX.discover], ['/config', '⚙️', CX.settings], ['donate', '❤️', CX.donate]]],
 ];
 const cxPage = () => {
@@ -1877,6 +1923,7 @@ function cxShow(scroll) {
   if (scroll) window.scrollTo(0, 0);
   setTimeout(() => { if (lastData) window.dispatchEvent(new Event('resize')); }, 0);   // gráficos medem a largura ao aparecer
 }
+if (!kiosk) document.querySelector('.page[data-page="race"]').hidden = false;   // no console a aba Corrida sempre aparece (no quiosque, só com corrida)
 if (!kiosk) {
   document.body.classList.add('console');
   $('cxNav').innerHTML = CX_NAV.map(([g, items]) => '<div class="cx-sec">' + g + '</div>' + items.map(([id, ic, label]) =>
@@ -2541,6 +2588,113 @@ function renderLuck(j) {
   histChart(L.hist, L.theory);
 }
 
+// ------------------------------------------------ corrida: mineradores escolhidos, share a share até N shares
+const RCT = { modes: { speed: 'Velocidade', avg: 'Média de sorte', best: 'Maior share' }, modesD: { speed: 'Vence quem chegar primeiro aos N shares aceitos. Justo entre máquinas iguais (ex.: dois Bitaxe).', avg: 'Cada um minera N shares; vence a maior sorte média por share (dificuldade ÷ pedida, média geométrica). Justo entre máquinas diferentes.', best: 'Cada um minera N shares; vence o maior share em relação à dificuldade pedida.' }, pick: 'Quem corre (2 ou mais)', goal: 'Meta de shares aceitos', mode: 'Como decide', limit: 'tempo limite', hours: 'h', start: '🏁 Largar', cancel: 'Cancelar corrida', again: 'Nova corrida', shares: 'shares', luck: 'sorte média', best: 'maior', diff: 'diff', running: 'Corrida em andamento', elapsed: 'largou às', endsIn: 'termina em', winner: 'venceu!', noWinner: 'Corrida encerrada sem vencedor', cancelled: 'cancelada', time: 'acabou o tempo', none: 'Nenhum minerador conectado ao proxy agora.', needTwo: 'Escolha pelo menos 2 mineradores.', lanOnly: 'Só dá para largar ou cancelar da rede de casa.', fail: 'Não consegui falar com o proxy.', eta: 'estimativa: ~', etaSlow: 'para o mais lento, pelos shares da última hora', history: 'Últimas corridas', when: 'Quando', who: 'Vencedor', finished: 'chegou', last: 'últimos shares', confirm: 'Cancelar a corrida em andamento?', place: ['🥇', '🥈', '🥉'] };
+let rcData = null, rcAt = 0, rcSel = null, rcErr = '', rcLastIds = {};
+const rcSec = () => document.querySelector('.page[data-page="race"]');
+async function loadRace() {
+  try { const r = await fetch('/api/race'); if (r.ok) { rcData = await r.json(); rcAt = Date.now(); } } catch (_) { /* segue */ }
+  renderRace();
+}
+async function raceCall(method, body) {
+  rcErr = '';
+  try {
+    const r = await fetch('/api/race', { method, headers: { 'Content-Type': 'application/json' }, body: body ? JSON.stringify(body) : undefined });
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || j.ok === false) rcErr = j.error === 'lan' ? RCT.lanOnly : j.error === 'racers' ? RCT.needTwo : RCT.fail;
+    else { rcData = j; rcAt = Date.now(); }
+  } catch (_) { rcErr = RCT.fail; }
+  renderRace();
+}
+function rcLanes(race) {
+  const rows = race.ranking || [];
+  return rows.map((r, i) => {
+    const pct = Math.round(r.progress * 1000) / 10;
+    const key = race.mode;
+    const prev = rcLastIds[r.name] || 0;
+    const dots = (r.last || []).map((x) => '<i class="' + (x[2] >= 10 ? 'y' : x[2] >= 1 ? 'g' : '') + (x[0] > prev && prev ? ' new' : '') + '" title="' + esc(diffTxt(x[1]) + ' · ' + nf(x[2], 2) + '×') + '"></i>').join('');
+    const st = [
+      '<span' + (key === 'speed' ? ' class="key"' : '') + '>' + nf(r.shares) + ' / ' + nf(race.goal) + ' ' + RCT.shares + '</span>',
+      r.shares ? '<span' + (key === 'avg' ? ' class="key"' : '') + '>' + RCT.luck + ' ' + nf(r.luck, 2) + '×</span>' : '',
+      r.shares ? '<span' + (key === 'best' ? ' class="key"' : '') + '>' + RCT.best + ' ' + nf(r.best, r.best < 10 ? 2 : 0) + '× (' + RCT.diff + ' ' + diffTxt(r.bestDiff) + ')</span>' : '',
+      r.done ? '<span>🏁 ' + RCT.finished + ' ' + hora(r.doneAt) + '</span>' : '',
+    ].filter(Boolean).join('');
+    return '<div class="rc-lane' + (r.done ? ' done' : '') + '"><div class="rc-place">' + (RCT.place[i] || r.place + 'º') + '</div><div class="rc-name">' + esc(r.name) + '</div>' +
+      '<div class="rc-track"><i style="width:' + pct + '%"></i>' + (r.done ? '' : '<b style="left:' + Math.max(3, Math.min(94, pct)) + '%">⛏️</b>') + '<s>' + (r.done ? '✅' : '🏁') + '</s></div>' +
+      '<div class="rc-stats">' + st + '</div>' + (dots ? '<div class="rc-dots" title="' + RCT.last + '">' + dots + '</div>' : '') + '</div>';
+  }).join('');
+}
+function rcForm(d) {
+  const cands = d.candidates || [];
+  if (!cands.length) return '<div class="card"><div class="sub">' + RCT.none + '</div></div>';
+  if (!rcSel) rcSel = { workers: cands.slice(0, 2).map((c) => c.name), goal: 100, mode: 'speed', hours: 24 };
+  const goal = rcSel.goal;
+  const chosen = cands.filter((c) => rcSel.workers.includes(c.name));
+  const slow = chosen.length ? Math.min.apply(null, chosen.map((c) => c.shares1h || 0)) : 0;
+  const eta = slow > 0 ? RCT.eta + dur(Math.max(60e3, goal / slow * 3600e3)) + ' ' + RCT.etaSlow : '';
+  return '<div class="card rc-form" id="rcForm">' +
+    '<div><div class="label">' + RCT.pick + '</div><div class="rc-ws">' + cands.map((c) => '<label class="chip"><input type="checkbox" name="w" value="' + esc(c.name) + '"' + (rcSel.workers.includes(c.name) ? ' checked' : '') + '>' + esc(c.name) + '</label>').join('') + '</div></div>' +
+    '<div><div class="label">' + RCT.goal + '</div><div class="row"><input type="number" id="rcGoal" min="1" max="100000" value="' + goal + '">' +
+      [10, 50, 100, 500, 1000].map((n) => '<button class="rc-btn sm" data-goal="' + n + '">' + nf(n) + '</button>').join('') +
+      '<span class="sub">' + RCT.limit + ' <input type="number" id="rcHours" min="1" max="168" value="' + rcSel.hours + '" style="width:70px"> ' + RCT.hours + '</span></div>' +
+      (eta ? '<div class="sub" style="margin-top:4px">' + esc(eta) + '</div>' : '') + '</div>' +
+    '<div><div class="label">' + RCT.mode + '</div><div class="rc-modes">' + ['speed', 'avg', 'best'].map((m) => '<label class="mode"><b><input type="radio" name="m" value="' + m + '"' + (rcSel.mode === m ? ' checked' : '') + '>' + RCT.modes[m] + '</b>' + RCT.modesD[m] + '</label>').join('') + '</div></div>' +
+    '<div class="row"><button class="rc-btn main" id="rcStart">' + RCT.start + '</button>' + (rcErr ? '<span class="rc-err">' + esc(rcErr) + '</span>' : '') + '</div></div>';
+}
+function rcHistory(d) {
+  const h = (d.history || []).filter((x) => x.reason !== 'replaced');
+  if (!h.length) return '';
+  return '<div class="card rc-histcard"><div class="label">' + RCT.history + '</div><table class="rc-hist"><thead><tr><th>' + RCT.when + '</th><th>' + RCT.mode + '</th><th>' + RCT.goal + '</th><th>' + RCT.who + '</th></tr></thead><tbody>' +
+    h.map((x) => '<tr><td>' + new Date(x.startedAt).toLocaleString(LOC, { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) + '</td><td>' + RCT.modes[x.mode] + '</td><td>' + nf(x.goal) + '</td><td>' +
+      (x.winner ? '🏆 ' + esc(x.winner) : '<span class="sub">' + (x.reason === 'cancelled' ? RCT.cancelled : RCT.time) + '</span>') + ' <span class="sub">' + x.ranking.map((r) => esc(r.name)).join(' × ') + '</span></td></tr>').join('') + '</tbody></table></div>';
+}
+function renderRace() {
+  const sec = rcSec(); if (!sec) return;
+  const d = rcData;
+  const race = d && d.race;
+  const fresh = race && (race.running || Date.now() - race.finishedAt < 3600e3);
+  if (kiosk) sec.hidden = !fresh;   // no quiosque, só enquanto há corrida (e por 1 h depois do fim)
+  if (!d) return;
+  // não redesenha o formulário enquanto a pessoa mexe nele
+  const form = $('rcForm');
+  if (form && form.contains(document.activeElement) && document.activeElement.tagName === 'INPUT' && document.activeElement.type === 'number') return;
+  let html = '';
+  if (race) {
+    const head = race.running
+      ? '<div class="rc-head"><span class="big">🏁 ' + RCT.running + '</span><span class="sub">' + RCT.modes[race.mode] + ' · ' + nf(race.goal) + ' ' + RCT.shares + ' · ' + RCT.elapsed + ' ' + hora(race.startedAt) + ' · ' + RCT.endsIn + ' ' + dur(race.endsAt - Date.now()) + '</span>' + (kiosk ? '' : '<button class="rc-btn sm" id="rcCancel">' + RCT.cancel + '</button>') + '</div>'
+      : '<div class="rc-win">' + (race.winner ? '🏆 ' + esc(race.winner) + ' ' + RCT.winner : RCT.noWinner + (race.reason === 'cancelled' ? ' (' + RCT.cancelled + ')' : race.reason === 'time' ? ' (' + RCT.time + ')' : '')) + '</div><div class="sub" style="margin-bottom:6px">' + RCT.modes[race.mode] + ' · ' + nf(race.goal) + ' ' + RCT.shares + ' · ' + hora(race.startedAt) + '–' + hora(race.finishedAt) + '</div>';
+    if (race.running || fresh) html += '<div class="card">' + head + rcLanes(race) + (race.running ? '' : '') + '</div>';
+  }
+  if (!race || !race.running) html += rcForm(d);
+  html += rcHistory(d);
+  $('rcBox').innerHTML = html;
+  if (race) for (const r of race.ranking || []) { const l = r.last || []; rcLastIds[r.name] = l.length ? l[l.length - 1][0] : 0; }
+}
+document.addEventListener('click', (e) => {
+  const t = e.target;
+  if (!t.closest || !t.closest('#rcBox')) return;
+  if (t.dataset && t.dataset.goal) { e.preventDefault(); rcSel.goal = Number(t.dataset.goal); renderRace(); return; }
+  if (t.id === 'rcStart') {
+    e.preventDefault();
+    rcSel.goal = Number($('rcGoal').value) || 100; rcSel.hours = Number($('rcHours').value) || 24;
+    if (rcSel.workers.length < 2) { rcErr = RCT.needTwo; renderRace(); return; }
+    raceCall('POST', { workers: rcSel.workers, goal: rcSel.goal, mode: rcSel.mode, maxHours: rcSel.hours });
+  }
+  if (t.id === 'rcCancel') { e.preventDefault(); if (confirm(RCT.confirm)) raceCall('DELETE'); }
+});
+document.addEventListener('change', (e) => {
+  const t = e.target;
+  if (!t.closest || !t.closest('#rcForm') || !rcSel) return;
+  if (t.name === 'w') rcSel.workers = Array.from(document.querySelectorAll('#rcForm input[name=w]:checked')).map((x) => x.value);
+  else if (t.name === 'm') rcSel.mode = t.value;
+  else if (t.id === 'rcGoal') rcSel.goal = Math.max(1, Math.round(Number(t.value) || 100));
+  else if (t.id === 'rcHours') rcSel.hours = Number(t.value) || 24;
+  rcErr = ''; renderRace();
+});
+loadRace();
+// rápido com a tela aberta (ou no quiosque com corrida), devagar no resto
+setInterval(() => { const sec = rcSec(); const on = sec && sec.offsetParent !== null; if (on || Date.now() - rcAt > 15e3) loadRace(); }, 2000);
+
 function histChart(h, th) {
   const el = $('lkHist');
   if (!h || !th) return;
@@ -3157,6 +3311,33 @@ function requestHandler(req, res) {
     if (!base || !name) return send(404, { error: 'noproxy' });
     getJson(base.replace(/\/stats\/?$/, '') + '/stats/worker?name=' + encodeURIComponent(name))
       .then((d) => send(200, d)).catch(() => send(404, { error: 'noworker' }));
+    return;
+  }
+  if (req.url.split('?')[0] === '/api/race') {
+    // aba Corrida: o estado fica no proxy (vê cada share); começar/cancelar só da rede de casa, com JSON (sem formulário
+    // de outro site disparando corrida)
+    const send = (code, body) => { res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(body)); };
+    const base = PROXY_URL();
+    if (!base) return send(404, { error: 'noproxy' });
+    const target = base.replace(/\/stats\/?$/, '') + '/stats/race';
+    if (req.method === 'GET') { getJson(target).then((d) => send(200, d)).catch(() => send(502, { error: 'proxy' })); return; }
+    if (req.method !== 'POST' && req.method !== 'DELETE') return send(405, { ok: false, error: 'method' });
+    const peer = cleanPeer(req.socket.remoteAddress);
+    if (!bitaxe.isPrivateHost(peer) && peer !== '127.0.0.1' && peer !== '::1') return send(403, { ok: false, error: 'lan' });
+    if (req.method === 'POST' && !/^application\/json/.test(req.headers['content-type'] || '')) return send(415, { ok: false, error: 'json' });
+    let body = '', big = false;
+    req.on('data', (c) => { body += c; if (body.length > 8192) { big = true; req.destroy(); } });
+    req.on('end', () => {
+      if (big) return;
+      const u = new URL(target);
+      const up = http.request({ host: u.hostname, port: u.port, path: u.pathname, method: req.method, timeout: 10000, headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(body) } }, (r) => {
+        let out = ''; r.on('data', (c) => (out += c));
+        r.on('end', () => { try { send(r.statusCode, JSON.parse(out)); } catch (_) { send(502, { ok: false, error: 'proxy' }); } });
+      });
+      up.on('timeout', () => up.destroy(new Error('timeout')));
+      up.on('error', () => send(502, { ok: false, error: 'proxy' }));
+      up.end(body);
+    });
     return;
   }
   if (req.url.startsWith('/api/alarm')) {

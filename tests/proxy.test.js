@@ -491,3 +491,52 @@ test('dificuldade local: ajuste mira ~15 s por share, só com erro de 2× ou mai
   assert.strictEqual(localDiffOn({ listen: 3334 }), false);    // desligada por padrão
   assert.strictEqual(localDiffOn({ listen: 3334, localDiff: true }), true);
 });
+
+test('corrida pelo /stats/race: largada, shares contam por worker e o primeiro a chegar vence', async (t) => {
+  const pool = net.createServer((c) => lines(c, (l) => {
+    const m = JSON.parse(l);
+    const send = (o) => c.write(JSON.stringify(o) + '\n');
+    if (m.method === 'mining.subscribe') send({ id: m.id, result: [[['mining.notify', 'x']], 'cafebabe', 4], error: null });
+    else if (m.method === 'mining.authorize') {
+      send({ id: m.id, result: true, error: null });
+      send({ id: null, method: 'mining.set_difficulty', params: [1e-16] });
+      send({ id: null, method: 'mining.notify', params: ['j1', '00'.repeat(32), '01000000010000000000000000000000000000000000000000000000000000000000000000ffffffff', 'ffffffff0100f2052a01000000434104', [], '20000000', '1d00ffff', '6553f100', true] });
+    } else if (m.method === 'mining.submit') send({ id: m.id, result: true, error: null });
+  }));
+  const poolPort = await new Promise((r) => pool.listen(0, '127.0.0.1', () => r(pool.address().port)));
+  const [listen, statsPort] = [await freePort(), await freePort()];
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'proxy-'));
+  const proxy = spawn(process.execPath, [path.join(__dirname, '../src/proxy.js')], {
+    env: { ...process.env, PROXY_ROUTES: JSON.stringify([{ listen, host: '127.0.0.1', port: poolPort, label: 'ck' }]), PROXY_STATS_PORT: String(statsPort), DATA_DIR: dir }, stdio: 'ignore' });
+  t.after(() => { proxy.kill(); pool.close(); fs.rmSync(dir, { recursive: true, force: true }); });
+  await waitFor(() => getJson(`http://127.0.0.1:${statsPort}/stats`));
+  const miner = async (name) => {
+    const s = net.connect(listen, '127.0.0.1');
+    let ready = false; lines(s, (l) => { if (JSON.parse(l).method === 'mining.notify') ready = true; });
+    await new Promise((r) => s.on('connect', r));
+    s.write(`{"id":1,"method":"mining.subscribe","params":["x"]}\n{"id":2,"method":"mining.authorize","params":["bc1qteste.${name}","x"]}\n`);
+    await waitFor(() => ready);
+    let n = 0;
+    return { s, submit: () => s.write(JSON.stringify({ id: 100 + n, method: 'mining.submit', params: ['bc1qteste.' + name, 'j1', '0000000' + (n % 10), '6553f100', String(5000 + n++).padStart(8, '0')] }) + '\n') };
+  };
+  const a = await miner('alfa'), b = await miner('beta');
+  t.after(() => { a.s.destroy(); b.s.destroy(); });
+  const post = (body) => new Promise((res, rej) => {
+    const data = JSON.stringify(body);
+    const rq = http.request({ host: '127.0.0.1', port: statsPort, path: '/stats/race', method: 'POST', headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(data) } },
+      (r) => { let o = ''; r.on('data', (c) => (o += c)); r.on('end', () => res({ status: r.statusCode, body: JSON.parse(o) })); });
+    rq.on('error', rej); rq.end(data);
+  });
+  const cand = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats/race`); return j.candidates.length === 2 ? j.candidates : null; });
+  assert.deepStrictEqual(cand.map((c) => c.name).sort(), ['alfa', 'beta']);
+  assert.strictEqual((await post({ workers: ['alfa'], goal: 2 })).status, 400, 'corrida de um só não larga');
+  const st = await post({ workers: ['alfa', 'beta'], goal: 2, mode: 'speed' });
+  assert.strictEqual(st.status, 200);
+  assert.strictEqual(st.body.race.running, true);
+  b.submit(); a.submit(); a.submit();
+  const done = await waitFor(async () => { const j = await getJson(`http://127.0.0.1:${statsPort}/stats/race`); return j.race && !j.race.running ? j : null; });
+  assert.strictEqual(done.race.winner, 'alfa');
+  assert.strictEqual(done.race.ranking.find((r) => r.name === 'beta').shares, 1);
+  const ev = await getJson(`http://127.0.0.1:${statsPort}/stats`);
+  assert.ok(ev.events.some((e) => e.type === 'race' && /alfa won/.test(e.msg)), 'evento do vencedor');
+});
